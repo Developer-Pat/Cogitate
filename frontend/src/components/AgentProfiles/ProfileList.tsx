@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 import { frontendLoggingService } from '@/services/frontendLoggingService'
 import type { Profile } from '@/services/domain/ProfileService'
 import { profileService, archiveFolderName, budgetReasonLabel } from '@/services/domain/ProfileService'
@@ -33,6 +33,10 @@ interface ProfileListProps {
   onHardDeleteAgent?: (agentId: string, agentName: string) => void
   showArchived?: boolean
   onToggleArchived?: () => void
+  // THE IMPORT DOOR (2026-11-19): a bundle import belongs at the LIST level.
+  // Export/Import lived only in the detail pane, which a page with zero
+  // profiles never reaches — exactly the state a fresh install starts in.
+  onImportBundle?: (file: File) => void
 }
 
 export default function ProfileList({
@@ -54,6 +58,7 @@ export default function ProfileList({
   onHardDeleteAgent,
   showArchived = false,
   onToggleArchived,
+  onImportBundle,
 }: ProfileListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
@@ -110,8 +115,25 @@ export default function ProfileList({
     setAddingToCollectionProfile(null)
   }
 
+  // THE IMPORT DOOR's input (2026-11-19) — one hidden picker shared by the
+  // header button and the empty state, so both open the same thing.
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const openImportPicker = () => importInputRef.current?.click()
+
   return (
     <div className="w-80 bg-base-100 border-l border-base-300 flex flex-col h-full">
+      {/* THE IMPORT PICKER: mounted once, whichever door opens it */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file && onImportBundle) onImportBundle(file)
+          e.target.value = ''
+        }}
+      />
       {/* Header with New Button and View Toggle */}
       <div className="p-4 border-b border-base-300">
         <div className="flex gap-2 mb-3">
@@ -123,6 +145,17 @@ export default function ProfileList({
             <span className="text-lg">+</span>
             New Profile
           </button>
+          {onImportBundle && (
+            <div className="tooltip tooltip-bottom" data-tip="Load an agent bundle (.json) exported from any install">
+              <button
+                onClick={openImportPicker}
+                disabled={isLoading}
+                className="btn btn-outline btn-sm rounded-[var(--button-radius)] px-[var(--button-padding)] transition-all duration-[var(--button-transition)]"
+              >
+                Import
+              </button>
+            </div>
+          )}
           {onViewModeChange && (
             <div className="btn-group">
               <div className="tooltip tooltip-bottom" data-tip="List view">
@@ -190,9 +223,25 @@ export default function ProfileList({
         {filteredProfiles.length === 0 ? (
           <div className="p-4 text-center text-readout">
             {profiles.length === 0 ? (
-              <div>
+              <div className="space-y-2">
                 <p className="text-sm">No profiles yet</p>
-                <p className="text-xs mt-2">Create one to get started</p>
+                <p className="text-xs">
+                  The two shipped reporters arrive once a chat model resolves — choose one on the Providers
+                  page and they seed on the next start.
+                </p>
+                <p className="text-xs">Or bring one in:</p>
+                <div className="flex flex-col gap-2 pt-1">
+                  <button onClick={onCreateNew} className="btn btn-primary btn-xs">
+                    Create a profile
+                  </button>
+                  {onImportBundle && (
+                    <div className="tooltip tooltip-bottom" data-tip="Load an agent bundle (.json) exported from any install">
+                      <button onClick={openImportPicker} className="btn btn-outline btn-xs w-full">
+                        Import a bundle
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="text-sm">No profiles match your search</p>

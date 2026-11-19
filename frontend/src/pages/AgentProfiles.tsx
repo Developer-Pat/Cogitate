@@ -234,6 +234,42 @@ export default function AgentProfiles() {
     }
   }
   
+  // THE IMPORT DOOR (2026-11-19): the bundle round-trip lived only in the detail
+  // pane, which a page with zero profiles never reaches. The backend owns the
+  // sentence: a bundle naming no service reports which one it landed on, and a
+  // box with no default provider REFUSES with the reason — so that text goes to
+  // the user, never a generic "import failed".
+  const handleImportBundle = useCallback(async (file: File) => {
+    setIsSaving(true)
+    try {
+      const bundle = JSON.parse(await file.text())
+      const resp = await fetch('/api/v1/agents/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bundle),
+      })
+      if (!resp.ok) {
+        const detail = (await resp.text()).trim()
+        throw new Error(detail || `the import was refused (HTTP ${resp.status})`)
+      }
+      const result = await resp.json()
+      await profileService.loadFromBackend()
+      useNotificationStore.getState().addSuccess(
+        'Agent imported',
+        result?.message || `${result?.name ?? 'The agent'} is in your list.`
+      )
+      if (result?.id !== undefined) selectProfile(String(result.id), 'edit')
+    } catch (err: unknown) {
+      useNotificationStore.getState().addError(
+        'Import failed',
+        err instanceof Error ? err.message : String(err)
+      )
+      frontendLoggingService.error('AgentProfiles', 'Bundle import failed', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [])
+
   // Get selected profile object from store
   const selectedProfile = useMemo(() => {
     if (!selectedProfileId) return null
@@ -531,6 +567,7 @@ export default function AgentProfiles() {
                   }}
                   showArchived={showDeleted}
                   onToggleArchived={() => setShowDeleted(s => !s)}
+                  onImportBundle={handleImportBundle}
                 />
               ) : (
                 <AgentTable
