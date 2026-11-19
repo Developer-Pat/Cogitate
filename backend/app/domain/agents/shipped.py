@@ -227,6 +227,17 @@ def _ensure_face(face: Optional[str]) -> Optional[str]:
     return f"/static/{face}"
 
 
+def _stored_entity_id(tool_id: str) -> str:
+    """The form `tools.id` is actually stored in: 32 hex characters, no dashes.
+
+    `Tool.id` is a UUID column and `CollectionItem.entity_id` is a plain String, so an id
+    read back through the UUID-typed attribute can stringify WITH dashes — every join then
+    misses. Measured on a fresh install: all 12 kit members dangled this way, the seeded
+    agents were offered zero tools, and the model invented a textual `<tool_call>` block.
+    """
+    return str(tool_id).replace("-", "")
+
+
 async def _ensure_kit(db, spec: KitSpec) -> tuple[Collection, list[str]]:
     """Find or create a kit BY NAME, fill in the tools it names, return the unresolved ones.
 
@@ -252,15 +263,16 @@ async def _ensure_kit(db, spec: KitSpec) -> tuple[Collection, list[str]]:
         db.add(kit)
         await db.flush()
 
-    present = set(
-        (
+    present = {
+        _stored_entity_id(v)
+        for v in (
             await db.execute(
                 select(CollectionItem.entity_id).where(CollectionItem.collection_id == kit.id)
             )
         )
         .scalars()
         .all()
-    )
+    }
     unresolved: list[str] = []
     for tool_name in spec.tools:
         tool = (
@@ -269,18 +281,19 @@ async def _ensure_kit(db, spec: KitSpec) -> tuple[Collection, list[str]]:
         if tool is None:
             unresolved.append(tool_name)
             continue
-        if str(tool.id) in present:
+        stored_id = _stored_entity_id(tool.id)
+        if stored_id in present:
             continue
         db.add(
             CollectionItem(
                 id=str(uuid.uuid4()),
                 collection_id=kit.id,
-                entity_id=str(tool.id),
+                entity_id=stored_id,
                 entity_type="tool",
                 entity_name=tool.name,
             )
         )
-        present.add(str(tool.id))
+        present.add(stored_id)
     return kit, unresolved
 
 

@@ -25,6 +25,7 @@ from sqlalchemy import select
 
 from app.core.config import Paths, get_settings
 from app.domain.agent_kits.model import AgentKit
+from app.domain.collections.models import CollectionItem
 from app.domain.agents.shipped import (
     CREATED,
     DEFERRED,
@@ -271,3 +272,40 @@ async def test_a_broken_package_is_reported_and_costs_the_other_nothing(seed_dir
     assert good.is_dir()
     names = [a.name for a in (await test_session.execute(select(Agent))).scalars().all()]
     assert names == ["Good"]
+
+
+async def test_a_kit_member_joins_to_the_tool_row_it_names(seed_dir, test_session):
+    """THE JOIN, not a name match — the query the chat path uses to build `llm_tools`.
+
+    Measured on a fresh install (2026-11-19): the seed wrote the tool id through a
+    UUID-typed attribute (dashed) into a plain String column that stores 32 hex characters,
+    so the join returned NULL for all 12 members of the reporters' three kits,
+    `tools_offered` was 0, and the model invented a textual `<tool_call>` block.
+    """
+    await _clear_providers(test_session)
+    await _default_row(test_session, model="scratch-model:7b")
+    test_session.add(
+        Tool(name="DateTime", slug="datetime", description="the clock", provider="System", type="builtin")
+    )
+    await test_session.flush()
+
+    write_package(
+        seed_dir,
+        "join-check",
+        name="Join Check",
+        kits=[{"name": "Workspace", "description": "the desk", "tools": ["DateTime"]}],
+    )
+    await seed_shipped_agents(test_session)
+
+    joined = (
+        await test_session.execute(
+            select(CollectionItem)
+            .join(Tool, Tool.id == CollectionItem.entity_id)
+            .where(CollectionItem.entity_type == "tool")
+        )
+    ).scalars().all()
+    assert len(joined) == 1, (
+        "the kit member must join to its tool row — an id in a form the tools table does not "
+        "store resolves to nothing, and the agent is offered zero tools"
+    )
+    assert joined[0].entity_name == "DateTime"

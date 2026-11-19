@@ -298,22 +298,42 @@ async def probe(db: AsyncSession, env_path: Path | None = None) -> SetupReport:
             await db.execute(select(Capability).where(Capability.key == key))
         ).scalar_one_or_none()
         kind = cap_row.kind if cap_row is not None else "llm"
+        # THE HONESTY (2026-11-19): a candidate with NO model is not a usable service for an
+        # LLM capability. The runtime asks the resolved row for its `default_model` and refuses
+        # when it is absent, so a probe that counted the candidate alone printed
+        # "✓ title deepseek (global default)" on an install whose every title call 500'd.
+        primary = resolved.primary
+        model_less = kind == "llm" and primary is not None and not getattr(primary, "model", None)
+        ok = resolved.resolved and not model_less
         offers: list[Offer] = []
-        if not resolved.resolved:
+        if not ok:
             offers.extend(_keyed_offers(key, env))
             offers.extend(await _local_offers(db, key))
         states.append(
             CapabilityState(
                 capability=key,
                 kind=kind,
-                resolved=resolved.resolved,
+                resolved=ok,
                 detail=(
                     f"{describe_chain(resolved)} ({resolved.reason})"
-                    if resolved.resolved
-                    else f"nothing resolves ({resolved.reason})"
+                    if ok
+                    else (
+                        f"{describe_chain(resolved)} — the provider row carries no default model"
+                        if model_less
+                        else f"nothing resolves ({resolved.reason})"
+                    )
                 ),
                 offers=offers,
-                gap="" if resolved.resolved else _gap_for(key, kind),
+                gap=(
+                    ""
+                    if ok
+                    else (
+                        f"'{key}' resolves to a provider with no model — "
+                        "set a default model on the Providers page"
+                        if model_less
+                        else _gap_for(key, kind)
+                    )
+                ),
             )
         )
     return SetupReport(states=states)
@@ -345,7 +365,10 @@ async def _provider_row(db: AsyncSession, offer: Offer) -> Provider:
         base_url=base_url,
         is_active=True,
         priority=50,
-        config={},
+        # THE MODEL RIDES THE ROW (2026-11-19): the resolver's last rung takes its model from
+        # `config.default_model`, so a row created without one resolves to a provider that
+        # cannot be called — the "title ✓" that 500'd on every session.
+        config={"default_model": offer.model},
     )
     db.add(row)
     await db.flush()
@@ -391,9 +414,16 @@ async def apply(
             service = DefaultProviderService()
             if await service.get_default_provider(db) is None:
                 await service.set_default_provider(db, row.id)
+                # …and the model the user accepted goes ON the row, because that is where the
+                # resolver's default rung reads it. Without this the inheritance was a promise
+                # the ladder could not keep (measured: every title generation 500'd).
+                cfg = dict(row.config) if isinstance(row.config, dict) else {}
+                if not cfg.get("default_model"):
+                    cfg["default_model"] = offer.model
+                    row.config = cfg
                 log.append(
                     f"default provider -> {offer.provider} "
-                    f"(the other LLM capabilities inherit it)"
+                    f"(default model {offer.model}; the other LLM capabilities inherit it)"
                 )
         await db.commit()
 

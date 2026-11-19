@@ -13,6 +13,7 @@ What these tests defend:
 """
 
 import pytest
+from sqlalchemy import select
 
 from app.domain.providers import setup_offers
 from app.domain.providers.capabilities import (
@@ -21,6 +22,7 @@ from app.domain.providers.capabilities import (
     ensure_capability_rows,
 )
 from app.domain.providers.litellm_route import litellm_model_string
+from app.infrastructure.database.models import Provider
 
 
 def test_every_offer_parses_as_a_litellm_model_string():
@@ -114,3 +116,50 @@ async def test_an_unknown_accept_writes_nothing(test_session):
 
     assert any("skipped" in line for line in log)
     assert [s.to_dict() for s in before.states] == [s.to_dict() for s in after.states]
+
+
+async def test_accepting_chat_puts_the_model_on_the_default_provider_row(test_session, monkeypatch):
+    """The inheritance must be REAL: the resolver's last rung reads `config.default_model`.
+
+    Measured on a fresh install (2026-11-19): `--accept-defaults` printed
+    `✓ title deepseek (global default)` while the provider row's config was `{}`, so every
+    session's title generation 500'd with "TitleService has no model configured".
+    """
+    await ensure_capability_rows(test_session)
+    offer = setup_offers.Offer(
+        key="chat-deepseek",
+        capability="chat",
+        provider="deepseek",
+        provider_type="deepseek",
+        model="deepseek-v4-flash",
+        reason="the test's offer",
+        needs="key:DEEPSEEK_API_KEY",
+    )
+    report = setup_offers.SetupReport(
+        states=[
+            setup_offers.CapabilityState(
+                capability="chat",
+                kind="llm",
+                resolved=False,
+                detail="nothing resolves",
+                offers=[offer],
+                gap="no model resolves for 'chat'",
+            )
+        ]
+    )
+
+    async def fake_probe(db, env_path=None):
+        return report
+
+    monkeypatch.setattr(setup_offers, "probe", fake_probe)
+    _report, log = await setup_offers.apply(test_session, ["chat-deepseek"])
+
+    row = (
+        await test_session.execute(select(Provider).where(Provider.name == "deepseek"))
+    ).scalars().one()
+    assert row.is_default, "the accepted chat offer names the default provider"
+    assert (row.config or {}).get("default_model") == "deepseek-v4-flash", (
+        "without the model on the row, the other LLM capabilities resolve to a provider that "
+        "cannot be called — the '✓ title' that 500'd on the fresh install"
+    )
+    assert any("default model" in line for line in log)
