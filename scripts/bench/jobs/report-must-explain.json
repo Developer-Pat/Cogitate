@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "id": "report-must-explain",
+  "why": "The same five sources as `scan-5-sources`, asked for a report instead of a digest: the KIND axis. Same sources and the same fact needles, so the delta between the two rows is depth alone — whether explaining costs more than listing, priced rather than asserted. The path is pinned the same way (the reader, one fetch per page, every given url fetched), which is what makes this job's price repeatable at all: unpinned it ran 2, 6, 6 and 5 rounds with peak prompts from 11,525 to 56,288. `min_answer_chars` is a shape gate, not a judge: without it a run that answered the report's prompt like a scan would pass the facts and make the depth look free.",
+  "axis": {"size": 5, "kind": "report"},
+  "agent": "Bob",
+  "state": {"assignment": "fresh"},
+  "message": "Using the reader on each of these five pages — one fetch per page, no answering from memory — write a short report on these five Nebraska cities: one section per city covering where it sits, when it was founded and what it is known for, then a closing paragraph comparing them: https://en.wikipedia.org/wiki/Omaha,_Nebraska https://en.wikipedia.org/wiki/Lincoln,_Nebraska https://en.wikipedia.org/wiki/Bellevue,_Nebraska https://en.wikipedia.org/wiki/Grand_Island,_Nebraska https://en.wikipedia.org/wiki/Kearney,_Nebraska",
+  "budget": {"rounds": 8, "schemas_max": 4200, "system_max": 3200, "capped_chars_per_fetch": 30000,
+             "tokens_in_alarm": 300000},
+  "check": {
+    "type": "contains_all",
+    "needles": ["Douglas County", "Lancaster County", "Sarpy County", "Hall County", "Buffalo County"],
+    "case_sensitive": false,
+    "min_answer_chars": 1200,
+    "require_fetched": true
+  }
+}

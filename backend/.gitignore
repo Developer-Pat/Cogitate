@@ -1,0 +1,41 @@
+# Environment files (contain real API keys & secrets)
+.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Logs
+*.log
+
+# Virtual environments
+.venv
+env/
+venv/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Alembic compiled files
+alembic/versions/*.pyc
+
+# IDE
+.idea/
+.vscode/

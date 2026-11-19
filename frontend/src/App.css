@@ -1,0 +1,10 @@
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/*
+ * Sidebar width is controlled via inline style on the <aside> element in App.tsx.
+ * See Layout function — SIDEBAR_EXPANDED_WIDTH / SIDEBAR_COLLAPSED_WIDTH constants.
+ * Rewritten 2026-06-15: Replaced DaisyUI drawer with flexbox layout.
+ */

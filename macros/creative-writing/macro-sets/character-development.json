@@ -1,0 +1,14 @@
+{
+  "topic": "Character Development",
+  "name": "Character Creator",
+  "description": "Build character biographies, backgrounds, relationships, and arcs",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Would you like to help me develop a character bio?",
+    "f2": "Can you describe this character physical appearance and personality?",
+    "f3": "Help me write a backstory that explains this character motivation.",
+    "f4": "How would these two characters relate to each other?",
+    "f5": "What inner conflict could drive this character story arc?"
+  }
+}

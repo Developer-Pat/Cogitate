@@ -1,0 +1,52 @@
+# Pre-commit hooks — the static gate at the commit boundary.
+#
+# WHY THIS EXISTS: mypy ran only in the sweep, which is run by hand, so the gate was real but
+# its cadence was unbounded — the error count went to zero and was back within weeks. A gate is
+# only as good as its cadence.
+#
+# WHAT RUNS HERE: static checks only (~4s measured). NOT the test suite — that is 9-10 minutes
+# and belongs at push/sweep time, not on every commit.
+#
+#   mypy .......... 2.3s   type annotations, checked across files
+#   path checks ... 0.8s   resolver discipline + no absolute paths
+#   script catalog  0.8s   the generated page matches the scripts (content only: the
+#                          frontmatter's `updated:` line is the day of the run, not a fact)
+#
+# To skip deliberately (a WIP commit):  git commit --no-verify
+#
+# pre-commit is a declared dev dependency; without this file it had never been configured.
+
+repos:
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy - type annotations
+        entry: bash -c 'cd backend && uv run mypy app'
+        language: system
+        pass_filenames: false
+        files: \.py$
+        stages: [pre-commit]
+
+      - id: path-checks
+        name: paths - resolver discipline, absolute paths, module specifiers
+        entry: python3 scripts/testing/precommit_path_checks.py
+        language: system
+        pass_filenames: false
+        files: \.(py|ts|tsx|md)$
+        stages: [pre-commit]
+
+      - id: script-catalog
+        name: catalog - the generated script catalog matches the scripts
+        entry: python3 scripts/dev/generate_script_catalog.py --check
+        language: system
+        pass_filenames: false
+        files: ^(scripts/.+\.(py|sh|js|mjs|cjs|ts)|backend/scripts/.+\.(py|sh|js|mjs|cjs|ts)|wiki/docs/script-catalog\.md)$
+        stages: [pre-commit]
+
+      - id: env-example
+        name: env-example - the generated .env.example matches the settings the app reads
+        entry: python3 scripts/dev/generate_env_example.py --check
+        language: system
+        pass_filenames: false
+        files: ^(\.env\.example|backend/app/core/config\.py|scripts/dev/generate_env_example\.py)$
+        stages: [pre-commit]

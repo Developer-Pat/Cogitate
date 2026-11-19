@@ -1,0 +1,14 @@
+{
+  "topic": "Debugging",
+  "name": "Find & Fix Bugs",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "I have a bug where my app crashes on null pointer exceptions. Can you help me debug this?",
+    "f2": "My API endpoint returns a 500 error but I am not sure why. Can you help me trace the issue?",
+    "f3": "The database query is running too slow. Can you help me find the bottleneck?",
+    "f4": "My React component keeps re-rendering in an infinite loop. What should I check?",
+    "f5": "The build pipeline is failing with a cryptic error. Can you help me diagnose it?"
+  }
+}

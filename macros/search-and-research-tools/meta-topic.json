@@ -1,0 +1,14 @@
+{
+  "name": "Search & Research Tools",
+  "namespace": "agent",
+  "description": "Search macros for DuckDuckGo, Tavily, and specialized research queries",
+  "is_active": true,
+  "sort_order": 0,
+  "macro_sets": [
+    "web-search.json",
+    "academic-research.json",
+    "technical-documentation.json",
+    "data-and-statistics.json",
+    "news-and-trends.json"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "Software Engineering & Design",
+  "namespace": "agent",
+  "description": "Software engineering toolkit - design patterns, architecture, code review, API design, and DevOps",
+  "is_active": true,
+  "sort_order": 0,
+  "macro_sets": [
+    "creational-patterns.json",
+    "structural-patterns.json",
+    "behavioral-patterns.json",
+    "architecture.json",
+    "solid-principles.json"
+  ]
+}

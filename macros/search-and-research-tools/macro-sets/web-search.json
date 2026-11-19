@@ -1,0 +1,14 @@
+{
+  "topic": "Web Search",
+  "name": "Find on the Web",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Can you search the web for recent developments in renewable energy?",
+    "f2": "Find current information about the latest version of Python.",
+    "f3": "Search for best practices in securing a REST API.",
+    "f4": "Look up the latest news about advances in AI language models.",
+    "f5": "Find reviews and comparisons of cloud hosting providers."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "Macros for creative writing tasks",
+  "data": {
+    "topic": "Creative Writing",
+    "name": "Creative Writing Tests",
+    "description": "Test creative writing and storytelling abilities",
+    "f1_macro": "Write a 200-word story that begins with: The last person on Earth sat alone in a room. The door opened.",
+    "f2_macro": "Write a poem in the style of Robert Frost about a robot learning to dream.",
+    "f3_macro": "Describe the color blue to someone who has been blind from birth. Use sensory details other than sight.",
+    "f4_macro": "Write a dialogue between two characters where one is lying but the other doesnt know it. Show subtle hints of the deception.",
+    "f5_macro": "Create a myth explaining why the moon has phases, in the style of ancient Greek mythology.",
+    "is_active": true,
+    "sort_order": 0
+  }
+}

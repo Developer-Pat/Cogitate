@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "Tool testing prompts for verifying calculator functionality",
+  "data": {
+    "topic": "Tool Testing - Calculator",
+    "name": "Tool Testing - Calculator",
+    "description": "Test prompts for verifying agent uses calculator tool correctly",
+    "f1_macro": "What is 234 × 567? Please use your calculator to verify the answer.",
+    "f2_macro": "Calculate (1234 + 5678) × 9 - 1000. Show your work and use the calculator.",
+    "f3_macro": "What is the square root of 15876? Use your calculator to find the exact value.",
+    "f4_macro": "Divide 987654 by 123. What is the result with 2 decimal places?",
+    "f5_macro": "Calculate: 2³ + 5² × (10 - 3). Use your calculator for each step.",
+    "is_active": true,
+    "sort_order": 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "Data & Statistics",
+  "name": "Find Numbers",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Find the latest population statistics for the United States.",
+    "f2": "Search for economic GDP growth data for the last decade.",
+    "f3": "Look up internet usage statistics by country and region.",
+    "f4": "Find data on global renewable energy adoption rates.",
+    "f5": "Search for employment statistics in the tech industry."
+  }
+}

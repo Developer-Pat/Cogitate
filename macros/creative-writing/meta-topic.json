@@ -1,0 +1,12 @@
+{
+  "name": "Creative Writing",
+  "namespace": "agent",
+  "description": "Complete creative writing toolkit - generation, editing, and brainstorming instructions",
+  "is_active": true,
+  "sort_order": 0,
+  "macro_sets": [
+    "character-development.json",
+    "plot-development.json",
+    "setting-and-atmosphere.json"
+  ]
+}

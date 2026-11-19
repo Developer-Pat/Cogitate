@@ -1,0 +1,31 @@
+# THE RAW-OPEN RULE'S SAMPLES — lines the rule is exercised against.
+#
+# DATA, not Python, and deliberately so: the path gate scans backend/**/*.py, so a
+# sample line kept in a .py test would be flagged BY the rule it exists to test —
+# and a gate that trips on the text of its own test is a gate people stop reading.
+#
+# The rule (sweep/backend.py: SHARED_DB_RAW_OPEN) flags a sqlite3.connect() whose
+# argument names a locator CLASS ATTRIBUTE or the literals cogitate.db / _shared.
+# A class attribute is a dataclass FIELD DEFAULT — a fixed path under BASE_DIR that
+# ignores settings — so it works on the operator's machine and silently targets
+# their LIVE installation from inside the test suite. That is the shape that wrote
+# 244 usage rows naming a fixture agent into the operator's cogitate.db.
+#
+# format:  <flag|clear> :: <the source line> :: <why it is a case>
+# lines starting with # and blank lines are ignored.
+
+flag ::         conn = _sqlite.connect(str(_Paths.shared_db)) :: the leak as executor.log_usage wrote it (244 live rows)
+flag ::     conn = sqlite3.connect(str(Paths.shared_db)) :: the same open, unaliased, as tools/registry.py had it
+flag ::                 conn = _sqlite.connect(str(_Paths.shared_db)) :: the same again at a deeper indent (three registry sites)
+flag ::         conn = _sqlite3.connect(str(CorePaths.shared_db)) :: the CorePaths alias, used by the test fixtures
+flag ::         conn = sqlite3.connect(Paths.trash_dir) :: any locator field, not just the database
+flag ::         conn = sqlite3.connect("./cogitate.db") :: the cwd-relative literal
+flag ::         conn = sqlite3.connect(_shared) :: the bare _shared variable the old rule alone knew
+clear ::         conn = _sqlite.connect(_db_path()) :: the module-level locator helper (post-fix registry)
+clear ::         conn = sqlite3.connect(str(_db)) :: a variable already resolved from settings
+clear ::     conn = sqlite3.connect(str(Paths.from_settings(get_settings()).shared_db)) :: the sanctioned resolved form
+clear ::         conn = _sqlite3.connect(_shared_db_path(), timeout=5) :: the provisioning router's settings-derived helper
+clear ::         con = sqlite3.connect(_TEST_DB_PATH, timeout=5) :: a path the caller owns (the guard's own read)
+clear ::         con = sqlite3.connect(":memory:") :: isolated by construction
+clear ::         conn = sqlite3.connect(Path(__file__).parent / "agent.db") :: a per-agent database, legitimate
+clear ::     conn = sqlite3.connect(str(self.db_path)) :: an audit service that was HANDED its path

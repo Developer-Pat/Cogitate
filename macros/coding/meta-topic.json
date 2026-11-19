@@ -1,0 +1,14 @@
+{
+  "name": "Coding",
+  "namespace": "agent",
+  "description": "Complete programming toolkit - writing, debugging, refactoring, testing, and documenting code",
+  "is_active": true,
+  "sort_order": 0,
+  "macro_sets": [
+    "testing.json",
+    "debugging.json",
+    "refactoring.json",
+    "documentation.json",
+    "code-generation.json"
+  ]
+}

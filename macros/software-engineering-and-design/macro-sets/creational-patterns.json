@@ -1,0 +1,14 @@
+{
+  "topic": "Creational Patterns",
+  "name": "Object Creation",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Can you tell me about the Singleton design pattern?",
+    "f2": "Can you tell me about the Factory Method and Abstract Factory patterns?",
+    "f3": "Can you tell me about the Builder pattern?",
+    "f4": "Can you tell me about the Prototype pattern?",
+    "f5": "Can you tell me about dependency injection and inversion of control?"
+  }
+}

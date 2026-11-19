@@ -1,0 +1,14 @@
+{
+  "name": "Popular History",
+  "namespace": "agent",
+  "description": "Comprehensive collection of specific historical questions covering major eras",
+  "is_active": true,
+  "sort_order": 0,
+  "macro_sets": [
+    "asia.json",
+    "europe-and-britain.json",
+    "north-america.json",
+    "british-commonwealth.json",
+    "latin-america-and-africa.json"
+  ]
+}

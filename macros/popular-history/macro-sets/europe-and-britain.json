@@ -1,0 +1,14 @@
+{
+  "topic": "Europe & Britain",
+  "name": "European History",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the history of Britain from the Roman occupation to the present.",
+    "f2": "Tell me about the history of France from the monarchy to the republic.",
+    "f3": "Tell me about the history of Germany from unification to reunification.",
+    "f4": "Tell me about the history of Italy from the Roman Empire to unification.",
+    "f5": "Tell me about the history of Russia from the Tsars to the Soviet era and beyond."
+  }
+}

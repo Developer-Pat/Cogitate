@@ -1,0 +1,691 @@
+/**
+ * Custom Design Tokens for Cogitate
+ *
+ * Extends DaisyUI 5 design tokens with component-specific and semantic tokens.
+ *
+ * Architecture:
+ * - @theme {} contains only primitive scale tokens that map to Tailwind utilities
+ * - :root {} contains component-specific tokens that are used as CSS variables only
+ * - Theme overrides use [data-theme] selectors exclusively
+ *
+ * @see docs/themes/design-and-style-guide.md
+ */
+
+/* ============================================
+ * PRIMITIVE SCALE TOKENS (in @theme for Tailwind utilities)
+ * ============================================ */
+@theme {
+  /* --------------------------------------------
+   * SPACING SCALE
+   * -------------------------------------------- */
+  --spacing-xs: 0.25rem;    /* 4px - tight */
+  --spacing-sm: 0.5rem;     /* 8px - compact */
+  --spacing-md: 1rem;       /* 16px - standard */
+  --spacing-lg: 1.5rem;     /* 24px - comfortable */
+  --spacing-xl: 2rem;       /* 32px - generous */
+  --spacing-2xl: 3rem;      /* 48px - section */
+
+  /* Semantic spacing aliases */
+  --button-padding: var(--spacing-md);
+  --card-padding: var(--spacing-lg);
+  --input-padding: var(--spacing-sm);
+  --modal-padding: var(--spacing-lg);
+
+  /* Component gaps */
+  --button-gap: var(--spacing-sm);
+  --card-gap: var(--spacing-md);
+  --form-field-gap: var(--spacing-sm);
+
+  /* --------------------------------------------
+   * BORDER RADIUS
+   * -------------------------------------------- */
+  --radius-sm: 0.25rem;     /* Buttons, small elements */
+  --radius-md: 0.5rem;      /* Cards, inputs */
+  --radius-lg: 0.75rem;     /* Modals, large cards */
+  --radius-xl: 1rem;        /* Special containers */
+  --radius-full: 9999px;    /* Circles, pills */
+
+  /* Semantic radius aliases */
+  --button-radius: var(--radius-md);
+  --card-radius: var(--radius-lg);
+  --modal-radius: var(--radius-xl);
+  --input-radius: var(--radius-md);
+  --avatar-radius: var(--radius-full);
+
+  /* --------------------------------------------
+   * SHADOW SCALE (theme-aware via color-mix)
+   * -------------------------------------------- */
+  --shadow-subtle: 0 1px 2px color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  --shadow-md: 0 4px 6px color-mix(in oklch, var(--color-base-content) 15%, transparent);
+  --shadow-lg: 0 10px 15px color-mix(in oklch, var(--color-base-content) 20%, transparent);
+  --shadow-xl: 0 20px 25px color-mix(in oklch, var(--color-base-content) 25%, transparent);
+
+  /* Semantic shadow aliases */
+  --card-shadow: var(--shadow-md);
+  --modal-shadow: var(--shadow-xl);
+  --dropdown-shadow: var(--shadow-lg);
+  --button-shadow: var(--shadow-subtle);
+
+  /* --------------------------------------------
+   * ANIMATION DURATION
+   * -------------------------------------------- */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* Semantic duration aliases */
+  --button-transition: var(--duration-fast);
+  --modal-transition: var(--duration-normal);
+  --fade-transition: var(--duration-slow);
+  --slide-transition: var(--duration-slower);
+}
+
+/* ============================================
+ * COMPONENT-SPECIFIC TOKENS (in :root, not Tailwind utilities)
+ * ============================================ */
+:root {
+  /* --------------------------------------------
+   * CHAT COMPONENT TOKENS
+   * Values derived from DaisyUI semantic tokens for automatic theme adaptation
+   * -------------------------------------------- */
+
+  /* Chat bubbles - backgrounds adapt to theme via color-mix */
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 40%, var(--color-base-200));
+  --chat-bubble-assistant-text: var(--color-neutral-content);
+  --chat-bubble-user-bg: var(--color-primary);
+  --chat-bubble-user-text: var(--color-primary-content);
+  --chat-bubble-system-bg: var(--color-neutral);
+  --chat-bubble-system-text: var(--color-neutral-content);
+
+  /* Chat container */
+  --chat-container-bg: var(--color-base-100);
+  --chat-container-border: var(--color-base-300);
+
+  /* Chat input */
+  --chat-input-bg: var(--color-base-200);
+  --chat-input-border: var(--color-base-300);
+  --chat-input-text: var(--color-base-content);
+
+  /* Chat action buttons (copy/delete) */
+  --chat-action-btn-bg: var(--color-base-100);
+  --chat-action-btn-hover-bg: var(--color-base-200);
+  --chat-action-btn-border: var(--color-base-300);
+  --chat-action-btn-delete-bg: color-mix(in oklch, var(--color-error) 20%, transparent);
+  --chat-action-btn-delete-hover-bg: var(--color-error);
+  --chat-action-btn-delete-text: var(--color-error);
+  --chat-action-btn-delete-hover-text: var(--color-error-content);
+
+  /* Chat metadata */
+  --chat-metadata-text: var(--color-base-content);
+
+  /* --------------------------------------------
+   * DIALOG/MODAL TOKENS
+   * -------------------------------------------- */
+
+  /* Dialog structure */
+  --dialog-bg: var(--color-base-200);
+  --dialog-border: var(--color-base-300);
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 50%, transparent);
+  --dialog-shadow: var(--modal-shadow);
+  --dialog-radius: var(--modal-radius);
+
+  /* Dialog header */
+  --dialog-header-bg: transparent;
+  --dialog-header-border: var(--color-base-300);
+  --dialog-header-padding: var(--spacing-lg);
+  --dialog-title-color: var(--color-base-content);
+
+  /* Dialog body */
+  --dialog-body-padding: var(--spacing-lg);
+  --dialog-body-bg: transparent;
+
+  /* Dialog footer */
+  --dialog-footer-bg: transparent;
+  --dialog-footer-border: var(--color-base-300);
+  --dialog-footer-gap: var(--spacing-md);
+  --dialog-footer-padding: var(--spacing-lg);
+
+  /* Dialog buttons */
+  --dialog-cancel-button-bg: var(--color-neutral);
+  --dialog-cancel-button-text: var(--color-neutral-content);
+  --dialog-cancel-button-hover-bg: color-mix(in oklch, var(--color-neutral) 80%, black);
+  --dialog-confirm-button-bg: var(--color-primary);
+  --dialog-confirm-button-text: var(--color-primary-content);
+  --dialog-confirm-button-hover-bg: color-mix(in oklch, var(--color-primary) 80%, black);
+  --dialog-danger-button-bg: var(--color-error);
+  --dialog-danger-button-text: var(--color-error-content);
+  --dialog-danger-button-hover-bg: var(--color-error);
+  --dialog-danger-button-hover-text: var(--color-error-content);
+
+  /* Dialog widths (for different modal sizes) */
+  --dialog-width-sm: 500px;      /* Small: confirmations, alerts */
+  --dialog-width-md: 600px;      /* Medium: simple forms */
+  --dialog-width-lg: 800px;      /* Large: complex forms */
+  --dialog-width-xl: 1000px;     /* Extra large: data-heavy modals */
+  --dialog-width-full: 95vw;     /* Responsive max width */
+
+  /* --------------------------------------------
+   * CONTENT MEASURE — how wide a column of PROSE may get
+   * --------------------------------------------
+   * NOT a max-w-* class. In this Tailwind v4 setup `max-w-md` resolves to
+   * 16px and `max-w-lg` to 24px (the `--container-*` tokens are undefined, so
+   * the utilities read the SPACING namespace instead) — a block child of an
+   * `items-center` column flex is sized BY its max-width, so the text comes out
+   * one word per line. Measured, not guessed: wiki/dev-notes/frontend/
+   * modal-dialogs.md.
+   *
+   * Use `style={{ maxWidth: 'var(--content-measure)' }}` (with `w-full`) for an
+   * empty state, an error message, or any other one-column explanation.
+   * A COMFORTABLE LINE LENGTH, chosen once — which is what makes it a token
+   * rather than a number repeated in fifteen files. */
+  --content-measure: 28rem;       /* ~65 characters at the body size */
+  --content-measure-wide: 42rem;  /* a paragraph plus a list beside it */
+
+  /* --------------------------------------------
+   * FORM TOKENS
+   * -------------------------------------------- */
+
+  /* Form fields */
+  --form-label-color: var(--color-base-content);
+  --form-label-font-weight: 500;
+  --form-input-bg: var(--color-base-100);
+  --form-input-border: var(--color-base-300);
+  --form-input-text: var(--color-base-content);
+  --form-input-placeholder: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+  --form-input-focus-border: var(--color-primary);
+  --form-input-focus-ring: color-mix(in oklch, var(--color-primary) 20%, transparent);
+  --form-input-radius: var(--input-radius);
+  --form-input-padding: var(--input-padding);
+
+  /* Form states */
+  --form-error-color: var(--color-error);
+  --form-error-border: var(--color-error);
+  --form-error-bg: color-mix(in oklch, var(--color-error) 10%, var(--color-base-100));
+  --form-success-color: var(--color-success);
+  --form-success-border: var(--color-success);
+  --form-success-bg: color-mix(in oklch, var(--color-success) 10%, var(--color-base-100));
+  --form-warning-color: var(--color-warning);
+  --form-warning-border: var(--color-warning);
+  --form-warning-bg: color-mix(in oklch, var(--color-warning) 10%, var(--color-base-100));
+
+  /* Form help text */
+  --form-help-text-color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  --form-help-text-alt-color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+
+  /* Select dropdowns */
+  --form-select-bg: var(--color-base-100);
+  --form-select-border: var(--color-base-300);
+  --form-select-text: var(--color-base-content);
+  --form-select-arrow: var(--color-base-content);
+
+  /* Checkbox & Radio */
+  --form-checkbox-bg: var(--color-base-100);
+  --form-checkbox-border: var(--color-base-300);
+  --form-checkbox-checked-bg: var(--color-primary);
+  --form-checkbox-checked-border: var(--color-primary);
+  --form-checkbox-size: 1.25rem;
+
+  /* Textarea */
+  --form-textarea-bg: var(--color-base-100);
+  --form-textarea-border: var(--color-base-300);
+  --form-textarea-text: var(--color-base-content);
+  --form-textarea-focus-border: var(--color-primary);
+
+  /* File input */
+  --form-file-input-bg: var(--color-base-200);
+  --form-file-input-border: var(--color-base-300);
+  --form-file-input-text: var(--color-base-content);
+
+  /* --------------------------------------------
+   * TAB COMPONENT TOKENS
+   * -------------------------------------------- */
+
+  /* Tab container */
+  --tab-container-bg: transparent;
+  --tab-container-border: var(--color-base-300);
+  --tab-container-radius: var(--radius-md);
+
+  /* Tab items */
+  --tab-bg: transparent;
+  --tab-text: var(--color-base-content);
+  --tab-hover-bg: color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  --tab-hover-text: var(--color-base-content);
+  --tab-active-bg: var(--color-primary);
+  --tab-active-text: var(--color-primary-content);
+  --tab-active-hover-bg: color-mix(in oklch, var(--color-primary) 90%, white);
+  --tab-border: var(--color-base-300);
+  --tab-radius: var(--radius-sm);
+
+  /* Tab boxed style */
+  --tab-boxed-bg: var(--color-base-200);
+  --tab-boxed-border: var(--color-base-300);
+
+  /* Tab outline for visibility */
+  --tab-outline-hover: 1px solid var(--color-base-content);
+
+  /* --------------------------------------------
+   * BADGE BUTTON TOKENS
+   * Compact pill-style buttons (Help, Create, Sessions, Tools, etc.)
+   * Uses primary color with transparent tint for subtle appearance
+   * -------------------------------------------- */
+
+  /* Default size */
+  --badge-btn-bg: color-mix(in oklch, var(--color-primary) 20%, transparent);
+  --badge-btn-text: var(--color-primary);
+  --badge-btn-border: color-mix(in oklch, var(--color-primary) 30%, transparent);
+  --badge-btn-hover-bg: color-mix(in oklch, var(--color-primary) 30%, transparent);
+  --badge-btn-padding-x: 0.75rem;
+
+  /* THE FLYOUT-SURFACE TOKENS (2026-09-01, the user's ask — the
+     text-over-text transparency): the dropdown/flyout PANELS need a
+     SOLID-ish surface — never the button-token's 20% alpha (the
+     topic-flyout's bug: the content bled through the menu). The
+     color-mix of the theme's base-100 + a 4% primary tint keeps
+     them THEME-AWARE: the theme flips, the panels follow. */
+  --flyout-panel-bg: color-mix(in oklch, var(--color-base-100) 92%, var(--color-primary) 4%);
+  --flyout-panel-border: color-mix(in oklch, var(--color-primary) 25%, transparent);
+  --flyout-panel-text: var(--color-base-content);
+  --badge-btn-padding-y: 0.25rem;
+  --badge-btn-font-size: 0.75rem;
+  --badge-btn-radius: 9999px;
+
+  /* Small variant (angle brackets, tools icon) */
+  --badge-btn-sm-padding-x: 0.5rem;
+  --badge-btn-sm-padding-y: 0.125rem;
+  --badge-btn-sm-font-size: 0.75rem;
+
+  /* Disabled state */
+  --badge-btn-disabled-opacity: 0.5;
+
+  /* --------------------------------------------
+   * CONTROL BORDER TOKENS
+   * -------------------------------------------- */
+
+  --control-border-subtle: 1px solid var(--color-base-300);
+  --control-border-hover: 1px solid var(--color-base-content);
+  --control-border-focus: 1px solid var(--color-primary);
+  --control-border-error: 1px solid var(--color-error);
+
+  /* --------------------------------------------
+   * CONTROL COLOR TOKENS
+   * -------------------------------------------- */
+
+  --control-fg: var(--color-base-content);
+  --control-fg-muted: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  --control-bg: var(--color-base-200);
+  --control-bg-hover: var(--color-base-300);
+  --control-bg-active: var(--color-primary);
+  --control-bg-active-hover: color-mix(in oklch, var(--color-primary) 90%, white);
+
+  /* --------------------------------------------
+   * TEXT ROLE TOKENS (2026-09-07 — the grays work)
+   * The roles are the SEMANTIC handles the components use;
+   * one-knob tuning per role, aliases where a role shares a
+   * value (the alias rule). The role classes live in index.css.
+   * The old undifferentiated text-base-content/NN ladder is
+   * what these replace — pick the role, never a bare tier.
+   * -------------------------------------------- */
+  --text-body: var(--color-base-content);
+  --text-label: var(--color-base-content);
+  /* ^ an ALIAS of the body — the label's distinction is the
+     weight (font-medium) and the size, not a dimmer color.
+     The alias keeps labels as readable as the body. */
+  --text-readout: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  /* ^ metadata / readouts: dates, counts, descriptions — the
+     old text-base-content/60 tier, now a NAMED role. */
+  --text-disabled: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  /* ^ the GRAY'S TRUE HOME (the user, 2026-09-07): disabled /
+     inactive controls and readouts. Dimmer than the readout
+     tier so the hierarchy survives. */
+  --text-muted: var(--color-muted);
+  /* ^ the quietest tone — the badge-muted family's text side
+     (the muted is theme-keyed by construction). */
+
+  /* --------------------------------------------
+   * HOVER-STRENGTH TOKENS (2026-09-07 — the quiet-hover rule)
+   * The fill strengths for the app's hover states: hovers NEVER
+   * jump to a solid fill (the DaisyUI outline-invert is overridden
+   * in index.css). One-knob per state.
+   * -------------------------------------------- */
+  --hover-tint-strength: 14%;
+  /* ^ the outline/dash + the quiet-demoted semantics' hover wash
+     (the hue at 14%, never solid) */
+  --hover-whisper-strength: 6%;
+  /* ^ the ghost buttons' hover whisper (the base-content at 6%) */
+
+  /* --------------------------------------------
+   * HIGHLIGHT / SECONDARY COLOR TOKENS
+   * -------------------------------------------- */
+
+  /* Secondary foreground (muted text) */
+  --secondary-fg: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+  --secondary-fg-muted: color-mix(in oklch, var(--color-base-content) 50%, transparent);
+
+  /* Highlight colors */
+  --highlight-bg: color-mix(in oklch, var(--color-info) 20%, transparent);
+  --highlight-border: var(--color-info);
+  --highlight-text: var(--color-info);
+
+  /* Info/Warning/Error semantic colors */
+  --info-bg: color-mix(in oklch, var(--color-info) 10%, var(--color-base-100));
+  --info-border: var(--color-info);
+  --info-text: var(--color-info);
+  --warning-bg: color-mix(in oklch, var(--color-warning) 10%, var(--color-base-100));
+  --warning-border: var(--color-warning);
+  --warning-text: var(--color-warning);
+  --error-bg: color-mix(in oklch, var(--color-error) 10%, var(--color-base-100));
+  --error-border: var(--color-error);
+  --error-text: var(--color-error);
+  --success-bg: color-mix(in oklch, var(--color-success) 10%, var(--color-base-100));
+  --success-border: var(--color-success);
+  --success-text: var(--color-success);
+
+  /* --------------------------------------------
+   * CAUTION SEMANTIC (2026-09-05 — the Clear-all button's class:
+   * the destructive-but-recoverable act, BETWEEN warning and
+   * error). Theme-aware by construction: a blend of the ACTIVE
+   * theme's warning + error — no hardcoded colors, works in every
+   * theme without a per-theme override (the design-system rule:
+   * add a DaisyUI theme and the caution adapts automatically).
+   * The content rides the warning pairing (the blend stays
+   * amber-dominant; the theme's designed dark-on-amber text
+   * keeps its contrast).
+   * -------------------------------------------- */
+  --caution-bg: color-mix(in oklab, var(--color-warning) 60%, var(--color-error) 40%);
+  --caution-content: var(--color-warning-content);
+
+  /* --------------------------------------------
+   * THE TRANSFER SEMANTIC (2026-09-05, the user's approval —
+   * import/export of agent bundles across the boundary): the
+   * primary+secondary mix lands in the VIOLET band — the one hue
+   * gap in every DaisyUI palette (dark: blue 277° -> pink 354° is
+   * empty; accent-teal collides with success/info, secondary-pink
+   * collides with error). Theme-adaptive by construction. Consumed
+   * by .btn-transfer / .badge-transfer (index.css).
+   * -------------------------------------------- */
+  --transfer-bg: color-mix(in oklab, var(--color-secondary) 55%, var(--color-primary) 45%);
+  --transfer-content: var(--color-accent-content);
+
+  /* --------------------------------------------
+   * THE DEFAULT CONTROL COLOR (2026-09-05, the user's choice —
+   * 'that [primary blue] looks like the style I'd like'): buttons
+   * with no strong semantic (Restore, Browse store, …) default to
+   * the ACTION-BLUE family instead of raw base-content — the
+   * 'white on black is too janky' fix. Hierarchy rides FILL
+   * WEIGHT, not hue: the one solid CTA per view vs the blue-toned
+   * outlines around it. Danger stays hue-coded (error red,
+   * caution amber — those classes override). The ESCAPE HATCH for
+   * the stop/exit voice: add DaisyUI's btn-neutral (gray) to a
+   * button to keep it a true neutral (e.g. Cancel/close buttons).
+   * -------------------------------------------- */
+  --btn-neutral-color: var(--color-primary);
+
+  /* --------------------------------------------
+   * UI-CONTROL FILL TOKENS — THE LOUDNESS DIAL (2026-09-05, the
+   * ui-loudness project P1; the user-approved Option 3).
+   *
+   * The vocabulary (settled in the design discussion):
+   * - ELEMENT opacity (`opacity-*`) dims text AND fill — reserved
+   *   for disabled/de-emphasized states, NEVER the brightness dial.
+   * - FILL opacity (alpha) fades only the fill — the text stays
+   *   crisp. Rule: "to quiet a bright control, lower its FILL
+   *   opacity — never the element's."
+   *
+   * The dial:
+   *   --fill-strength-* = the alpha steps a semantic's fill can
+   *     ride. 100% = the theme's solid fill (DaisyUI-native);
+   *     the lower steps are the quieted fills. The theme adapts by
+   *     construction — every fill derives from the ACTIVE theme's
+   *     semantic var via color-mix over transparent (no hardcoded
+   *     colors, no per-theme overrides needed).
+   *   --{semantic}-fill-default / -dim = the quieted fills for the
+   *     census's loud semantics (primary 78, error 27, caution 1).
+   *     Consumed by the class layer / per-surface overrides — a
+   *     control STAYS in its semantic tier (btn-caution stays
+   *     caution) while its fill rides a lower strength step.
+   *
+   * The ladder note: DaisyUI's own quiet tier (btn-soft, ~8%
+   * fill) covers the DEMOTION half (semantic → quieter tier); this
+   * dial covers the "stays in its tier but stops shouting" half.
+   * -------------------------------------------- */
+
+  /* The fill-strength steps (alpha over the page surface) */
+  --fill-strength-solid: 100%;   /* the CTA tier — DaisyUI solid */
+  --fill-strength-default: 88%;  /* the standard-action tier */
+  --fill-strength-dim: 72%;      /* the clearly-quieted tier */
+
+  /* The quieted fills for the loud semantics (the solid fills are
+     the theme vars themselves — DaisyUI's btn-* already consume
+     those; the existing --caution-bg / --caution-content ARE the
+     caution pair) */
+  --primary-fill-default: color-mix(in oklab, var(--color-primary) var(--fill-strength-default), transparent);
+  --primary-fill-dim: color-mix(in oklab, var(--color-primary) var(--fill-strength-dim), transparent);
+  --caution-fill-default: color-mix(in oklab, var(--caution-bg) var(--fill-strength-default), transparent);
+  --caution-fill-dim: color-mix(in oklab, var(--caution-bg) var(--fill-strength-dim), transparent);
+  --error-fill-default: color-mix(in oklab, var(--color-error) var(--fill-strength-default), transparent);
+  --error-fill-dim: color-mix(in oklab, var(--color-error) var(--fill-strength-dim), transparent);
+}
+
+/* ============================================
+ * THEME-SPECIFIC OVERRIDES
+ * Using [data-theme] selectors exclusively for consistency with DaisyUI 5
+ * ============================================ */
+
+/* --------------------------------------------
+ * THE MUTED TOKEN (2026-09-07 — the quiet-status vocabulary
+ * expansion, the depth-chip lesson). The app had NO color for
+ * "a quiet/ordinary status readout that reads on both themes":
+ * --color-neutral is the near-black FILL token (never outline
+ * text on dark), and full base-content shouts. Muted is the
+ * theme-keyed gray between them — the badge text for the
+ * neither-good-nor-bad states (shallow/balanced depth,
+ * completed/skipped/ignored statuses, the map defaults).
+ * Usage: badge badge-outline + badge-muted (or badge-muted
+ * alone for a quiet fill). RATIO MATH: the dark themes' content
+ * sits at ~98% luminance so the muted must fall ~44% of the way
+ * to the surface (~57% = a definite gray); the light themes'
+ * content sits at ~25% so the muted must rise ~72% (~46%).
+ * One recipe cannot serve both — hence the per-group values.
+ * -------------------------------------------- */
+:root {
+  --color-muted: color-mix(in oklab, var(--color-base-content) 72%, var(--color-base-100));
+}
+
+/* The DARK theme group (the ThemeSelector's Dark category — their
+   content = near-white, so the muted falls further toward the
+   surface). */
+[data-theme="black"],
+[data-theme="business"],
+[data-theme="coffee"],
+[data-theme="dark"],
+[data-theme="dim"],
+[data-theme="dracula"],
+[data-theme="forest"],
+[data-theme="halloween"],
+[data-theme="luxury"],
+[data-theme="night"],
+[data-theme="sunset"],
+[data-theme="synthwave"] {
+  --color-muted: color-mix(in oklab, var(--color-base-content) 44%, var(--color-base-100));
+}
+
+/* --------------------------------------------
+ * DARK THEME
+ * -------------------------------------------- */
+[data-theme="dark"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 70%, transparent);
+}
+
+/* --------------------------------------------
+ * LIGHT THEME
+ * -------------------------------------------- */
+[data-theme="light"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 30%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 30%, transparent);
+}
+
+/* --------------------------------------------
+ * BLACK THEME (Pure black OLED)
+ * -------------------------------------------- */
+[data-theme="black"] {
+  --chat-bubble-assistant-bg: oklch(0.15 0 0);
+  --dialog-bg: oklch(0.18 0 0);
+  --dialog-overlay-bg: color-mix(in oklch, black 80%, transparent);
+}
+
+/* --------------------------------------------
+ * LUXURY THEME (Warm gold accents)
+ * -------------------------------------------- */
+[data-theme="luxury"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --chat-bubble-user-bg: color-mix(in oklch, var(--color-primary) 60%, var(--color-base-300));
+  --dialog-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --form-input-focus-border: var(--color-primary);
+}
+
+/* --------------------------------------------
+ * SYNTHWAVE THEME (Purple/pink retro)
+ * -------------------------------------------- */
+[data-theme="synthwave"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --chat-bubble-user-bg: color-mix(in oklch, var(--color-primary) 60%, var(--color-base-300));
+  --dialog-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --form-input-focus-border: var(--color-primary);
+}
+
+/* --------------------------------------------
+ * DRACULA THEME (Purple dark)
+ * -------------------------------------------- */
+[data-theme="dracula"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --chat-bubble-user-bg: color-mix(in oklch, var(--color-primary) 60%, var(--color-base-300));
+  --dialog-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --form-input-focus-border: var(--color-primary);
+}
+
+/* --------------------------------------------
+ * NIGHT THEME (Deep blue)
+ * -------------------------------------------- */
+[data-theme="night"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --chat-bubble-user-bg: color-mix(in oklch, var(--color-primary) 60%, var(--color-base-300));
+  --dialog-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+}
+
+/* --------------------------------------------
+ * FOREST THEME (Green natural)
+ * -------------------------------------------- */
+[data-theme="forest"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --chat-bubble-user-bg: color-mix(in oklch, var(--color-primary) 60%, var(--color-base-300));
+  --dialog-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --form-input-focus-border: var(--color-primary);
+}
+
+/* --------------------------------------------
+ * BUSINESS THEME (Professional gray)
+ * -------------------------------------------- */
+[data-theme="business"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 45%, var(--color-base-200));
+  --chat-bubble-user-bg: color-mix(in oklch, var(--color-primary) 50%, var(--color-base-300));
+  --dialog-bg: color-mix(in oklch, var(--color-neutral) 45%, var(--color-base-200));
+  --form-input-focus-border: var(--color-primary);
+}
+
+/* --------------------------------------------
+ * CUPCAKE THEME (Light pastel)
+ * -------------------------------------------- */
+[data-theme="cupcake"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 20%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 30%, transparent);
+}
+
+/* --------------------------------------------
+ * RETRO THEME (Vintage light)
+ * -------------------------------------------- */
+[data-theme="retro"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 25%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 35%, transparent);
+}
+
+/* --------------------------------------------
+ * CYBERPUNK THEME (Neon dark)
+ * -------------------------------------------- */
+[data-theme="cyberpunk"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 65%, transparent);
+}
+
+/* --------------------------------------------
+ * VALENTINE THEME (Pink romantic)
+ * -------------------------------------------- */
+[data-theme="valentine"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 35%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 40%, transparent);
+}
+
+/* --------------------------------------------
+ * AQUA THEME (Dark blue-green)
+ * -------------------------------------------- */
+[data-theme="aqua"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 65%, transparent);
+}
+
+/* --------------------------------------------
+ * LOFI THEME (Warm minimal)
+ * -------------------------------------------- */
+[data-theme="lofi"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 15%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 25%, transparent);
+}
+
+/* --------------------------------------------
+ * FANTASY THEME (Whimsical dark)
+ * -------------------------------------------- */
+[data-theme="fantasy"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 65%, transparent);
+}
+
+/* --------------------------------------------
+ * WIREFRAME THEME (Monochrome)
+ * -------------------------------------------- */
+[data-theme="wireframe"] {
+  --chat-bubble-assistant-bg: var(--color-base-200);
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 40%, transparent);
+}
+
+/* --------------------------------------------
+ * AUTUMN THEME (Warm earth tones)
+ * -------------------------------------------- */
+[data-theme="autumn"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 65%, transparent);
+}
+
+/* --------------------------------------------
+ * DIM THEME (Muted dark)
+ * -------------------------------------------- */
+[data-theme="dim"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 55%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 70%, transparent);
+}
+
+/* --------------------------------------------
+ * HELLOWEEN THEME (Orange/purple)
+ * -------------------------------------------- */
+[data-theme="halloween"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 50%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 65%, transparent);
+}
+
+/* --------------------------------------------
+ * LEMONADE THEME (Fresh light)
+ * -------------------------------------------- */
+[data-theme="lemonade"] {
+  --chat-bubble-assistant-bg: color-mix(in oklch, var(--color-neutral) 25%, var(--color-base-200));
+  --dialog-overlay-bg: color-mix(in oklch, var(--color-neutral) 35%, transparent);
+}

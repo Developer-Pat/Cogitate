@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "id": "scan-5-sources",
+  "why": "Five sources, scan depth: the marginal cost per source, which is what the input cap question is made of. The PATH IS PINNED — the reader, one fetch per page, and the check requires that every given url was actually fetched — because unpinned the agent chose a different route each run (jina ×10 + wikipedia ×8, then jina ×5 + duckduckgo ×2, then jina ×6 + duckduckgo ×12) and no metric held still. Each needle is a fact only its own page carries, so the check reads as coverage; the fetch requirement makes 'five sources' mean five sources rather than five facts the model already knew.",
+  "axis": {"size": 5, "kind": "scan"},
+  "agent": "Bob",
+  "state": {"assignment": "fresh"},
+  "message": "Read each of these five pages with the reader — one fetch per page, and don't answer from your own knowledge — then tell me, for each one, the county it sits in and the year it was founded: https://en.wikipedia.org/wiki/Omaha,_Nebraska https://en.wikipedia.org/wiki/Lincoln,_Nebraska https://en.wikipedia.org/wiki/Bellevue,_Nebraska https://en.wikipedia.org/wiki/Grand_Island,_Nebraska https://en.wikipedia.org/wiki/Kearney,_Nebraska",
+  "budget": {"rounds": 10, "schemas_max": 4200, "system_max": 3200, "capped_chars_per_fetch": 30000,
+             "tokens_in_alarm": 200000},
+  "check": {
+    "type": "contains_all",
+    "needles": ["Douglas County", "Lancaster County", "Sarpy County", "Hall County", "Buffalo County"],
+    "case_sensitive": false,
+    "require_fetched": true
+  }
+}

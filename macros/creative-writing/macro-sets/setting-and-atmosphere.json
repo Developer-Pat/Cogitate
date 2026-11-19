@@ -1,0 +1,14 @@
+{
+  "topic": "Setting & Atmosphere",
+  "name": "World Builder",
+  "description": "Describe locations, time periods, weather, and sensory atmosphere",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Write a scene set in a quiet coffee shop during an evening rainstorm.",
+    "f2": "Describe a misty autumn morning in an old European city square.",
+    "f3": "Write a scene set in a bustling marketplace at midday in a fantasy world.",
+    "f4": "Describe an abandoned lighthouse during a winter storm at night.",
+    "f5": "Write a sunset scene on a remote beach where the tide is coming in."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "Testing",
+  "name": "Write & Run Tests",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Can you help me write unit tests for this function?",
+    "f2": "Help me set up integration tests for my API endpoints.",
+    "f3": "Can you write a test that mocks an external service call?",
+    "f4": "What edge cases should I test for this input validation logic?",
+    "f5": "Help me write end-to-end tests for a user login flow."
+  }
+}

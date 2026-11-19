@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "Tool testing verification checklist prompts",
+  "data": {
+    "topic": "Tool Testing - Verification",
+    "name": "Tool Testing - Verification",
+    "description": "Prompts to verify tool usage is working correctly",
+    "f1_macro": "Before answering, please confirm: Do you have access to a calculator tool? If yes, use it to solve: 456 × 789.",
+    "f2_macro": "I want to test if you're using tools correctly. Please calculate 2026 - 1945 and explain which tool you used.",
+    "f3_macro": "Demonstrate your calculator: Calculate 123 + 456, then multiply by 789. Show each step.",
+    "f4_macro": "Test question: What tools do you have available? Please use the most appropriate one to answer: What is 1000 ÷ 8?",
+    "f5_macro": "Verify tool usage: Calculate 25², then explain step-by-step how you arrived at the answer using your calculator.",
+    "is_active": true,
+    "sort_order": 4
+  }
+}

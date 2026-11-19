@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "Comprehensive tool testing with mixed task types",
+  "data": {
+    "topic": "Tool Testing - Mixed Tools",
+    "name": "Tool Testing - Mixed Tools",
+    "description": "Test prompts that require choosing between calculator and web search tools",
+    "f1_macro": "Calculate the tip on a $87.50 bill at 18%, then search for good Italian restaurants nearby.",
+    "f2_macro": "What is 15% of 250? After calculating, search for the best budget smartphones in 2026.",
+    "f3_macro": "Compute the area of a circle with radius 7.5cm, then search for geometry learning resources.",
+    "f4_macro": "Calculate: 567 × 890. Then search for mental math tricks to verify this quickly.",
+    "f5_macro": "What is the square root of 2025? After that, search for the history of square roots in mathematics.",
+    "is_active": true,
+    "sort_order": 3
+  }
+}

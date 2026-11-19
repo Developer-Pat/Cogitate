@@ -1,0 +1,14 @@
+{
+  "topic": "Physics",
+  "name": "Famous Physics Equations",
+  "description": "Iconic equations from physics: relativity, mechanics, thermodynamics, and quantum mechanics",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What can you tell me about E=mc\u00b2 (mass-energy equivalence)?",
+    "f2": "What can you tell me about F=ma (Newton's second law of motion)?",
+    "f3": "What can you tell me about PV=nRT (the ideal gas law)?",
+    "f4": "What can you tell me about Schr\u00f6dinger's equation?",
+    "f5": "What can you tell me about Maxwell's equations?"
+  }
+}

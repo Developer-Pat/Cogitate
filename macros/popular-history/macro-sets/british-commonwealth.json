@@ -1,0 +1,14 @@
+{
+  "topic": "British Commonwealth",
+  "name": "Commonwealth History",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the history of Australia from colonization to federation.",
+    "f2": "Tell me about the history of New Zealand from Maori settlement to today.",
+    "f3": "Tell me about the history of South Africa from apartheid to democracy.",
+    "f4": "Tell me about the history of Ireland from the Norman invasion to independence.",
+    "f5": "Tell me about the history of the British Empire and its global impact."
+  }
+}

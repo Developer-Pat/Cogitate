@@ -1,0 +1,14 @@
+{
+  "topic": "Linear Algebra",
+  "name": "Vectors & Tensors",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What can you tell me about eigenvectors and eigenvalues?",
+    "f2": "What can you tell me about vector spaces and linear transformations?",
+    "f3": "What can you tell me about tensors and tensor operations?",
+    "f4": "What can you tell me about matrix diagonalization?",
+    "f5": "What can you tell me about the dot product, cross product, and their geometric meanings?"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "SOLID Principles",
+  "name": "Code Quality",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Can you tell me about the SOLID principles?",
+    "f2": "Can you tell me about clean architecture?",
+    "f3": "Can you tell me about the difference between REST and GraphQL?",
+    "f4": "Can you tell me about testing strategies (unit, integration, e2e)?",
+    "f5": "Can you tell me about database design normalization?"
+  }
+}

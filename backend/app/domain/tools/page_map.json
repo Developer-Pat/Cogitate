@@ -1,0 +1,395 @@
+{
+  "_generated_by": "scripts/core/gen_page_map.py",
+  "_source": [
+    "frontend/src/config/routes.ts",
+    "frontend/src/services/appNavigation.ts"
+  ],
+  "counts": {
+    "routes": 39,
+    "aliases": 10,
+    "tabs": 5
+  },
+  "pages": [
+    {
+      "kind": "route",
+      "path": "/",
+      "title": "Dashboard",
+      "description": "System overview and quick actions"
+    },
+    {
+      "kind": "route",
+      "path": "/agent-integration",
+      "title": "Exa Config",
+      "description": "Configure Exa — the external consulting agent (Hermes/OpenClaw) connection"
+    },
+    {
+      "kind": "route",
+      "path": "/agent-interaction",
+      "title": "Agent Chat",
+      "description": "Interact with AI agents using streaming responses"
+    },
+    {
+      "kind": "route",
+      "path": "/agent-profiles",
+      "title": "Agent Profiles",
+      "description": "View and manage agent cognitive profiles"
+    },
+    {
+      "kind": "route",
+      "path": "/agents/templates",
+      "title": "Agent Templates",
+      "description": "Browse and use agent templates"
+    },
+    {
+      "kind": "route",
+      "path": "/analytics",
+      "title": "Analytics",
+      "description": "Usage metrics and performance insights"
+    },
+    {
+      "kind": "route",
+      "path": "/cognitive-pipeline",
+      "title": "Cognitive Pipeline",
+      "description": "Configure cognitive pipeline strategies, memory profiles, and cognitive profiles for agents"
+    },
+    {
+      "kind": "route",
+      "path": "/collections",
+      "title": "Collections",
+      "description": "Manage your curated collections of tools, agents, and more"
+    },
+    {
+      "kind": "route",
+      "path": "/components",
+      "title": "Gallery",
+      "description": "The live control and text vocabulary — every token and role with its sample"
+    },
+    {
+      "kind": "route",
+      "path": "/debugging",
+      "title": "Debugging",
+      "description": "Advanced debugging and troubleshooting tools"
+    },
+    {
+      "kind": "route",
+      "path": "/exa",
+      "title": "Exa Agent",
+      "description": "Chat with Exa — the system agent"
+    },
+    {
+      "kind": "route",
+      "path": "/history",
+      "title": "History",
+      "description": "Analyze log patterns and message frequencies"
+    },
+    {
+      "kind": "route",
+      "path": "/images",
+      "title": "Image Management",
+      "description": "Application image assets — upload, browse, delete, import/export"
+    },
+    {
+      "kind": "route",
+      "path": "/logs",
+      "title": "Logs",
+      "description": "View and analyze system logs"
+    },
+    {
+      "kind": "route",
+      "path": "/macros",
+      "title": "Macros",
+      "description": "Create and manage system macro sets and meta topics"
+    },
+    {
+      "kind": "route",
+      "path": "/messages",
+      "title": "Message Center",
+      "description": "The system message queue — view, filter, and manage the notifications"
+    },
+    {
+      "kind": "route",
+      "path": "/provider-dashboard",
+      "title": "Provider Dashboard",
+      "description": "Redirect to Cloud Providers (the A1 split)"
+    },
+    {
+      "kind": "route",
+      "path": "/providers",
+      "title": "Providers",
+      "description": "Redirect to Cloud Providers"
+    },
+    {
+      "kind": "route",
+      "path": "/providers/capabilities",
+      "title": "Capabilities",
+      "description": "What each part of the app uses — the service it resolves to, its backups, and the rung that chose"
+    },
+    {
+      "kind": "route",
+      "path": "/providers/cloud",
+      "title": "Cloud Providers",
+      "description": "The cloud-class provider roof (the A1 split): SaaS providers, usage, health, the curated recommendation layer, and the keys"
+    },
+    {
+      "kind": "route",
+      "path": "/providers/local",
+      "title": "Local Providers",
+      "description": "The local-class provider roof (the A1 split): the daemons, the installed models, and the occupancy"
+    },
+    {
+      "kind": "route",
+      "path": "/rag-index",
+      "title": "RAG Index",
+      "description": "Monitor system health and performance"
+    },
+    {
+      "kind": "route",
+      "path": "/sessions",
+      "title": "Session Management",
+      "description": "Manage and organize your conversation sessions"
+    },
+    {
+      "kind": "route",
+      "path": "/settings",
+      "title": "Settings",
+      "description": "Manage user preferences and application settings"
+    },
+    {
+      "kind": "route",
+      "path": "/setup",
+      "title": "Setup",
+      "description": "First-run setup — providers, keys, default model, starter agent"
+    },
+    {
+      "kind": "route",
+      "path": "/skills",
+      "title": "Skills Management",
+      "description": "Skill assets — browse, curated status, in-use view"
+    },
+    {
+      "kind": "route",
+      "path": "/sounds",
+      "title": "Sounds",
+      "description": "Notification-sound assets — upload, browse, preview, pick the toast sound"
+    },
+    {
+      "kind": "route",
+      "path": "/system-configs",
+      "title": "System Configs",
+      "description": "The system status + the config surfaces"
+    },
+    {
+      "kind": "route",
+      "path": "/teams",
+      "title": "Collectives",
+      "description": "Organize agents into collectives — groups by a common attribute"
+    },
+    {
+      "kind": "route",
+      "path": "/testing-dashboard",
+      "title": "Testing Dashboard",
+      "description": "Comprehensive testing and validation tools"
+    },
+    {
+      "kind": "route",
+      "path": "/toolboxes",
+      "title": "Toolboxes",
+      "description": "Redirect to Toolkits"
+    },
+    {
+      "kind": "route",
+      "path": "/toolkits",
+      "title": "Toolkits",
+      "description": "Manage your toolkits — the tool collections an agent owns"
+    },
+    {
+      "kind": "route",
+      "path": "/tools",
+      "title": "Tool Management",
+      "description": "Browse, manage, and configure AI agent tools"
+    },
+    {
+      "kind": "route",
+      "path": "/trash",
+      "title": "Trash",
+      "description": "Everything moved out of the way rather than erased — five shelves, and the way back off each"
+    },
+    {
+      "kind": "route",
+      "path": "/workflow-automation",
+      "title": "Workflow Automation",
+      "description": "Set up recurring workflow runs and monitor their history"
+    },
+    {
+      "kind": "route",
+      "path": "/workflow-execution",
+      "title": "Workflow Execution",
+      "description": "Run a workflow now — select, launch, watch progress"
+    },
+    {
+      "kind": "route",
+      "path": "/workflow-kinds",
+      "title": "Templates",
+      "description": "The canonical workflow process shapes — a template is a kind"
+    },
+    {
+      "kind": "route",
+      "path": "/workflow-products",
+      "title": "Workflow Products",
+      "description": "Products delivered by workflow runs — digests, alerts, reports"
+    },
+    {
+      "kind": "route",
+      "path": "/workflow-templates",
+      "title": "Workflows",
+      "description": "Configured workflows — each is a template (kind) with concrete parameters"
+    }
+  ],
+  "aliases": [
+    {
+      "kind": "alias",
+      "label": "Wiki — Site Index",
+      "match": [
+        "wiki index",
+        "site index",
+        "wiki home",
+        "index page"
+      ],
+      "to": "/wiki"
+    },
+    {
+      "kind": "alias",
+      "label": "Settings -> Appearance (themes)",
+      "match": [
+        "themes",
+        "theme",
+        "theme picker",
+        "themes page",
+        "appearance",
+        "themes and appearance"
+      ],
+      "to": "/settings?tab=appearance"
+    },
+    {
+      "kind": "alias",
+      "label": "Settings -> General",
+      "match": [
+        "general settings",
+        "settings general"
+      ],
+      "to": "/settings?tab=general"
+    },
+    {
+      "kind": "alias",
+      "label": "Settings -> Notifications",
+      "match": [
+        "notification settings",
+        "settings notifications",
+        "notifications"
+      ],
+      "to": "/settings?tab=notifications"
+    },
+    {
+      "kind": "alias",
+      "label": "Settings -> Data",
+      "match": [
+        "data settings",
+        "settings data"
+      ],
+      "to": "/settings?tab=data"
+    },
+    {
+      "kind": "alias",
+      "label": "Logs",
+      "match": [
+        "logging"
+      ],
+      "to": "/logs"
+    },
+    {
+      "kind": "alias",
+      "label": "Testing Dashboard",
+      "match": [
+        "tests"
+      ],
+      "to": "/testing-dashboard"
+    },
+    {
+      "kind": "alias",
+      "label": "Provider Dashboard — the Keys tab",
+      "match": [
+        "keys",
+        "api key",
+        "api keys",
+        "the keys"
+      ],
+      "to": "/provider-dashboard"
+    },
+    {
+      "kind": "alias",
+      "label": "Providers — Cloud",
+      "match": [
+        "models",
+        "the models"
+      ],
+      "to": "/providers/cloud"
+    },
+    {
+      "kind": "alias",
+      "label": "Message Center — the page",
+      "match": [
+        "message list"
+      ],
+      "to": "/messages"
+    }
+  ],
+  "tabs": [
+    {
+      "kind": "tab",
+      "label": "Exa",
+      "match": [
+        "exa",
+        "exa page",
+        "system agent"
+      ],
+      "app": "exa"
+    },
+    {
+      "kind": "tab",
+      "label": "Message Center",
+      "match": [
+        "message center",
+        "messages"
+      ],
+      "app": "messages"
+    },
+    {
+      "kind": "tab",
+      "label": "Sessions",
+      "match": [
+        "sessions",
+        "session list"
+      ],
+      "app": "sessions"
+    },
+    {
+      "kind": "tab",
+      "label": "Agent Chat",
+      "match": [
+        "agent chat",
+        "chat",
+        "agent interaction"
+      ],
+      "app": "agent-chat"
+    },
+    {
+      "kind": "tab",
+      "label": "Wiki",
+      "match": [
+        "wiki",
+        "the wiki"
+      ],
+      "app": "wiki"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "North America",
+  "name": "American History",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the history of the United States from colonization to superpower.",
+    "f2": "Tell me about the history of Canada from Confederation to modern nation.",
+    "f3": "Tell me about the history of Mexico from the Aztecs to independence.",
+    "f4": "Tell me about the Caribbean history from colonialism to independence.",
+    "f5": "Tell me about the history of Indigenous peoples of North America."
+  }
+}

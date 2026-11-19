@@ -1,0 +1,14 @@
+{
+  "topic": "Mathematics",
+  "name": "Famous Math Equations",
+  "description": "Landmark equations from mathematics: Euler, Pythagoras, calculus, and number theory",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What can you tell me about e^(i\u03c0) + 1 = 0 (Euler's identity)?",
+    "f2": "What can you tell me about a\u00b2 + b\u00b2 = c\u00b2 (the Pythagorean theorem)?",
+    "f3": "What can you tell me about the Riemann Hypothesis?",
+    "f4": "What can you tell me about Fermat's Last Theorem?",
+    "f5": "What can you tell me about the Navier-Stokes existence and smoothness problem?"
+  }
+}

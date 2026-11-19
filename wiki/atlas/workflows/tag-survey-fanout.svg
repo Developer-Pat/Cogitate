@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="JetBrains Mono, monospace">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6C63FF"/>
+    </marker>
+    <marker id="arrowdim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="640" fill="url(#bg)"/>
+  <rect width="1200" height="640" fill="url(#grid)"/>
+
+  <!-- ============ THE PIPELINE (the named parts) ============ -->
+
+  <!-- 1. DISCOVER -->
+  <rect x="40" y="120" width="170" height="90" rx="8" fill="#0f172a" stroke="none"/>
+  <rect x="40" y="120" width="170" height="90" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="125" y="152" fill="#22d3ee" font-size="13" text-anchor="middle" font-weight="bold">DISCOVER</text>
+  <text x="125" y="170" fill="#94a3b8" font-size="9" text-anchor="middle">tag_discover_node</text>
+  <text x="125" y="186" fill="#64748b" font-size="8" text-anchor="middle">recursive walk · no LLM</text>
+  <text x="125" y="200" fill="#64748b" font-size="8" text-anchor="middle">→ file_list (519)</text>
+
+  <!-- 2. DISPATCH -->
+  <rect x="290" y="120" width="170" height="90" rx="8" fill="#0f172a" stroke="none"/>
+  <rect x="290" y="120" width="170" height="90" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="375" y="152" fill="#22d3ee" font-size="13" text-anchor="middle" font-weight="bold">DISPATCH</text>
+  <text x="375" y="170" fill="#94a3b8" font-size="9" text-anchor="middle">boss_dispatch_node</text>
+  <text x="375" y="186" fill="#64748b" font-size="8" text-anchor="middle">count-based · no LLM</text>
+  <text x="375" y="200" fill="#64748b" font-size="8" text-anchor="middle">→ batch_plan (44×12)</text>
+
+  <!-- 3. WORKERS -->
+  <rect x="540" y="90" width="190" height="150" rx="8" fill="#0f172a" stroke="none"/>
+  <rect x="540" y="90" width="190" height="150" rx="8" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="635" y="118" fill="#34d399" font-size="13" text-anchor="middle" font-weight="bold">WORKERS ×N</text>
+  <text x="635" y="136" fill="#94a3b8" font-size="9" text-anchor="middle">tag_extract_worker_node</text>
+  <text x="635" y="152" fill="#64748b" font-size="8" text-anchor="middle">1 LLM call per batch</text>
+  <text x="635" y="166" fill="#64748b" font-size="8" text-anchor="middle">probe: batch_size 3</text>
+  <text x="635" y="180" fill="#64748b" font-size="8" text-anchor="middle">→ tag_rows (JSON)</text>
+  <text x="635" y="196" fill="#fb923c" font-size="8" text-anchor="middle">trickle: pause 5s→2.5s</text>
+  <text x="635" y="210" fill="#fb923c" font-size="8" text-anchor="middle">max_batches: 2 (probe)</text>
+
+  <!-- 4. COLLECT -->
+  <rect x="810" y="120" width="170" height="90" rx="8" fill="#0f172a" stroke="none"/>
+  <rect x="810" y="120" width="170" height="90" rx="8" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="895" y="152" fill="#a78bfa" font-size="13" text-anchor="middle" font-weight="bold">COLLECT</text>
+  <text x="895" y="170" fill="#94a3b8" font-size="9" text-anchor="middle">tag_merge_node</text>
+  <text x="895" y="186" fill="#64748b" font-size="8" text-anchor="middle">dict merge · no LLM</text>
+  <text x="895" y="200" fill="#64748b" font-size="8" text-anchor="middle">→ manifest + counts</text>
+
+  <!-- 5. THE THE BOSS -->
+  <rect x="1040" y="90" width="140" height="150" rx="8" fill="#0f172a" stroke="none"/>
+  <rect x="1040" y="90" width="140" height="150" rx="8" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="1110" y="118" fill="#fb7185" font-size="13" text-anchor="middle" font-weight="bold">THE BOSS</text>
+  <text x="1110" y="136" fill="#94a3b8" font-size="9" text-anchor="middle">tag_consolidate_node</text>
+  <text x="1110" y="152" fill="#64748b" font-size="8" text-anchor="middle">stealth/ox-alpha</text>
+  <text x="1110" y="166" fill="#64748b" font-size="8" text-anchor="middle">the reasoning tier</text>
+  <text x="1110" y="180" fill="#64748b" font-size="8" text-anchor="middle">→ proposals</text>
+  <text x="1110" y="196" fill="#fb7185" font-size="8" text-anchor="middle">DRY: report only</text>
+  <text x="1110" y="210" fill="#fb7185" font-size="8" text-anchor="middle">WET: apply (future)</text>
+
+  <!-- ARROWS -->
+  <line x1="210" y1="165" x2="286" y2="165" stroke="#6C63FF" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="460" y1="165" x2="536" y2="165" stroke="#6C63FF" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="730" y1="165" x2="806" y2="165" stroke="#6C63FF" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="980" y1="165" x2="1036" y2="165" stroke="#6C63FF" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- THE OUTPUTS -->
+  <rect x="540" y="310" width="190" height="70" rx="8" fill="#0f172a" stroke="none"/>
+  <rect x="540" y="310" width="190" height="70" rx="8" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="635" y="336" fill="#94a3b8" font-size="10" text-anchor="middle">THE MANIFEST</text>
+  <text x="635" y="352" fill="#64748b" font-size="8" text-anchor="middle">tag-layer-manifest.md</text>
+  <text x="635" y="366" fill="#64748b" font-size="8" text-anchor="middle">provenance + counts</text>
+  <line x1="635" y1="240" x2="635" y2="306" stroke="#475569" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrowdim)"/>
+
+  <rect x="810" y="310" width="190" height="70" rx="8" fill="#0f172a" stroke="none"/>
+  <rect x="810" y="310" width="190" height="70" rx="8" fill="rgba(136,19,55,0.3)" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="905" y="336" fill="#fb7185" font-size="10" text-anchor="middle">THE PROPOSALS</text>
+  <text x="905" y="352" fill="#64748b" font-size="8" text-anchor="middle">consolidation-report.md</text>
+  <text x="905" y="366" fill="#64748b" font-size="8" text-anchor="middle">renames / adds / drops</text>
+  <line x1="1110" y1="240" x2="905" y2="306" stroke="#475569" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrowdim)"/>
+
+  <!-- THE TITLE -->
+  <text x="40" y="52" fill="#e2e8f0" font-size="20" font-weight="bold">The Boss-Batching Pipeline</text>
+  <text x="40" y="72" fill="#64748b" font-size="11">TRICKLE MODE — the deterministic pipeline with the LLM at the edges</text>
+
+  <!-- THE LEGEND -->
+  <rect x="40" y="430" width="360" height="150" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+  <text x="60" y="458" fill="#e2e8f0" font-size="11" font-weight="bold">THE PARTS (each swappable)</text>
+  <circle cx="64" cy="480" r="5" fill="none" stroke="#22d3ee" stroke-width="1.5"/><text x="80" y="484" fill="#94a3b8" font-size="9">discover — the corpus (file list)</text>
+  <circle cx="64" cy="500" r="5" fill="none" stroke="#22d3ee" stroke-width="1.5"/><text x="80" y="504" fill="#94a3b8" font-size="9">dispatch — the batches (batch_plan)</text>
+  <circle cx="64" cy="520" r="5" fill="none" stroke="#34d399" stroke-width="1.5"/><text x="80" y="524" fill="#94a3b8" font-size="9">workers — the LLM extraction (tag_rows)</text>
+  <circle cx="64" cy="540" r="5" fill="none" stroke="#a78bfa" stroke-width="1.5"/><text x="80" y="544" fill="#94a3b8" font-size="9">collect — the merge (manifest + counts)</text>
+  <circle cx="64" cy="560" r="5" fill="none" stroke="#fb7185" stroke-width="1.5"/><text x="80" y="564" fill="#94a3b8" font-size="9">the THE BOSS — the consolidation (proposals)</text>
+
+  <!-- THE KNOBS -->
+  <rect x="430" y="430" width="380" height="150" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+  <text x="450" y="458" fill="#e2e8f0" font-size="11" font-weight="bold">THE KNOBS (template config)</text>
+  <text x="450" y="482" fill="#fb923c" font-size="9">batch_size — files per batch (probe: 3)</text>
+  <text x="450" y="502" fill="#fb923c" font-size="9">max_batches — the smoke gate (probe: 2)</text>
+  <text x="450" y="522" fill="#fb923c" font-size="9">max_workers — concurrency (local: 1-2)</text>
+  <text x="450" y="542" fill="#fb923c" font-size="9">batch_delay + trickle — the adaptive pause</text>
+  <text x="450" y="562" fill="#fb923c" font-size="9">worker_model — Ling / nano-30b / granite4</text>
+</svg>

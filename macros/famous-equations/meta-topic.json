@@ -1,0 +1,7 @@
+{
+  "name": "Famous Equations",
+  "namespace": "agent",
+  "description": "A collection of famous equations",
+  "is_active": true,
+  "macro_sets": []
+}

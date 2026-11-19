@@ -1,0 +1,3 @@
+"""
+Agent Registry API package.
+"""

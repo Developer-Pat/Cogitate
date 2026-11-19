@@ -1,0 +1,14 @@
+{
+  "topic": "Advanced Trig",
+  "name": "Advanced Trigonometry",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What can you tell me about graphing sine and cosine functions?",
+    "f2": "What can you tell me about trigonometric identities and proofs?",
+    "f3": "What can you tell me about inverse trigonometric functions?",
+    "f4": "What can you tell me about polar coordinates?",
+    "f5": "What can you tell me about periodic functions and their applications?"
+  }
+}

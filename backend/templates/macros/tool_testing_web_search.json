@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "Tool testing prompts for verifying web search functionality",
+  "data": {
+    "topic": "Tool Testing - Web Search",
+    "name": "Tool Testing - Web Search",
+    "description": "Test prompts for verifying agent uses web search tool correctly (requires API key)",
+    "f1_macro": "Search for the latest news about artificial intelligence in 2026. What are the top developments?",
+    "f2_macro": "Find information about the weather forecast for this week. Use your web search tool.",
+    "f3_macro": "Search for recent scientific breakthroughs in quantum computing. Summarize the findings.",
+    "f4_macro": "What are the top-rated restaurants in my area? Use web search to find reviews.",
+    "f5_macro": "Search for the current stock price of major tech companies (Apple, Google, Microsoft).",
+    "is_active": true,
+    "sort_order": 2
+  }
+}

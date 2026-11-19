@@ -1,0 +1,14 @@
+{
+  "topic": "Finance & Applied",
+  "name": "Famous Applied Equations",
+  "description": "Practical equations from finance, probability, and economics",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What can you tell me about the compound interest formula A = P(1 + r/n)^(nt)?",
+    "f2": "What can you tell me about the Black-Scholes equation for option pricing?",
+    "f3": "What can you tell me about Bayes' theorem?",
+    "f4": "What can you tell me about the supply and demand equilibrium?",
+    "f5": "What can you tell me about the CAPM (Capital Asset Pricing Model)?"
+  }
+}

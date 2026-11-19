@@ -1,0 +1,14 @@
+{
+  "topic": "Structural Patterns",
+  "name": "Code Organization",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Can you tell me about the Adapter pattern?",
+    "f2": "Can you tell me about the Decorator pattern?",
+    "f3": "Can you tell me about the Facade pattern?",
+    "f4": "Can you tell me about the Proxy pattern?",
+    "f5": "Can you tell me about the Composite pattern?"
+  }
+}

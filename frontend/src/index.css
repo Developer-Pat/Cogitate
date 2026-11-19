@@ -1,0 +1,721 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+@plugin "daisyui" {
+  themes: all;
+}
+@plugin "@tailwindcss/typography";
+
+/* ============================================
+ * THE CAUTION BUTTON (2026-09-05, the user's ask)
+ * Extends the DaisyUI btn machinery exactly like the built-in
+ * btn-warning/btn-error modifiers: the --btn-color/--btn-fg vars
+ * drive the fill, the hover darkening, the focus ring + the
+ * border. The values come from the CAUTION tokens (tokens.css) —
+ * a theme-aware blend of the active theme's warning + error.
+ * Usage: <button className="btn btn-caution btn-sm">…
+ * ============================================ */
+.btn-caution {
+  --btn-color: var(--caution-bg);
+  --btn-fg: var(--caution-content);
+}
+.btn-caution.btn-outline {
+  --btn-fg: var(--caution-bg);
+}
+
+/* THE MUTED BADGE (2026-09-07 — the quiet-status vocabulary).
+   A var-setter exactly like .btn-caution/.btn-transfer: DaisyUI's
+   badge machinery consumes --badge-color (text + border on the
+   outline variant; the fill on the plain). The value = the
+   --color-muted token (tokens.css) — theme-keyed by construction.
+   Usage: <span className="badge badge-muted badge-outline">… */
+.badge-muted {
+  --badge-color: var(--color-muted);
+  --badge-fg: var(--color-base-content);
+}
+
+/* THE TEXT-ROLE CLASSES (2026-09-07, the grays work): the
+   semantic handles over the role tokens. Naming avoids the
+   DaisyUI hue utilities (text-secondary = the hue — these are
+   body/label/readout/disabled/muted only). Pick the ROLE, never
+   a bare text-base-content/NN tier. */
+.text-body { color: var(--text-body); }
+.text-label { color: var(--text-label); }
+.text-readout { color: var(--text-readout); }
+.text-disabled { color: var(--text-disabled); }
+.text-muted { color: var(--text-muted); }
+
+/* THE TRANSFER SEMANTIC (2026-09-05) — import/export actions.
+   Mirrors .btn-caution: a var-setter DaisyUI's button machinery
+   consumes (fill = the accent hue, content = its pairing).
+   Outlines ride --btn-color automatically. */
+.btn-transfer {
+  --btn-color: var(--transfer-bg);
+  --btn-fg: var(--transfer-content);
+}
+
+
+/* ============================================
+ * THE DEFAULT CONTROL COLOR (2026-09-05, the user's choice):
+ * neutral outline + ghost buttons read --btn-color (outline) or
+ * fall back to inherited color (ghost) — this :where() rule hands
+ * them the --btn-neutral-color token (the action-blue family —
+ * see tokens.css) instead of raw base-content. CASCADE LAW: this
+ * file is UNLAYERED, so it beats DaisyUI's @layer'd classes even
+ * at zero specificity — hence the :not(:where(...)) guard MUST
+ * list every semantic class, or btn-info/warning/error/etc.
+ * outlines would all be overridden to blue (the 2026-09-05
+ * monochrome bug the user caught). ESCAPE HATCH: btn-neutral on a
+ * button = the true neutral gray (the stop/exit voice —
+ * Cancel/close).
+ * ============================================ */
+:where(.btn-outline, .btn-ghost):not(:where(.btn-primary, .btn-secondary, .btn-accent, .btn-info, .btn-success, .btn-warning, .btn-error, .btn-neutral, .btn-caution, .btn-transfer)) {
+  --btn-color: var(--btn-neutral-color, var(--color-base-content));
+}
+
+/* ============================================
+ * THE LOUDNESS SURFACE HOOK (2026-09-05, the ui-loudness P2
+ * pilot — Option 2, the SURFACE-level quieting): a surface that
+ * opts in (className="msg-center-surface") re-points its semantic
+ * buttons at the OVERRIDE-ABLE fill tokens (tokens.css). The
+ * defaults = the theme's solid fills (zero visual change without
+ * an opt-in); a surface quiets a semantic by declaring e.g.
+ * `--primary-fill: var(--primary-fill-default)` on itself — every
+ * btn-primary inside dims together, no className churn. The fill
+ * tokens are theme-adaptive color-mixes, so the dim tracks every
+ * DaisyUI theme.
+ * ============================================ */
+.msg-center-surface .btn-primary {
+  --btn-color: var(--primary-fill, var(--color-primary));
+}
+.msg-center-surface .btn-caution {
+  --btn-color: var(--caution-fill, var(--caution-bg));
+}
+.msg-center-surface .btn-error {
+  --btn-color: var(--error-fill, var(--color-error));
+}
+.msg-center-surface {
+  /* THE PILOT DEFAULTS: primary + error ride the standard-action
+     tier (88%), caution rides the clearly-quieted tier (72%) —
+     the destructive-but-recoverable act is the quietest. */
+  --primary-fill: var(--primary-fill-default);
+  --error-fill: var(--error-fill-default);
+  --caution-fill: var(--caution-fill-dim);
+}
+
+/* ============================================
+ * QUIET MODE (2026-09-05, the user's ask — 'I want a quiet mode
+ * for the app... mixing quiet and loud only makes the loud
+ * louder'): html[data-loudness="quiet"] demotes EVERY solid
+ * semantic fill one ladder step to its OUTLINE var-set — buttons
+ * and badges alike, app-wide, zero per-button classes. The
+ * ladder classes compose, so the demotion = replicating DaisyUI's
+ * own outline var-sets (button.css / badge.css, 5.5.18) under the
+ * mode scope. The toggle: Settings > Appearance > Quiet Mode
+ * (appearance.loudness -> html[data-loudness] via App.tsx).
+ * Hierarchy survives: the semantic COLORS stay (a primary outline
+ * still reads primary) — only the loud fills go away.
+ * ============================================ */
+[data-loudness="quiet"] .btn-primary,
+[data-loudness="quiet"] .btn-secondary,
+[data-loudness="quiet"] .btn-accent,
+[data-loudness="quiet"] .btn-info,
+[data-loudness="quiet"] .btn-success,
+[data-loudness="quiet"] .btn-warning,
+[data-loudness="quiet"] .btn-error,
+[data-loudness="quiet"] .btn-neutral,
+[data-loudness="quiet"] .btn-caution,
+[data-loudness="quiet"] .btn-transfer {
+  --btn-bg: transparent;
+  --btn-fg: var(--btn-color);
+  --btn-border: var(--btn-color);
+  --btn-shadow: "";
+}
+
+/* The quiet-mode DEMOTED semantics hover the SAME soft tint as the
+   outlines (2026-09-07, the user — the +New Profile seemed
+   unaffected): the quiet var-set above pins --btn-bg: transparent
+   THROUGH the hover, so a demoted solid gave no feedback while the
+   explicit outlines got the tint. The hover = the hue at ~14%,
+   never solid. */
+[data-loudness="quiet"] .btn-primary:hover,
+[data-loudness="quiet"] .btn-secondary:hover,
+[data-loudness="quiet"] .btn-accent:hover,
+[data-loudness="quiet"] .btn-info:hover,
+[data-loudness="quiet"] .btn-success:hover,
+[data-loudness="quiet"] .btn-warning:hover,
+[data-loudness="quiet"] .btn-error:hover,
+[data-loudness="quiet"] .btn-neutral:hover,
+[data-loudness="quiet"] .btn-caution:hover,
+[data-loudness="quiet"] .btn-transfer:hover {
+  --btn-bg: color-mix(in oklab, var(--btn-color, var(--color-base-content)) var(--hover-tint-strength), transparent);
+}
+
+[data-loudness="quiet"] .badge-primary,
+[data-loudness="quiet"] .badge-secondary,
+[data-loudness="quiet"] .badge-accent,
+[data-loudness="quiet"] .badge-info,
+[data-loudness="quiet"] .badge-success,
+[data-loudness="quiet"] .badge-warning,
+[data-loudness="quiet"] .badge-error,
+[data-loudness="quiet"] .badge-neutral {
+  --badge-bg: transparent;
+  color: var(--badge-color);
+  border-color: currentColor;
+}
+
+/* ============================================
+ * THE HOVER-FILLS STAY QUIET (2026-09-07, the user — the button
+ * hovers read VERY bright on the dark theme, especially in the
+ * quiet mode)
+ *
+ * DaisyUI's outline/dash buttons drop their outline var-set while
+ * hovered (:not(:hover) gates the transparent set) and fall back
+ * to the base .btn:hover — a FULL SOLID fill of the hue. On the
+ * dark that is a bright flash (e.g. the primary at ~58% L over a
+ * ~25% surface). The ghost paints its fill directly (base-content
+ * at 10% — the near-white at 10% on the dark).
+ *
+ * The fix: an outline hovers to a SOFT TINT of its hue (the color
+ * at ~14%, never solid) with the body text; the ghost's whisper
+ * drops to 6%. The unlayered rules beat DaisyUI's layered hover
+ * var-sets app-wide (the cascade law).
+ * ============================================ */
+.btn-outline:hover,
+.btn-dash:hover {
+  --btn-bg: color-mix(in oklab, var(--btn-color, var(--color-base-content)) var(--hover-tint-strength), transparent);
+  --btn-fg: var(--color-base-content);
+  --btn-border: var(--btn-color);
+  --btn-shadow: "";
+}
+.btn-ghost:hover {
+  background-color: color-mix(in oklab, var(--color-base-content) var(--hover-whisper-strength), transparent);
+}
+
+/* ============================================
+ * SLIDER/RANGE INPUT STYLES
+ * ============================================ */
+.range, input[type="range"] {
+  --range-thumb: var(--color-primary);
+  --range-bg: var(--color-base-300);
+  --range-progress: var(--color-primary);
+}
+
+/* ============================================
+ * BASE TYPOGRAPHY
+ * ============================================ */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* ============================================
+ * HELP MODAL - List styling
+ * ============================================ */
+.help-content ul,
+.prose ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin: 0.75rem 0 !important;
+}
+
+.help-content ol,
+.prose ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin: 0.75rem 0 !important;
+}
+
+/* ============================================
+ * HELP MODAL - Collapsible animation
+ * ============================================ */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.help-content li,
+.prose li {
+  margin: 0.5rem 0 !important;
+  padding-left: 0.5rem !important;
+}
+
+.help-content li::marker,
+.prose li::marker {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ============================================
+ * FORM ELEMENTS - Theme-aware defaults
+ * These provide sensible defaults without !important overrides
+ * ============================================ */
+
+/* Ensure dropdowns and selects use theme colors */
+select option {
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
+}
+
+/* Number inputs - ensure text is visible */
+input[type="number"] {
+  color: var(--color-base-content);
+  background-color: var(--color-base-100);
+}
+
+/* ============================================
+ * MARKDOWN CONTENT STYLES
+ * Theme-aware styling for rendered markdown in chat bubbles
+ * ============================================ */
+.markdown-content {
+  line-height: 1.5;
+  text-align: left;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  max-height: none;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: visible;
+  display: block;
+  max-width: 100%;
+}
+
+/* Chat bubbles should expand naturally without height constraints */
+.chat-bubble {
+  max-height: none;
+  height: auto;
+  overflow: visible;
+  white-space: normal;
+  display: block;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ensure chat messages don't have hidden overflow */
+.chat {
+  overflow: visible;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* THE GHOST BUBBLES (2026-09-01, the user's ask): the bubble
+   field matches the page background — invisible, clutter gone.
+   The 2026-09-04 refinement: hover NO LONGER repaints the fill —
+   the backlight glow alone is the selection cue (see below). */
+.chat-bubble.bubble-ghost {
+  background-color: var(--color-base-100);
+  transition: box-shadow 0.2s ease;
+  border-color: transparent;
+}
+
+/* THE ALL-CORNERS ROUNDING + THE BACKLIGHT (2026-09-03, the user's
+   asks — "rounded corners on all the bubbles, all 4 corners" then
+   "I am not seeing the rounded corners. Could we have a little
+   backlight definition / glow like we get with modal dialogs?"):
+   DaisyUI squares the TAIL corner (chat-start the bottom-left,
+   chat-end the bottom-right). Every chat bubble now keeps the
+   FULL --radius-xl rounding (1rem — the MODAL radius, visible)
+   on all four corners; the ghost tail pseudo-element is dropped.
+   The ghost bubbles' field EQUALS the page bg (base-100), so the
+   shape was invisible at any radius — they now carry a soft
+   MODAL-LIKE BACKLIGHT (a large low-alpha halo from the content
+   token, theme-aware) that defines the rounded panel without
+   turning it into a hard box. Unlayered -> beats DaisyUI. */
+.chat.chat-start .chat-bubble,
+.chat.chat-end .chat-bubble {
+  border-end-start-radius: var(--radius-xl);
+  border-end-end-radius: var(--radius-xl);
+}
+.chat-bubble {
+  border-radius: var(--radius-xl);
+}
+.chat-bubble.bubble-ghost::before {
+  display: none;
+}
+/* THE GLOW LIVES ON THE HOVER (2026-09-03, the user's follow-ups):
+   the modal-like backlight is an INTERACTION cue — it fades in on
+   hover and back out on mouse-leave (0.2s above); at rest the
+   bubble is the plain ghost (text clean on the page). The 2026-09-04
+   refinement ("only the backlight glow — no background change; the
+   glow is a subtle selection effect"): the hover no longer swaps
+   the fill to the burn/dodge colors — the glow ALONE is the
+   selection cue, the background never changes. */
+.chat.chat-start .chat-bubble.bubble-ghost:hover,
+.chat.chat-end .chat-bubble.bubble-ghost:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--color-base-content) 7%, transparent),
+    0 1px 2px color-mix(in oklch, var(--color-base-content) 10%, transparent),
+    0 8px 24px color-mix(in oklch, var(--color-base-content) 18%, transparent);
+}
+
+/* ============================================
+ * WIKI CODE BLOCKS — single-box rendering
+ * ============================================ */
+/* The typography plugin's <pre> is the one visible container; the
+   hljs <code> inside must be transparent so we don't get nested
+   boxes with different backgrounds. */
+.prose pre {
+  background-color: var(--color-neutral);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85rem;
+}
+
+/* ============================================
+ * MERMAID LABELS — render in the family mermaid MEASURED with
+ * ============================================ */
+/* A diagram lives inside the fenced-code wrapper, so its labels inherited the
+   monospace font while mermaid had already sized every box with its own sans
+   metrics. At 16px monospace a label is ~20% wider than its box, so long labels
+   were silently CLIPPED — measured on a live page: 21 nodes across five
+   diagrams, 12 of 15 in the widest one. Declaring mermaid's own default family
+   on the rendered labels makes the measured width the rendered width. */
+.prose .mermaid,
+.prose .mermaid * {
+  font-family: "trebuchet ms", verdana, arial, sans-serif;
+}
+
+
+
+/* ============================================
+ * MERMAID FIGURES — their own ground, and never shrunk to fit
+ * ============================================ */
+/* The fenced-code wrapper paints itself in --color-neutral, which is a dark
+   surface in EVERY daisyUI theme — brown in `coffee`, blue-grey in `dark`. A
+   figure is not code: it carries the style sheet's own ground (#111726, the
+   same value the pinned `%%{init}%%` declares), identical in every theme. */
+.prose pre:has(.mermaid-figure) {
+  background-color: transparent;
+  padding: 0;
+}
+.prose .mermaid-figure {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 0.85rem 1rem;
+  background-color: #111726;
+  border: 1px solid #2b3550;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+/* THE EDGE LABEL is an annotation, not a fragment floating on the ground: mermaid paints its
+   box in `edgeLabelBackground`, and the sheet sets that to the figure's OWN ground — so the box
+   was invisible. The sheet now gives it the annotation surface (#1f242e, the cluster colour) and
+   this border, matching the node boxes. */
+.prose .mermaid-figure .labelBkg {
+  border: 1px solid #2b3550;
+  border-radius: 3px;
+}
+
+/* THE POPOUT CANVAS. It caps the WIDTH only, by default: a figure narrower than the popout keeps
+   its natural size — and its text — while a wider one is scaled to fit, so there is never a
+   horizontal slider. Vertical scrolling is normal reading. `whole` also caps the height, for
+   seeing an entire tall figure at once, at the cost of the text. */
+.figure-canvas {
+  background-color: #111726;
+  border: 1px solid #2b3550;
+  border-radius: 0.375rem;
+  overflow: auto;
+  display: flex;
+}
+.figure-canvas svg {
+  margin: auto; /* centre it when it fits, and never clip the start when it does not */
+  max-width: 100%;
+  width: auto;
+  height: auto;
+}
+.figure-canvas.whole svg {
+  max-height: 72vh;
+}
+/* mermaid ships `useMaxWidth` on: the SVG gets `max-width: <natural>` plus a
+   width of 100%, so a wide figure is scaled DOWN to the column — measured 0.30
+   at 736px for a 2466px diagram, i.e. 5px text, unreadable. Keep the natural
+   size and let the figure scroll instead. `width: max-content` on the flex
+   wrapper is what keeps the left edge reachable once it overflows; without it
+   the centred content overflows both ways and the start is unreachable. */
+.prose .mermaid-figure svg {
+  max-width: none !important;
+  height: auto;
+}
+.prose .mermaid-figure .mermaid {
+  width: max-content;
+  min-width: 100%;
+}
+
+/* Messages container should scroll normally */
+.messages-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Headings */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  text-align: left;
+}
+
+.markdown-content h1 {
+  font-size: 1.5em;
+}
+
+.markdown-content h2 {
+  font-size: 1.3em;
+}
+
+.markdown-content h3 {
+  font-size: 1.1em;
+}
+
+/* Paragraphs and lists */
+.markdown-content p {
+  margin-bottom: 0.75em;
+  text-align: left;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-left: 1.5em;
+  margin-bottom: 0.75em;
+  text-align: left;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25em;
+}
+
+/* Text formatting */
+.markdown-content strong {
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+/* Code blocks - theme-aware background */
+.markdown-content code {
+  background-color: color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  padding: 0.125em 0.25em;
+  border-radius: 0.25em;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875em;
+}
+
+.markdown-content pre {
+  background-color: color-mix(in oklch, var(--color-base-content) 8%, transparent);
+  padding: 0.75em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin-bottom: 0.75em;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.markdown-content pre code {
+  background: none;
+  padding: 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* Blockquotes - theme-aware border */
+.markdown-content blockquote {
+  border-left: 4px solid color-mix(in oklch, var(--color-base-content) 25%, transparent);
+  padding-left: 1em;
+  margin-left: 0;
+  margin-bottom: 0.75em;
+  font-style: italic;
+  max-width: 100%;
+  overflow: hidden;
+  word-wrap: break-word;
+}
+
+/* Links */
+.markdown-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.markdown-content a:hover {
+  color: color-mix(in oklch, var(--color-primary) 80%, black);
+}
+
+/* ============================================
+ * SUBTLE HOVER EFFECTS
+ * Global utility classes for consistent hover behavior
+ * ============================================ */
+.hover-subtle:hover {
+  background-color: color-mix(in oklch, var(--color-base-content) 30%, transparent);
+  transition: background-color 200ms;
+}
+
+.hover-subtle-dark:hover {
+  background-color: color-mix(in oklch, var(--color-base-content) 15%, transparent);
+  transition: background-color 200ms;
+}
+
+.hover-subtle-light:hover {
+  background-color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+  transition: background-color 200ms;
+}
+
+/* ============================================
+ * DAISYUI HOVER OVERRIDES
+ * Tone down overly bright default hover effects
+ * ============================================ */
+.dropdown-content li > *:hover,
+.menu li > *:hover,
+.table tr:hover {
+  background-color: color-mix(in oklch, var(--color-base-content) 10%, transparent);
+}
+
+/* List box containers */
+.dropdown-content,
+.menu {
+  background-color: var(--color-base-100);
+}
+
+/* ============================================
+ * MODAL WIDTH FIX
+ * DaisyUI 5 sets max-width on .modal-box via descendant selectors
+ * inside @layer daisyui.l1.l2 (e.g. .modal-bottom .modal-box,
+ * .modal-middle .modal-box). Unlayered CSS wins over layered CSS,
+ * but the DaisyUI descendant rules (.modal-middle .modal-box) have
+ * specificity 0,2,0 — the same as our .modal-box.max-w-4xl rules.
+ * When specificity ties, source order wins and DaisyUI's stylesheet
+ * is processed after ours, so it overrides us.
+ *
+ * Fix: use a :where(.modal) ancestor to keep our selector unlayered
+ * but raise specificity with an explicit :not() pseudo-class trick,
+ * OR simply use !important on a more-specific selector. We use a
+ * 3-class selector (.modal .modal-box.max-w-*) to beat specificity.
+ * ============================================ */
+.modal .modal-box.max-w-2xl {
+  max-width: min(42rem, 95vw) !important;
+  width: 91.6667% !important;
+}
+
+.modal .modal-box.max-w-3xl {
+  max-width: min(48rem, 95vw) !important;
+  width: 91.6667% !important;
+}
+
+.modal .modal-box.max-w-4xl {
+  max-width: min(56rem, 95vw) !important;
+  width: 91.6667% !important;
+}
+
+.modal .modal-box.max-w-5xl {
+  max-width: min(64rem, 95vw) !important;
+  width: 91.6667% !important;
+}
+
+.modal .modal-box.max-w-6xl {
+  max-width: min(72rem, 95vw) !important;
+  width: 91.6667% !important;
+}
+
+/* ============================================
+ * MODAL BACKDROP — the house dim for a native <dialog class="modal">
+ * A dialog opened with showModal() gets the browser's own ::backdrop, which is
+ * `rgba(0, 0, 0, 0.1)` — too light to separate a data panel from the page behind it.
+ * This is the same value the overlay-div template carries as `bg-black/50`, so a modal
+ * reads the same whichever shell it is built on.
+ * ============================================ */
+dialog.modal::backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s ease-out;
+}
+
+/* THE PILL BUTTON (2026-08-31, the user's design-element ask): the
+   house's pill — ONE named definition (the drift-killer for the
+   inline class-copies). The BASE holds the geometry; the modifiers
+   hold only the SEMANTIC color from the theme's tokens — the
+   dark/light themes recolor it automatically. */
+.pill-button {
+  @apply rounded-full px-3 py-1 text-xs font-medium transition-all;
+}
+.pill-button--normal {
+  @apply bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30;
+}
+.pill-button--warning {
+  @apply bg-warning/20 text-warning border border-warning/30 hover:bg-warning/30;
+}
+
+/* THE btn-neutral GRAY ROLE (2026-09-05, the user's dark-on-dark
+   catch): DaisyUI's neutral-outline/ghost read --btn-color = the
+   dark neutral FILL (14% lightness in the dark theme) = dark text
+   on dark. The gray TEXT belongs to the neutral-content pairing —
+   the readable side of the neutral semantic. Placed LAST (after
+   the quiet layer) so it wins the same-specificity tie — the
+   quiet layer re-points --btn-fg at --btn-color, which would
+   re-darken it. */
+.btn-neutral.btn-outline,
+.btn-neutral.btn-ghost,
+[data-loudness="quiet"] .btn-neutral.btn-outline,
+[data-loudness="quiet"] .btn-neutral.btn-ghost {
+  --btn-fg: var(--color-neutral-content);
+}
+.btn-neutral.btn-outline,
+[data-loudness="quiet"] .btn-neutral.btn-outline {
+  --btn-border: var(--color-neutral-content);
+}
+
+/* THE SELECTED STATE (2026-09-06): btn-active rides --btn-color, so a
+ * bare .btn-active fills with base-200 (white-on-black, fades into the
+ * card) and .btn-active.btn-secondary fills pink ('backend shows red').
+ * .btn-selected points the fill at the action-blue family — ONE uniform
+ * selected look for the filter controls (levels + source segmented).
+ * Deliberately NOT in the quiet-demotion list: an active selection is
+ * state, not noise — the one filled button per group survives quiet so
+ * the choice stays legible. */
+.btn-selected {
+  --btn-color: var(--color-primary);
+}

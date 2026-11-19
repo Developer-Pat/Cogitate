@@ -1,0 +1,153 @@
+"""The external-agent tool-call budget tests.
+
+The runaway-turn class: silent 50+-call turns crash and hang. The
+router counts the tool calls per turn; at the check-in cadence it
+sends a 'working' beacon; at the hard cap it halts via the same
+two-stage path as Stop and reports 'tool_call_limit'.
+
+Drives the real router with a fake ACP subprocess that emits a
+TOOL STORM (tool_call events forever, never a usage event — the
+rabbit-hole shape) + a config with tiny caps.
+"""
+
+import time
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.domain.external_agent import AcpClient
+from app.domain.external_agent.schemas import ExternalAgentConfig
+from app.api.v1.external_agent_router import router as external_agent_router
+
+from tests.unit.test_external_agent_ws_cancel import _wait_for
+
+app = FastAPI()
+app.include_router(external_agent_router)
+
+TOOLSTORM_ACP = r"""
+import json, sys, time
+
+def send(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg["method"] == "initialize":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
+    elif msg["method"] == "session/new":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"sessionId": "storm-1"}})
+        send({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "storm-1",
+            "update": {"size": 1000, "used": 1, "sessionUpdate": "usage_update"},
+        }})
+    elif msg["method"] == "session/set_config_option":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"configOptions": []}})
+    elif msg["method"] == "session/prompt":
+        # THE TOOL STORM: tool_call events forever, never a usage
+        # event — the rabbit-hole shape. The router's budget must
+        # beacon (working) then halt (tool_call_limit).
+        n = 0
+        while True:
+            n += 1
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {
+                "sessionId": "storm-1",
+                "update": {"content": {"type": "text", "text": f"tool-{n}"},
+                           "sessionUpdate": "tool_call"},
+            }})
+            time.sleep(0.02)
+"""
+
+
+@pytest.fixture
+def storm_script(tmp_path):
+    script = tmp_path / "storm_acp.py"
+    script.write_text(TOOLSTORM_ACP, encoding="utf-8")
+    return ["python3", str(script)]
+
+
+def _patch(monkeypatch, client: AcpClient, config: ExternalAgentConfig):
+    """Point the handler at our fake client + the tiny-cap config."""
+    monkeypatch.setattr(
+        "app.api.v1.external_agent_router.get_acp_client",
+        lambda *a, **k: client,
+    )
+
+    async def _fake_get_config(db):
+        # the ACTIVE path: Exa ships inactive (2026-11-18)
+        return config.model_copy(update={"enabled": True})
+
+    monkeypatch.setattr("app.api.v1.external_agent_router.get_config", _fake_get_config)
+
+    async def _fake_db():
+        yield None
+
+    monkeypatch.setattr("app.api.v1.external_agent_router._db", _fake_db)
+
+
+def test_tool_storm_hits_the_cap_with_checkins(monkeypatch, storm_script, tmp_path):
+    """The tool storm must trigger the 'working' beacons (the enforced
+    check-in) and then the 'tool_call_limit' halt — never run silent."""
+    client = AcpClient(command=storm_script, cwd=str(tmp_path))
+    config = ExternalAgentConfig(
+        max_tool_calls_per_turn=3,
+        tool_call_checkin_every=2,
+        max_turn_seconds=0,  # the time cap off — the tool cap must fire
+    )
+    _patch(monkeypatch, client, config)
+
+    with TestClient(app) as tc:
+        with tc.websocket_connect("/external-agent/ws") as ws:
+            statuses = []
+            # the ready handshake first
+            while True:
+                msg = ws.receive_json()
+                if msg.get("type") == "status" and msg["status"] == "ready":
+                    break
+            ws.send_json({"type": "prompt", "text": "go"})
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                msg = ws.receive_json()
+                if msg.get("type") == "status":
+                    statuses.append(msg["status"])
+                    if msg["status"] == "tool_call_limit":
+                        break
+            assert "tool_call_limit" in statuses, (
+                f"the tool cap never fired — statuses: {statuses}"
+            )
+            assert "working" in statuses, (
+                f"the check-in beacons never fired — statuses: {statuses}"
+            )
+            # the halt escalates (the storm ignores session/cancel) —
+            # wait INSIDE the WS context for the subprocess death
+            assert _wait_for(lambda: client.connected is False, timeout=12.0)
+
+
+def test_tool_cap_zero_is_unlimited(monkeypatch, storm_script, tmp_path):
+    """max_tool_calls_per_turn=0 disables the cap — the storm runs
+    until the test tears it down (no tool_call_limit status)."""
+    client = AcpClient(command=storm_script, cwd=str(tmp_path))
+    config = ExternalAgentConfig(
+        max_tool_calls_per_turn=0,
+        tool_call_checkin_every=0,
+        max_turn_seconds=0,
+    )
+    _patch(monkeypatch, client, config)
+
+    with TestClient(app) as tc:
+        with tc.websocket_connect("/external-agent/ws") as ws:
+            while True:
+                msg = ws.receive_json()
+                if msg.get("type") == "status" and msg["status"] == "ready":
+                    break
+            ws.send_json({"type": "prompt", "text": "go"})
+            # a few tool-call frames arrive (the storm is running)
+            tool_frames = 0
+            for _ in range(20):
+                msg = ws.receive_json()
+                if msg.get("type") == "tool_call":
+                    tool_frames += 1
+            assert tool_frames > 0
+            # the turn is still alive — the budget never fired
+            ws.send_json({"type": "nuke"})

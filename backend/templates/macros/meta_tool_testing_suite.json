@@ -1,0 +1,32 @@
+{
+  "export_type": "meta_topic",
+  "version": "1.0",
+  "description": "Complete tool testing suite - all tool testing macro sets combined",
+  "data": {
+    "name": "Tool Testing Suite",
+    "description": "Comprehensive tool testing across calculator basics, advanced, web search, mixed tools, and verification",
+    "topic_mappings": [
+      {
+        "topic": "Tool Testing - Calculator",
+        "slot_start": "F1"
+      },
+      {
+        "topic": "Tool Testing - Calculator Advanced",
+        "slot_start": "F6"
+      },
+      {
+        "topic": "Tool Testing - Web Search",
+        "slot_start": "F11"
+      },
+      {
+        "topic": "Tool Testing - Mixed Tools",
+        "slot_start": "F16"
+      },
+      {
+        "topic": "Tool Testing - Verification",
+        "slot_start": "F21"
+      }
+    ],
+    "is_active": true
+  }
+}

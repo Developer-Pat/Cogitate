@@ -1,0 +1,14 @@
+{
+  "topic": "Refactoring",
+  "name": "Improve Code Quality",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Can you help me refactor this function to be more readable?",
+    "f2": "This class has too many responsibilities. How should I split it up?",
+    "f3": "Help me replace this switch statement with polymorphism.",
+    "f4": "Can you show me how to extract this duplicate logic into a shared utility?",
+    "f5": "This method is too long. Can you help me break it into smaller functions?"
+  }
+}

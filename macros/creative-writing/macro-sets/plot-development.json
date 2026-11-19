@@ -1,0 +1,14 @@
+{
+  "topic": "Plot Development",
+  "name": "Plot Architect",
+  "description": "Outline story structure, create twists, build tension, and resolve conflicts",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Could you outline a three-act story structure for me?",
+    "f2": "Can you suggest a plot twist that would surprise the reader?",
+    "f3": "Help me build rising tension with escalating conflicts.",
+    "f4": "How should I write the climax of this story?",
+    "f5": "Can you create a subplot that ties into the main story?"
+  }
+}

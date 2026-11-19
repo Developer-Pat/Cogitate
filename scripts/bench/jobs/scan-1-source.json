@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "id": "scan-1-source",
+  "why": "One source, scan depth: the floor. It prices the fixed cost of a turn that reads a single page — system prompt, tool schemas and one fetch's tool result — and it is the control the bigger jobs are read against. The check is a fact only that page carries (its founding year and its county), so a run that answers from the model's own memory instead of reading fails. The path is PINNED: one source, one fetch, so this is the job whose band is tight enough to gate on.",
+  "axis": {"size": 1, "kind": "scan"},
+  "agent": "Bob",
+  "state": {"assignment": "fresh"},
+  "message": "Read this page with the reader and give me the essentials in a few lines — what it is, where it is, and when it started: https://en.wikipedia.org/wiki/Omaha,_Nebraska",
+  "budget": {"rounds": 6, "schemas_max": 4200, "system_max": 3200, "capped_chars_per_fetch": 30000,
+             "tokens_in_alarm": 80000},
+  "check": {
+    "type": "contains_all",
+    "needles": ["1854", "Douglas County"],
+    "case_sensitive": false,
+    "require_fetched": true
+  }
+}

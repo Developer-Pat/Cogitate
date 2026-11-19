@@ -1,0 +1,14 @@
+{
+  "name": "Algebra & Trig",
+  "namespace": "agent",
+  "description": "Algebra-related macro sets",
+  "is_active": true,
+  "sort_order": 0,
+  "macro_sets": [
+    "basic-algebra.json",
+    "advanced-algebra.json",
+    "basic-trig.json",
+    "advanced-trig.json",
+    "linear-algebra.json"
+  ]
+}

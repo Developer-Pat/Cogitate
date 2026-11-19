@@ -1,0 +1,14 @@
+{
+  "topic": "News & Trends",
+  "name": "Stay Informed",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What are the top technology news stories this week?",
+    "f2": "Find recent articles about breakthroughs in battery technology.",
+    "f3": "Search for trends in software development methodologies.",
+    "f4": "Look up the latest developments in space exploration.",
+    "f5": "Find analysis of current trends in cybersecurity threats."
+  }
+}

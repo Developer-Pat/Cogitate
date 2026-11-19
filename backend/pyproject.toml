@@ -1,0 +1,115 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Cogitate Backend - Multi-agent LLM orchestration platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-2.0-only"
+dependencies = [
+    "alembic>=1.16.5",
+    "click>=8.1.0",
+    "fastapi>=0.116.1",
+    "httpx>=0.28.1",
+    "langchain-core>=0.3.11",
+    "langchain>=0.3.27",
+    "langchain-community>=0.3.29",
+    "langchain-openai>=0.3.33",
+    "langgraph>=0.6.7",
+    "pydantic-settings>=2.10.1",
+    "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
+    "sqlalchemy[asyncio]>=2.0.53,<2.1",
+    "sqlite-vec>=0.1.0",
+    "uvicorn[standard]>=0.35.0",
+    "psutil>=7.1.0",
+    "aiosqlite>=0.22.1",
+    "litellm>=1.96.0",  # ollama streaming tool calls need the ollama_chat handler (1.96 verified live)
+    "cryptography>=46.0.5",
+    "pytz>=2025.2",
+    "langgraph-checkpoint-sqlite>=3.0.3",
+    "langfuse>=4.0.1",
+    "langchain-ollama>=1.0.1",
+    "apscheduler>=3.11.2",
+    "mistune>=3.2.0",
+    "markdown-it-py>=4.0.0",
+    "duckduckgo-search>=8.1.1",
+    "ddgs>=9.13.0",
+    "blinker>=1.9.0",
+    "sse-starlette>=3.4.8",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "flower>=2.0.1",
+    "isort>=6.0.1",
+    "mypy>=1.18.1",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "pytest-xdist>=3.8.0",
+    "testcontainers>=4.13.0",
+    "vulture>=2.16",
+]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-autodoc-typehints>=1.25.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "furo>=2024.1.0",
+    "myst-parser>=2.0.0",
+]
+
+[project.scripts]
+svc = "backend.svc_standalone:main"
+llm = "backend.cli.main:cli"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests",
+    "performance: marks tests as performance tests",
+    "slow: marks tests as slow (live LLM calls or long-running); excluded from light scans"
+]
+asyncio_mode = "auto"
+norecursedirs = [
+    "arch",
+    "archives",
+    "tmp",
+    "obsolete"
+]
+testpaths = [
+    "tests",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "apscheduler.*",
+    "psutil",
+    "pyperclip",
+    "sqlite_vec",
+    "app.workflows.template_models",
+    "app.api.deps",
+    "app.domain.providers.models",
+    "langchain_anthropic",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
+disable_error_code = "import-untyped"

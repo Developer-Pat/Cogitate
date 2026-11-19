@@ -1,0 +1,14 @@
+{
+  "topic": "Quick Fact",
+  "name": "Fast & Stateless",
+  "description": "",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What is the capital of France?",
+    "f2": "What year did the Berlin Wall fall?",
+    "f3": "What is the chemical symbol for gold?",
+    "f4": "How many continents are there?",
+    "f5": "What is the speed of light in a vacuum?"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "Latin America & Africa",
+  "name": "Global South History",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the history of Brazil from colony to emerging power.",
+    "f2": "Tell me about the history of Argentina from Spanish rule to modern times.",
+    "f3": "Tell me about the history of Nigeria from pre-colonial kingdoms to today.",
+    "f4": "Tell me about the history of Egypt from the Pharaohs to the Arab Spring.",
+    "f5": "Tell me about the history of Kenya from colonialism to independence."
+  }
+}

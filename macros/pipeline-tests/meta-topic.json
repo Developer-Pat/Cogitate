@@ -1,0 +1,13 @@
+{
+  "name": "Pipeline Tests",
+  "namespace": "agent",
+  "description": "Macros designed to exercise cognitive pipeline strategies: fast path, hybrid two-pass, memory retention, JSON output, and stateless behavior.",
+  "is_active": true,
+  "macro_sets": [
+    "quick-fact.json",
+    "deep-analysis.json",
+    "conversation-memory.json",
+    "json-output.json",
+    "stateless-test.json"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "Technical Documentation",
+  "name": "API & Tool Docs",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Find the official documentation for the React useEffect hook.",
+    "f2": "Search for the Docker Compose file format reference.",
+    "f3": "Look up the AWS S3 API for uploading files with Python.",
+    "f4": "Find the TypeScript handbook section on generics.",
+    "f5": "Search for PostgreSQL query optimization techniques."
+  }
+}

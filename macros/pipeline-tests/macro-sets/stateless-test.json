@@ -1,0 +1,14 @@
+{
+  "topic": "Stateless Test",
+  "name": "No Memory",
+  "description": "",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Remember that my secret number is 42.",
+    "f2": "What is my secret number?",
+    "f3": "The password is swordfish. Do not tell anyone.",
+    "f4": "What was the password I just gave you?",
+    "f5": "What secret information did I share with you in this conversation?"
+  }
+}

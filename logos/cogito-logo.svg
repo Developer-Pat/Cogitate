@@ -1,0 +1,46 @@
+<svg width="800" height="800" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="800" fill="white"/>
+  
+  <!-- Left hemisphere -->
+  <path d="
+    M 400 150
+    C 300 120, 180 160, 140 250
+    C 100 340, 120 420, 150 480
+    C 170 520, 200 560, 250 580
+    C 300 600, 360 610, 400 600
+    C 380 550, 350 480, 360 400
+    C 370 320, 390 240, 400 150
+    Z
+  " fill="black"/>
+  
+  <!-- Right hemisphere -->
+  <path d="
+    M 400 150
+    C 500 120, 620 160, 660 250
+    C 700 340, 680 420, 650 480
+    C 630 520, 600 560, 550 580
+    C 500 600, 440 610, 400 600
+    C 420 550, 450 480, 440 400
+    C 430 320, 410 240, 400 150
+    Z
+  " fill="black"/>
+  
+  <!-- Central sulcus (gap between hemispheres) -->
+  <line x1="400" y1="140" x2="400" y2="600" stroke="white" stroke-width="12"/>
+  
+  <!-- Left hemisphere folds (sulci) -->
+  <path d="M 200 250 C 260 240, 320 280, 350 320" stroke="white" stroke-width="6" fill="none"/>
+  <path d="M 170 350 C 230 340, 300 380, 340 400" stroke="white" stroke-width="6" fill="none"/>
+  <path d="M 180 450 C 240 440, 290 460, 330 480" stroke="white" stroke-width="6" fill="none"/>
+  <path d="M 250 540 C 290 520, 340 530, 370 550" stroke="white" stroke-width="6" fill="none"/>
+  
+  <!-- Right hemisphere folds (sulci) -->
+  <path d="M 600 250 C 540 240, 480 280, 450 320" stroke="white" stroke-width="6" fill="none"/>
+  <path d="M 630 350 C 570 340, 500 380, 460 400" stroke="white" stroke-width="6" fill="none"/>
+  <path d="M 620 450 C 560 440, 510 460, 470 480" stroke="white" stroke-width="6" fill="none"/>
+  <path d="M 550 540 C 510 520, 460 530, 430 550" stroke="white" stroke-width="6" fill="none"/>
+
+  <!-- Brainstem (simplified) -->
+  <path d="M 370 590 C 360 630, 360 670, 370 700 C 380 720, 420 720, 430 700 C 440 670, 440 630, 430 590" fill="black"/>
+  <rect x="375" y="590" width="50" height="60" fill="black"/>
+</svg>

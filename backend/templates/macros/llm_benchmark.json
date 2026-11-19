@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "Pre-configured macros for benchmarking LLM responses across different task types",
+  "data": {
+    "topic": "LLM Benchmark Tests",
+    "name": "LLM Benchmark Tests",
+    "description": "Standard prompts for testing and comparing LLM capabilities",
+    "f1_macro": "Explain the following concept in simple terms that a 10-year-old could understand: [concept]",
+    "f2_macro": "Translate the following text to French, then Spanish, then Japanese: [text]",
+    "f3_macro": "Write a Python function that [task]. Include docstrings and type hints.",
+    "f4_macro": "Analyze the following argument for logical fallacies: [argument]",
+    "f5_macro": "Summarize the key points from the following text in 3 bullet points: [text]",
+    "is_active": true,
+    "sort_order": 0
+  }
+}

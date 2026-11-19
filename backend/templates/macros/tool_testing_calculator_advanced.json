@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "Advanced calculator testing with edge cases and complex expressions",
+  "data": {
+    "topic": "Tool Testing - Calculator Advanced",
+    "name": "Tool Testing - Calculator Advanced",
+    "description": "Advanced calculator tests including edge cases and complex multi-step problems",
+    "f1_macro": "What is 123456789 × 987654321? Use your calculator for this large multiplication.",
+    "f2_macro": "Calculate 100 ÷ 0. What happens? Explain the result.",
+    "f3_macro": "Compute: (2.5 × 10⁸) ÷ (5 × 10³). Express in scientific notation.",
+    "f4_macro": "What is 17 factorial (17!)? Use your calculator to compute this.",
+    "f5_macro": "Calculate the compound interest: $1000 × (1.05)^10. Show the final amount.",
+    "is_active": true,
+    "sort_order": 1
+  }
+}

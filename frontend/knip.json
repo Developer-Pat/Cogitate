@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "vite.config.ts",
+    "src/config/routes.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": [
+    "src/components/**/index.ts",
+    "src/hooks/index.ts",
+    "src/services/index.ts",
+    "src/**/__tests__/**",
+    "src/**/*.test.{ts,tsx}",
+    "src/**/*.spec.{ts,tsx}"
+  ],
+  "ignoreDependencies": [
+    "@types/react",
+    "@types/react-dom",
+    "@types/node"
+  ],
+  "ignoreExportsUsedInFile": true
+}

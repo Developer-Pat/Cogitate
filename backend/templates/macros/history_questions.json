@@ -1,0 +1,17 @@
+{
+  "export_type": "macro_set",
+  "version": "1.0",
+  "description": "History questions about Ancient Egypt",
+  "data": {
+    "topic": "Ancient Egypt",
+    "name": "Ancient Egypt Questions",
+    "description": "Specific questions about Egyptian history",
+    "f1_macro": "How were the pyramids of Giza constructed and for which pharaohs?",
+    "f2_macro": "What did Howard Carter discover in Tutankhamun tomb in 1922?",
+    "f3_macro": "Explain the religious reforms of Pharaoh Akhenaten.",
+    "f4_macro": "What was the significance of the Rosetta Stone in deciphering hieroglyphics?",
+    "f5_macro": "Describe the reign of Cleopatra VII and her relationships with Rome.",
+    "is_active": true,
+    "sort_order": 0
+  }
+}

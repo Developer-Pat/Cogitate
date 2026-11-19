@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cogitate Memory Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg-body);color:var(--text-primary);font-family:'JetBrains Mono',monospace;padding:8px 4px;display:flex;flex-direction:column;align-items:center}
+.container{width:100%}
+.header{text-align:center;margin-bottom:40px}
+.header h1{font-size:24px;font-weight:600;color:var(--text-primary)}
+.header .subtitle{font-size:12px;color:var(--text-muted);margin-top:8px}
+.pulse{display:inline-block;width:8px;height:8px;background:#a78bfa;border-radius:50%;margin-right:8px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.diagram-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px;padding:8px;margin-bottom:16px;overflow-x:auto}
+svg{display:block;margin:0 auto}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;padding:8px}
+.card-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.card-dot{width:8px;height:8px;border-radius:50%}
+.card-dot.violet{background:#a78bfa}
+.card-dot.emerald{background:#34d399}
+.card-dot.cyan{background:#22d3ee}
+.card h3{font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px}
+.card ul{list-style:none;padding:0}
+.card li{font-size:10px;color:var(--text-muted);padding:2px 0}
+.footer{text-align:center;font-size:9px;color:var(--text-dim);padding:16px}
+
+/* ─── Theme Variables ─────────────────────────────── */
+:root, .dark {
+  --bg-body: #020617;
+  --bg-card: #0f172a;
+  --border-color: #1e293b;
+  --text-primary: #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim: #475569;
+  --grid-color: #1e293b;
+  --accent-cyan: #22d3ee;
+  --accent-emerald: #34d399;
+  --accent-violet: #a78bfa;
+  --accent-orange: #fb923c;
+  --accent-rose: #fb7185;
+  --accent-amber: #fbbf24;
+  --fill-frontend: rgba(8, 51, 68, 0.4);
+  --fill-backend: rgba(6, 78, 59, 0.4);
+  --fill-database: rgba(76, 29, 149, 0.4);
+  --fill-orange: rgba(251, 146, 60, 0.3);
+  --fill-green: rgba(22, 163, 74, 0.3);
+  --arrow-color: #64748b;
+}
+
+.light {
+  --bg-body: #f1f5f9;
+  --bg-card: #ffffff;
+  --border-color: #cbd5e1;
+  --text-primary: #1e293b;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --grid-color: #e2e8f0;
+  --accent-cyan: #0891b2;
+  --accent-emerald: #059669;
+  --accent-violet: #7c3aed;
+  --accent-orange: #ea580c;
+  --accent-rose: #e11d48;
+  --accent-amber: #d97706;
+  --fill-frontend: rgba(14, 116, 144, 0.15);
+  --fill-backend: rgba(5, 150, 105, 0.15);
+  --fill-database: rgba(124, 58, 237, 0.12);
+  --fill-orange: rgba(234, 88, 12, 0.1);
+  --fill-green: rgba(22, 163, 74, 0.1);
+  --arrow-color: #94a3b8;
+}
+
+</style>
+</head>
+<body>
+
+<div style="text-align:right;margin-bottom:8px">
+  <button onclick="toggleTheme()" style="background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border-color);border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:'JetBrains Mono',monospace">
+    🌙 Toggle Theme
+  </button>
+</div>
+
+
+<script>
+function toggleTheme() {
+  var el = document.body;
+  if (el.classList.contains('light')) {
+    el.classList.remove('light');
+    el.classList.add('dark');
+  } else {
+    el.classList.remove('dark');
+    el.classList.add('light');
+  }
+}
+</script>
+
+
+<div class="container">
+<div class="header">
+<h1><span class="pulse"></span>Memory Architecture</h1>
+<p class="subtitle">KVStoreMemoryManager &mdash; per-agent isolation &amp; fact storage</p>
+</div>
+
+<div class="diagram-card">
+<svg width="960" height="520" viewBox="45 20 880 490">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--grid-color)" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--arrow-color)"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-violet)"/>
+    </marker>
+  </defs>
+  <rect width="960" height="520" fill="url(#grid)"/>
+
+  <!-- Memory Manager -->
+  <rect x="330" y="30" width="300" height="50" rx="6" fill="var(--bg-card)"/>
+  <rect x="330" y="30" width="300" height="50" rx="6" fill="var(--fill-database)"/>
+  <rect x="330" y="30" width="300" height="50" rx="6" fill="none" stroke="var(--accent-violet)" stroke-width="1.5"/>
+  <text x="480" y="53" font-size="12" fill="var(--accent-violet)" text-anchor="middle" font-weight="500">KVStoreMemoryManager</text>
+  <text x="480" y="69" font-size="9" fill="var(--arrow-color)" text-anchor="middle">Interface: remember() &bull; recall() &bull; save_facts() &bull; recall_facts()</text>
+
+  <!-- Arrow to Per-Agent DBs -->
+  <line x1="400" y1="80" x2="400" y2="130" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+  <text x="280" y="108" font-size="8" fill="var(--arrow-color)">_is_deep=True &rarr; per-agent path</text>
+
+  <!-- Per-Agent DB (left) -->
+  <rect x="60" y="130" width="300" height="100" rx="6" fill="var(--bg-card)"/>
+  <rect x="60" y="130" width="300" height="100" rx="6" fill="var(--fill-database)"/>
+  <rect x="60" y="130" width="300" height="100" rx="6" fill="none" stroke="var(--accent-violet)" stroke-width="1.5"/>
+  <text x="210" y="155" font-size="11" fill="var(--accent-violet)" text-anchor="middle" font-weight="500">Deep Agents</text>
+  <text x="210" y="175" font-size="9" fill="var(--arrow-color)" text-anchor="middle">agents/{name}/cognitive_memory.db</text>
+  <text x="210" y="195" font-size="9" fill="var(--arrow-color)" text-anchor="middle">Researcher &bull; System Manager</text>
+  <text x="210" y="215" font-size="9" fill="var(--arrow-color)" text-anchor="middle">Key: agent_{id}:facts / agent_{id}:{session}</text>
+
+  <!-- Arrow to Shared DB -->
+  <line x1="560" y1="80" x2="560" y2="130" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="620" y="108" font-size="8" fill="var(--arrow-color)">_is_deep=False</text>
+
+  <!-- Shared DB (right) -->
+  <rect x="460" y="130" width="440" height="100" rx="6" fill="var(--bg-card)"/>
+  <rect x="460" y="130" width="440" height="100" rx="6" fill="var(--fill-database)"/>
+  <rect x="460" y="130" width="440" height="100" rx="6" fill="none" stroke="var(--text-muted)" stroke-width="1.5"/>
+  <text x="680" y="155" font-size="11" fill="#94a3b8" text-anchor="middle" font-weight="500">Shallow / Standard Agents</text>
+  <text x="680" y="175" font-size="9" fill="var(--arrow-color)" text-anchor="middle">data/cognitive_memory.db (shared)</text>
+  <text x="680" y="195" font-size="9" fill="var(--arrow-color)" text-anchor="middle">All agents use same database file</text>
+  <text x="680" y="215" font-size="9" fill="var(--arrow-color)" text-anchor="middle">Key prefix: agent_{id}:* for isolation</text>
+
+  <!-- Region: How keys work -->
+  <rect x="60" y="270" width="840" height="120" rx="12" fill="none" stroke="var(--accent-violet)" stroke-width="1.5" stroke-dasharray="8,4"/>
+  <text x="80" y="292" font-size="9" fill="var(--accent-violet)" font-weight="500">KEY STRUCTURE</text>
+
+  <!-- Fact storage -->
+  <rect x="80" y="305" width="370" height="40" rx="6" fill="var(--bg-card)"/>
+  <rect x="80" y="305" width="370" height="40" rx="6" fill="var(--fill-database)"/>
+  <rect x="80" y="305" width="370" height="40" rx="6" fill="none" stroke="var(--accent-violet)" stroke-width="1"/>
+  <text x="265" y="325" font-size="11" fill="var(--accent-violet)" text-anchor="middle" font-weight="500">Facts</text>
+  <text x="265" y="338" font-size="8" fill="var(--arrow-color)" text-anchor="middle">key: &quot;agent_{id}:facts&quot; &rarr; value: [...]</text>
+
+  <!-- Turn storage -->
+  <rect x="510" y="305" width="370" height="40" rx="6" fill="var(--bg-card)"/>
+  <rect x="510" y="305" width="370" height="40" rx="6" fill="var(--fill-database)"/>
+  <rect x="510" y="305" width="370" height="40" rx="6" fill="none" stroke="var(--accent-violet)" stroke-width="1"/>
+  <text x="695" y="325" font-size="11" fill="var(--accent-violet)" text-anchor="middle" font-weight="500">Conversation Turns</text>
+  <text x="695" y="338" font-size="8" fill="var(--arrow-color)" text-anchor="middle">key: &quot;agent_{id}:{session_id}&quot; &rarr; value: [...]</text>
+
+  <!-- DB tables -->
+  <rect x="60" y="420" width="840" height="70" rx="12" fill="none" stroke="var(--accent-emerald)" stroke-width="1.5" stroke-dasharray="8,4"/>
+  <text x="80" y="442" font-size="9" fill="var(--accent-emerald)" font-weight="500">DATABASE SCHEMA (cognitive_memory table)</text>
+
+  <rect x="80" y="450" width="800" height="30" rx="4" fill="var(--bg-card)" stroke="#1e293b" stroke-width="1"/>
+  <text x="120" y="470" font-size="9" fill="var(--accent-cyan)">key (TEXT PK)</text>
+  <text x="320" y="470" font-size="9" fill="var(--accent-emerald)">value (TEXT — JSON encoded)</text>
+  <text x="600" y="470" font-size="9" fill="var(--accent-violet)">turn_count (INTEGER)</text>
+  <text x="780" y="470" font-size="9" fill="var(--accent-orange)">updated_at (DATETIME)</text>
+
+  <!-- Legend -->
+  <rect x="750" y="30" width="170" height="100" rx="6" fill="var(--bg-card)" stroke="#1e293b" stroke-width="1"/>
+  <text x="765" y="50" font-size="9" fill="#94a3b8" font-weight="500">MEMORY PROFILES</text>
+  <text x="765" y="68" font-size="8" fill="var(--accent-cyan)">kv_store &rarr; SQLite</text>
+  <text x="765" y="83" font-size="8" fill="#94a3b8">default &rarr; in-memory</text>
+  <text x="765" y="98" font-size="8" fill="var(--arrow-color)">noop &rarr; none</text>
+  <text x="765" y="113" font-size="8" fill="var(--accent-orange)">config: persistence=sqlite</text>
+</svg>
+</div>
+
+<div class="summary-grid">
+  <div class="card">
+    <div class="card-header"><div class="card-dot violet"></div><h3>Per-Agent DBs</h3></div>
+    <ul>
+      <li>&bull; File: agents/{name}/cognitive_memory.db</li>
+      <li>&bull; Created on first deep-pass message</li>
+      <li>&bull; _is_deep=True triggers per-agent path</li>
+      <li>&bull; Used by: research-pro, system-admin profiles</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-dot emerald"></div><h3>Session Isolation</h3></div>
+    <ul>
+      <li>&bull; Switching agents creates new session</li>
+      <li>&bull; Session messages NOT shared across agents</li>
+      <li>&bull; KV key: agent_{id}:{session_id}</li>
+      <li>&bull; Facts key: agent_{id}:facts (always isolated)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-dot cyan"></div><h3>Facts</h3></div>
+    <ul>
+      <li>&bull; Extracted after each assistant response</li>
+      <li>&bull; JSON array of strings per agent</li>
+      <li>&bull; Best-effort extraction (silent on failure)</li>
+      <li>&bull; Shared "facts" key bug: FIXED (now per-agent)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">Cogitate &mdash; Nous Research Hermes Agent Platform</div>
+</div>
+</body>
+</html>

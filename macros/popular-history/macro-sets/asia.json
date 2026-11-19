@@ -1,0 +1,14 @@
+{
+  "topic": "Asia",
+  "name": "Asian History",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the history of China from the dynasties to modern times.",
+    "f2": "Tell me about the history of Japan from the shogun era to modernization.",
+    "f3": "Tell me about the history of India from the Indus Valley to independence.",
+    "f4": "Tell me about the history of Korea from the Three Kingdoms to division.",
+    "f5": "Tell me about the history of Vietnam and the Indochina wars."
+  }
+}

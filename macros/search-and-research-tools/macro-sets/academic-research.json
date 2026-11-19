@@ -1,0 +1,14 @@
+{
+  "topic": "Academic Research",
+  "name": "Deep Research",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Search for peer-reviewed papers on the effects of climate change on agriculture.",
+    "f2": "Find research on the effectiveness of spaced repetition for learning.",
+    "f3": "Look up the history and development of the transformer architecture in NLP.",
+    "f4": "Search for studies comparing remote work productivity to in-office work.",
+    "f5": "Find academic sources on the economic impact of universal basic income."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "Advanced Algebra",
+  "name": "Advanced Algebra",
+  "description": null,
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "What can you tell me about polynomial long division?",
+    "f2": "What can you tell me about matrices and determinants?",
+    "f3": "What can you tell me about complex numbers?",
+    "f4": "What can you tell me about logarithms and exponential functions?",
+    "f5": "What can you tell me about sequences and series?"
+  }
+}
