@@ -140,7 +140,7 @@ export default function ProfileList({
           <button
             onClick={onCreateNew}
             disabled={isLoading}
-            className="btn btn-primary btn-sm flex-1 rounded-[var(--button-radius)] px-[var(--button-padding)] transition-all duration-[var(--button-transition)]"
+            className="btn btn-primary btn-sm flex-1 whitespace-nowrap rounded-[var(--button-radius)] px-[var(--button-padding)] transition-all duration-[var(--button-transition)]"
           >
             <span className="text-lg">+</span>
             New Profile
