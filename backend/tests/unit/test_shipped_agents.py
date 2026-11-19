@@ -309,3 +309,20 @@ async def test_a_kit_member_joins_to_the_tool_row_it_names(seed_dir, test_sessio
         "store resolves to nothing, and the agent is offered zero tools"
     )
     assert joined[0].entity_name == "DateTime"
+
+    # THE GRANT — the half that actually broke the chat path: the surface is built from
+    # `tool_collection_permissions`, so a kit that only LISTS its members grants nothing and
+    # `_toolkit_slugs_for_agent` returns an EMPTY set ("owns kits ⇒ no GRAS default").
+    from app.domain.tools.execution_service import ToolExecutionService
+    from app.domain.tools.tool_permission_models import ToolCollectionPermission
+
+    grants = (await test_session.execute(select(ToolCollectionPermission))).scalars().all()
+    assert len(grants) == 1, "membership without a grant is a kit that grants nothing"
+    assert grants[0].tool_id == joined[0].entity_id
+
+    agent = (await test_session.execute(select(Agent))).scalars().one()
+    slugs = await ToolExecutionService(test_session)._toolkit_slugs_for_agent(str(agent.id))
+    assert slugs == {"datetime"}, (
+        "the agent's surface must resolve to the kit's granted tools — an empty set means "
+        "tools_offered=0 and the model invents a textual <tool_call>"
+    )

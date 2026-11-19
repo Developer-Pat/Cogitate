@@ -50,6 +50,7 @@ from app.core.config import Paths, get_settings
 from app.domain.agents.workspace import scaffold
 from app.domain.collections.models import Collection, CollectionItem
 from app.domain.tools.models import Tool as ToolModel
+from app.domain.tools.tool_permission_models import ToolCollectionPermission
 from app.infrastructure.database.models import Agent, SystemFlag
 
 logger = logging.getLogger(__name__)
@@ -291,6 +292,19 @@ async def _ensure_kit(db, spec: KitSpec) -> tuple[Collection, list[str]]:
                 entity_id=stored_id,
                 entity_type="tool",
                 entity_name=tool.name,
+            )
+        )
+        # THE GRANT (2026-11-19): the chat path builds an agent's tool surface from
+        # `tool_collection_permissions`, NOT from `collection_items`. A kit that only LISTS its
+        # members grants nothing, and `_toolkit_slugs_for_agent` then takes its "owns kits" branch
+        # and returns an EMPTY set — which is why the seeded reporters were offered zero tools
+        # while their three kits looked complete. Membership and grant are written together.
+        db.add(
+            ToolCollectionPermission(
+                id=str(uuid.uuid4()),
+                tool_id=stored_id,
+                collection_id=kit.id,
+                permission_level="execute",
             )
         )
         present.add(stored_id)
