@@ -18,6 +18,7 @@ import { useCognitiveHubStore } from '@/stores/cognitiveHubStore';
 import { SessionService } from '@/services/domain/SessionService';
 import { addTopics, removeTopics } from '@/services/messagingFeed';
 import { eventBus } from '@/services/eventBus';
+import { backoffDelay, shouldReconnectOnClose } from '@/services/exaSocketPolicy';
 import type { ConversationSession } from '@/types/agentInteraction';
 import { frontendLoggingService } from '@/services/frontendLoggingService';
 
@@ -286,6 +287,12 @@ export function AgentPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { addError } = useNotificationStore();
 
+  // THE INACTIVE GATE (2026-11-19): a switched-off Exa answers `inactive` and
+  // closes. Reconnecting against that gate repeats the same sentence every
+  // second (the backoff was reset on open), so the panel says it once and stops.
+  const inactiveRef = useRef(false);
+  const inactiveNotifiedRef = useRef(false);
+
   const close = useCallback(() => {
     setIsOpen(false);
     isOpenRef.current = false;
@@ -318,7 +325,7 @@ export function AgentPanel() {
     if (reconnectTimerRef.current !== null) return; // already scheduled
     const attempt = reconnectAttemptRef.current;
     // exponential backoff: 1s, 2s, 4s... capped at 15s
-    const delay = Math.min(1000 * 2 ** attempt, 15000);
+    const delay = backoffDelay(attempt, 15000);
     reconnectTimerRef.current = window.setTimeout(() => {
       reconnectTimerRef.current = null;
       reconnectAttemptRef.current += 1;
@@ -335,7 +342,13 @@ export function AgentPanel() {
     isOpenRef.current = true;
     setOpenContext(context || null);
     pendingContextRef.current = context || null;
-    reconnectAttemptRef.current = 0;
+    // (the backoff counter is NOT reset here: this runs for the user's open AND
+    // for every scheduled reconnect, so resetting here pinned the delay at 1s —
+    // it resets on the server's `ready` instead)
+    // A user open is a fresh attempt at the gate, so the inactive latch lifts
+    // here and the one-note budget refills.
+    inactiveRef.current = false;
+    inactiveNotifiedRef.current = false;
     // reflect the persisted fix-mode grant (the explicit grant lives
     // on the Exa Agent page; the panel shows it)
     fetch('/api/v1/external-agent/config')
@@ -359,6 +372,10 @@ export function AgentPanel() {
           }
           if (msg.type === 'status' && msg.status === 'ready') {
             setConnected(true);
+            // the server is answering a live Exa: the blips are over
+            inactiveRef.current = false;
+            inactiveNotifiedRef.current = false;
+            reconnectAttemptRef.current = 0;
             // Pending hand-off — NO auto-fire (2026-08-13 incident: a
             // queued prompt that executed on reconnect ran away with no
             // halt path). Surface it as a confirmable message instead;
@@ -474,7 +491,13 @@ export function AgentPanel() {
           } else if (msg.type === 'status' && msg.status === 'inactive') {
             // THE GATE (2026-11-18): Exa ships switched off — say so plainly
             // and stop the spinner, instead of an input that waits forever.
-            addError('Exa', String(msg.message || 'Exa is not active — activate it on the Exa page.'));
+            // ONCE, and the socket stops (2026-11-19): the gate refuses every
+            // reconnect, so repeating the note is only noise.
+            inactiveRef.current = true;
+            if (!inactiveNotifiedRef.current) {
+              inactiveNotifiedRef.current = true;
+              addError('Exa', String(msg.message || 'Exa is not active — activate it on the Exa page.'));
+            }
             clearBusy();
           } else if (msg.type === 'status' && msg.status === 'error') {
             addError('Agent Panel', String(msg.message || 'connection error'));
@@ -540,7 +563,7 @@ export function AgentPanel() {
           // 'offline' until manually reopened. Keep the drawer open and
           // reconnect with exponential backoff — the panel is a
           // persistent workspace, not a one-shot chat.
-          if (isOpenRef.current) {
+          if (isOpenRef.current && shouldReconnectOnClose({ disposed: false, inactive: inactiveRef.current })) {
             scheduleReconnect();
           }
         };

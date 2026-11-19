@@ -24,6 +24,7 @@ import { frontendLoggingService } from '../services/frontendLoggingService'
 import type { ConversationMessage, ConversationSession } from '../types/agentInteraction'
 import { ttsService } from '../services/ttsService'
 import { ttsConfigService } from '../services/domain/ttsConfigService'
+import { backoffDelay, shouldReconnectOnClose } from '../services/exaSocketPolicy'
 
 // THE WS-PROTOCOL (step 1.4 — the first-class stream): the
 // /external-agent/ws events (the AgentPanel's protocol — the local
@@ -429,6 +430,14 @@ export default function ExaChat() {
   // heals itself instead of dying until the reload.
   const reconnectAttemptRef = useRef(0)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // THE INACTIVE GATE (2026-11-19, the user's "loop of messaging" report): an
+  // `inactive` frame is a STATE, not a blip — the socket stops for good and the
+  // page says it ONCE. Reconnecting against a switched-off Exa produced a toast
+  // per attempt, every second, because `onopen` also reset the backoff.
+  const exaInactiveRef = useRef(false)
+  const inactiveNotifiedRef = useRef(false)
+  // the connect closure, so activation can reopen the socket by hand
+  const connectRef = useRef<(() => void) | null>(null)
   // THE AUTO-VOICE (2026-08-30, the _25 P2 build; 2026-09-04, the
   // chat-audio rework P2 — the LIVE read): the tts config's enabled
   // flag — new responses read themselves aloud. The REF (the handler
@@ -487,7 +496,8 @@ export default function ExaChat() {
       const ws = new WebSocket(`${proto}://${window.location.host}/api/v1/external-agent/ws`)
       wsRef.current = ws
       ws.onopen = () => {
-        reconnectAttemptRef.current = 0
+        // the backoff resets on `ready`, never on open — a socket that opens
+        // and immediately closes must still back off (the toast loop's second half)
         setExaConnected(true)
       }
       ws.onmessage = (ev: MessageEvent) => {
@@ -499,15 +509,26 @@ export default function ExaChat() {
       }
       if (msg.type === 'status' && msg.status === 'inactive') {
         // the gate's answer (2026-11-18): a switched-off Exa is a STATE, so the
-        // page says it once and stops pretending the input can send
+        // page says it ONCE and the socket stops for good — the reconnect in
+        // onclose is what turned that one sentence into a toast per second
+        // (2026-11-19, the user's "loop of messaging").
+        exaInactiveRef.current = true
         setExaActive(false)
         setExaBusy(false)
-        useNotificationStore.getState().addNotification({
-          type: 'info',
-          title: 'Exa is not active',
-          message: msg.message || 'Activate it on the Exa page when you want it to answer.',
-        })
+        if (!inactiveNotifiedRef.current) {
+          inactiveNotifiedRef.current = true
+          useNotificationStore.getState().addNotification({
+            type: 'info',
+            title: 'Exa is not active',
+            message: msg.message || 'Activate it on the Exa page when you want it to answer.',
+          })
+        }
       } else if (msg.type === 'status' && msg.status === 'ready') {
+        // a live Exa is answering: the blips are over, so the blip-detection
+        // resets here rather than on every socket open
+        exaInactiveRef.current = false
+        inactiveNotifiedRef.current = false
+        reconnectAttemptRef.current = 0
         setExaConnected(true)
       } else if (msg.type === 'message' && msg.text) {
         // THE STREAMING-CHUNKS (the protocol: {type:'message',
@@ -656,8 +677,10 @@ export default function ExaChat() {
         // THE RECONNECT (2026-08-30): the exp-backoff — 1s, 2s, 4s…
         // capped at 30s — the page comes back on its own; the ring
         // catch-up + the bubble-persistence make the recovery whole.
-        if (!disposed) {
-          const delay = Math.min(30000, 1000 * 2 ** reconnectAttemptRef.current)
+        // NOT after an `inactive` answer: the gate refuses every attempt,
+        // so a reconnect only repeats the sentence (2026-11-19).
+        if (shouldReconnectOnClose({ disposed, inactive: exaInactiveRef.current })) {
+          const delay = backoffDelay(reconnectAttemptRef.current)
           reconnectAttemptRef.current += 1
           reconnectTimerRef.current = setTimeout(connect, delay)
         }
@@ -666,9 +689,11 @@ export default function ExaChat() {
         // the onclose follows the error — the reconnect there
       }
     }
+    connectRef.current = connect
     connect()
     return () => {
       disposed = true
+      connectRef.current = null
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
       wsRef.current?.close()
       wsRef.current = null
@@ -788,12 +813,24 @@ export default function ExaChat() {
 
   // THE ACTIVATION (2026-11-18): one press, and the answer says what the box
   // can actually do — "activated" and "able to answer" are two different facts.
+  // THE RE-PROBE (2026-11-19): activation happens on the SERVER, so the page's
+  // stopped socket is reopened by hand — the gate is lifted, the toast may speak
+  // again, and the backoff starts fresh.
+  const reconnectNow = useCallback(() => {
+    exaInactiveRef.current = false
+    inactiveNotifiedRef.current = false
+    reconnectAttemptRef.current = 0
+    if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) wsRef.current.close()
+    connectRef.current?.()
+  }, [])
+
   const activate = useCallback(async () => {
     setActivating(true)
     try {
       const res = await activateExa()
       setExaActive(res.enabled)
       setExaBlockedReason(res.blocked_reason ?? null)
+      if (res.enabled) reconnectNow()
       useNotificationStore.getState().addNotification({
         type: res.runnable ? 'success' : 'warning',
         title: res.runnable ? 'Exa activated' : 'Exa activated — but it cannot run here yet',
@@ -806,7 +843,7 @@ export default function ExaChat() {
     } finally {
       setActivating(false)
     }
-  }, [])
+  }, [reconnectNow])
 
   return (
     <ErrorBoundary>
