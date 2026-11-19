@@ -1,0 +1,37 @@
+# Line endings: normalise to LF in the repository, let git translate on checkout.
+* text=auto eol=lf
+
+# Source and docs are text on purpose.
+*.py      text eol=lf
+*.sh      text eol=lf
+*.md      text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.json    text eol=lf
+*.toml    text eol=lf
+*.svg     text eol=lf
+*.css     text eol=lf
+*.ts      text eol=lf
+*.tsx     text eol=lf
+
+# Assets: never diff, never converted.
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.webp    binary
+*.gif     binary
+*.ico     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.pdf     binary
+*.onnx    binary
+*.db      binary
+*.sqlite  binary
+*.bundle  binary
+*.qcow2   binary
+
+# Generated lockfiles: one line in diffs, out of the language statistics.
+uv.lock                    linguist-generated=true -diff
+backend/uv.lock            linguist-generated=true -diff
+frontend/package-lock.json linguist-generated=true -diff

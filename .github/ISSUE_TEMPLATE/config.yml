@@ -1,0 +1,11 @@
+# The issue chooser: templates only, no blank issues — the two templates ask the
+# questions that make a report actionable, and install questions are not issues.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Question or install report
+    url: https://github.com/Developer-Pat/Cogitate/discussions
+    about: Ask a question or post an install report in Discussions instead of opening an issue.
+  - name: Report a security vulnerability
+    url: https://github.com/Developer-Pat/Cogitate/blob/main/SECURITY.md
+    about: Please do not open a public issue for a vulnerability — SECURITY.md explains the private route.

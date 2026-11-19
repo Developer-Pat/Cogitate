@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/python-3.14-blue" alt="Python 3.14"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/node-20+-green" alt="Node 20+"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/license-GPLv2-blue" alt="License GPLv2"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/status-active%20development-brightgreen" alt="Status Active Development"/></a>
+  <img src="https://img.shields.io/badge/python-3.14-blue" alt="Python 3.14"/>
+  <img src="https://img.shields.io/badge/node-20+-green" alt="Node 20+"/>
+  <img src="https://img.shields.io/badge/license-GPLv2-blue" alt="License GPLv2"/>
+  <img src="https://img.shields.io/badge/status-active%20development-brightgreen" alt="Status Active Development"/>
 </p>
 
 > 🚀 **Project Status: Active Development**
