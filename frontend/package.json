@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
-    "@storybook/react-vite": "^9.1.13",
+    "@storybook/react-vite": "^10.6.7",
     "@tailwindcss/vite": "^4.2.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
