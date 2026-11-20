@@ -34,6 +34,30 @@ from app.domain.providers.provider_endpoints import compat_root_offer, resolve_e
 # those other homes are banked in the todo's literal sweep rather than churned here.
 LOCAL_KEY_PLACEHOLDER = "local-llama"
 
+# The hosts whose key NOTHING authenticates: a loopback server, and only a loopback server.
+_LOOPBACK_MARKERS = ("localhost", "127.0.0.1", "0.0.0.0", "::1")
+
+
+def placeholder_key_for(endpoint: str | None, model: str | None = None) -> str | None:
+    """The dummy key for a KEYLESS call — None for anything that authenticates.
+
+    THE GUARD (measured 2026-11-20): the placeholder was applied whenever a row had *any*
+    api_base, so a CLOUD row with no key in reach authenticated with `local-llama` and the
+    vendor's 401 read as a bad credential. A cloud endpoint with no key must fail as MISSING,
+    which means sending no key and letting the caller name the provider.
+
+    KEYLESS is a property of the HANDLER and the HOST, not of having an address:
+    - `ollama_chat/…` attaches no auth at all (its `ollama_cloud` root is `https://ollama.com`,
+      a cloud host, and the key is added by its own separate branch) — so the handler decides;
+    - an openai-compatible adapter pointed at a loopback server needs a non-empty key it will
+      never check — so the host decides.
+    """
+    if model and model.startswith("ollama_chat/"):
+        return LOCAL_KEY_PLACEHOLDER
+    if not endpoint:
+        return None
+    return LOCAL_KEY_PLACEHOLDER if any(m in endpoint for m in _LOOPBACK_MARKERS) else None
+
 
 def single_served_model(config: ProviderConfig, base_url: str | None = None) -> str:
     """What a LOCAL server reports it is serving, when it reports EXACTLY ONE model.

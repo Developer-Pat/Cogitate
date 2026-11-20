@@ -1194,7 +1194,10 @@ async def chat_delegate(
         # The keyless local servers (the llama, 2026-09-01) still
         # need a NON-EMPTY key for the litellm's openai-adapter —
         # the 'Missing credentials' error otherwise.
-        request_kwargs["api_key"] = "local-llama"
+        from app.domain.providers.llm_factory import placeholder_key_for
+        _placeholder = placeholder_key_for(api_base)
+        if _placeholder:
+            request_kwargs["api_key"] = _placeholder
         logger.info("BUILD-DEBUG elif fired (api_base=%s api_key=%r)", bool(api_base), api_key)
 
     if provider_name == "ollama_cloud" and api_key:
@@ -3534,7 +3537,11 @@ def _backup_request(request_kwargs: Dict[str, Any], candidate: Any) -> Dict[str,
         # `https://ollama.com/v1/api/chat`, a measured 404, for every `ollama_cloud` BACKUP. The
         # alias stays the source of the endpoint; the root is derived from it.
         kwargs["api_base"] = api_base_for(kwargs["model"], alias_base)
-        kwargs["api_key"] = "local-llama"
+        from app.domain.providers.llm_factory import placeholder_key_for
+        _placeholder = placeholder_key_for(kwargs["api_base"], kwargs.get("model"))
+        if _placeholder:
+            kwargs["api_key"] = _placeholder
+
     return kwargs
 
 

@@ -406,7 +406,14 @@ Topics:""",
         # (the Bonsai test, 2026-09-01 — 'Missing credentials').
         if api_base:
             config["api_base"] = api_base
-            config["api_key"] = self.api_key or "local-llama"
+            if self.api_key:
+                config["api_key"] = self.api_key
+            else:
+                from app.domain.providers.llm_factory import placeholder_key_for
+
+                _placeholder = placeholder_key_for(api_base, model_name)
+                if _placeholder:
+                    config["api_key"] = _placeholder
         elif self.api_key:
             config["api_key"] = self.api_key
 

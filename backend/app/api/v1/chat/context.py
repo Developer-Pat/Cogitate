@@ -557,7 +557,10 @@ def build_llm_request(
         # credentials' error otherwise. (The earlier fixes landed
         # in the router's chat_delegate — the WRONG function; the
         # stream's kwargs come from THIS build_llm_request.)
-        request_kwargs["api_key"] = "local-llama"
+        from app.domain.providers.llm_factory import placeholder_key_for
+        _placeholder = placeholder_key_for(context.api_base, getattr(context, "model", None))
+        if _placeholder:
+            request_kwargs["api_key"] = _placeholder
         logger.info("BUILD-DEBUG elif fired (api_base=%s)", bool(context.api_base))
     # THE OLLAMA CLOUD AUTH (2026-08-24, live): the ollama_chat
     # handler serves the LOCAL ollama (no auth) — it does NOT attach

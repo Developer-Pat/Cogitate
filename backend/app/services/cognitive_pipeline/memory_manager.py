@@ -70,9 +70,12 @@ async def _ask_service(
     }
     if api_base:
         kwargs["api_base"] = api_base_for(litellm_model, api_base)
-        # The keyless local servers still need a NON-EMPTY key for litellm's openai adapter
-        # (the Bonsai test, 2026-09-01 — the 'Missing credentials' error).
-        kwargs["api_key"] = "local-llama"
+        # Keyless LOCAL servers only — a cloud endpoint with no key must fail as missing.
+        from app.domain.providers.llm_factory import placeholder_key_for
+        _placeholder = placeholder_key_for(kwargs["api_base"], litellm_model)
+        if _placeholder:
+            kwargs["api_key"] = _placeholder
+
 
     response = await acompletion(**kwargs)
     return response.choices[0].message.content or ""

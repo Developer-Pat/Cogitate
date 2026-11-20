@@ -56,8 +56,17 @@ class EnvKeyStore:
         return PROVIDER_ENV_VAR.get(provider_type)
 
     def get_key(self, provider_type: str) -> Optional[str]:
-        """Read the key from the current .env file (fresh read)."""
-        var = self.env_var_for(provider_type)
+        """Read the key from the current .env file (fresh read).
+
+        THE LOOKUP TOLERATES A ROW NAME (measured 2026-11-20). The table is keyed by provider
+        TYPE, but several callers hand it the row's NAME — and a row named "Deepseek" found no
+        key, fell through to the keyless placeholder, and sent `local-llama` to DeepSeek, whose
+        401 read as "your key is invalid" for a key that was valid all along. A name that
+        lower-cases onto a known type is that type.
+        """
+        var = self.env_var_for(provider_type) or self.env_var_for(
+            (provider_type or "").strip().lower()
+        )
         if not var or not self.env_path.exists():
             return None
         for line in self.env_path.read_text(encoding="utf-8").splitlines():
