@@ -659,7 +659,7 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
                 <label className="label"><span className="label-text font-semibold">Context Length (tokens)</span></label>
                 <div
                   className="tooltip tooltip-top w-full"
-                  data-tip="The model's context window. The provider's own catalog number WINS: the row is verified against it as it is created, so a value that disagrees is replaced with the provider's and the disagreement is logged."
+                  data-tip="The model's context window. The provider's own catalogue number WINS at create, so a disagreeing value is replaced and logged. It can only LOWER the app's 16,000-token input budget, never raise it — worth setting for a small local model so a turn is trimmed instead of rejected; leave it empty if unknown, because unknown does not clamp."
                 >
                   <input
                     type="number"

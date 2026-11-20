@@ -15,7 +15,8 @@ import type {
   ProviderConfigCreate,
   ProviderConfigUpdate,
 } from '@/types/providers';
-import { HelpButton } from '@/components/help/HelpButton';
+import { HelpButton } from '@/components/help/HelpButton'
+import apiClient from '@/services/apiClient';
 
 /**
  * Configuration form schema using Zod
@@ -59,8 +60,10 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isValid },
     setValue,
+    getValues,
   } = useForm<ConfigFormData>({
     resolver: zodResolver(configFormSchema) as unknown as Resolver<ConfigFormData>,
     mode: 'onChange',
@@ -74,6 +77,51 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
       priority: 99,
     },
   });
+
+  // THE PREFILL (2026-11-20). The app already knows each type's address — the registry
+  // answers at GET /providers, which reads PROVIDER_ENDPOINTS rather than keeping a second
+  // copy (the 2026-10-12 address ruling). So picking a type fills the address in, and a
+  // stranger types nothing they could get wrong. The list grows by adding to the registry.
+  const [catalog, setCatalog] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (mode !== 'add') return
+    let live = true
+    apiClient
+      .get<Record<string, { base_url?: string }>>('/api/v1/providers')
+      .then((resp) => {
+        if (!live) return
+        const rows = (resp.data ?? {}) as Record<string, { base_url?: string }>
+        const table: Record<string, string> = {}
+        for (const [slug, row] of Object.entries(rows)) {
+          if (row?.base_url) table[slug] = row.base_url
+        }
+        setCatalog(table)
+      })
+      .catch(() => {
+        /* no catalog: the fields stay manual, which is what they were before */
+      })
+    return () => {
+      live = false
+    }
+  }, [mode])
+
+  const typeNow = watch('provider_type')
+  const prefilled = React.useRef<Record<string, string>>({})
+  useEffect(() => {
+    if (mode !== 'add' || !typeNow) return
+    const address = catalog[typeNow]
+    if (!address) return
+    const currentUrl = (getValues('base_url') || '').trim()
+    const priorPrefill = Object.values(prefilled.current).includes(currentUrl)
+    if (!currentUrl || priorPrefill) {
+      setValue('base_url', address, { shouldValidate: true })
+      prefilled.current[typeNow] = address
+    }
+    const currentName = (getValues('name') || '').trim()
+    if (!currentName) {
+      setValue('name', typeNow, { shouldValidate: true })
+    }
+  }, [typeNow, catalog, mode, getValues, setValue])
 
   // Populate form when editing
   useEffect(() => {
@@ -205,7 +253,8 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
             <select
               {...register('provider_type')}
               disabled={mode === 'edit' || loading}
-              className="w-full px-4 py-2 border border-base-content/20 dark:border-base-content/20 rounded-lg focus:ring-2 focus:ring-primary dark:bg-base-200 dark:text-base-content disabled:opacity-50"
+              data-tip="The type decides the address — picking one fills the name and URL in"
+              className="tooltip tooltip-top w-full px-4 py-2 border border-base-content/20 dark:border-base-content/20 rounded-lg focus:ring-2 focus:ring-primary dark:bg-base-200 dark:text-base-content disabled:opacity-50"
             >
               {providerTypes.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -215,6 +264,12 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
             </select>
             {errors.provider_type && (
               <p className="mt-1 text-sm text-error">{errors.provider_type.message}</p>
+            )}
+            {mode === 'add' && (
+              <p className="mt-1 text-xs text-readout">
+                The name and address fill in from the type. Change the address only for a
+                self-hosted server — it is kept exactly as written.
+              </p>
             )}
           </div>
 
