@@ -21,14 +21,16 @@
 >
 > * **Want to contribute?** Open an issue — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Cogitate™, is a new open source agentic development platform.
+Cogitate™ is a new open source agentic development platform.
 
-Its working hypothesis — the *factoring hypothesis* — is that a smaller or local model looks incompetent at
-"trivial" tasks because those tasks are really multi-step, carry hidden state, and have no verification. A
-workflow can supply the missing machinery: skills carry the *how*, workflows carry the *when / if / verify*.
-The testable claim is that a workflow turns a small model's failures into bounded, verifiable outcomes — and
-this application is the instrument for testing it: agents on different providers, a tool registry, and
-reusable workflows, in one local installation.
+It is a place to test what an agent system can be. One question it was built to ask is the *factoring
+hypothesis*: a smaller or local model looks incompetent at "trivial" tasks because those tasks are really
+multi-step, carry hidden state and have no verification — and a workflow can supply the missing machinery,
+skills carrying the *how* and workflows the *when / if / verify*. It asks others too: whether an agent is
+best encapsulated as a persona together with its own skills and tools, and whether agents built for separate
+domains serve a person better than one agent asked to do everything. It is not only a research tool — the aim
+is light duty as an agent hosting system, a local installation where these questions are settled by running
+them.
 
 The design behind that framing: [`wiki/dev-notes/design/research-framework.md`](wiki/dev-notes/design/research-framework.md)
 and the [`honesty loop`](wiki/dev-notes/design/honesty-loop.md).
@@ -265,7 +267,7 @@ This project is licensed under the **GNU General Public License v2 (GPLv2)** —
 
 Copyright (C) 2026 The Cogitate Authors. See [`NOTICE`](NOTICE) and the [`LICENSE`](LICENSE) file for the full license text.
 
-**Trademark Notice:** "Cogitate" and the Cogitate logo are trademarks of the project. Unauthorized use of the name or logo is prohibited. Forks must rename and remove the logo to avoid confusion.
+**Trademark Notice:** "Cogitate", the Cogitate logo and "Exa" are trademarks of the project. Unauthorized use of the name or logo is prohibited. Forks must rename and remove the logo to avoid confusion.
 
 ---
 
