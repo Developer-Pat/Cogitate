@@ -61,6 +61,29 @@ async def test_a_resolved_chat_model_is_offered_and_named_in_the_fix(test_sessio
     assert report.offer.model in model_check.fix
 
 
+async def test_the_offer_names_the_type_not_the_rows_capitalised_name(test_session, tmp_path):
+    """Measured on the install (2026-11-20): a row NAMED "Deepseek" typed "deepseek" offered
+    `Deepseek/deepseek-flash` — litellm's handlers are lowercase, so that string dials nothing.
+    The offer must carry the type's handler."""
+    await _bare(test_session)
+    test_session.add(
+        Provider(
+            name="Deepseek",
+            display_name="Deepseek",
+            provider_type="deepseek",
+            base_url="https://api.deepseek.com",
+            is_active=True,
+            is_default=True,
+            config={"default_model": "deepseek-flash"},
+        )
+    )
+    await test_session.commit()
+
+    offer = await activation.chat_offer(test_session)
+    assert offer is not None
+    assert offer.model == "deepseek/deepseek-flash", offer.model
+
+
 async def test_from_default_accepts_the_offer_and_writes_the_section(test_session, tmp_path):
     await _bare(test_session)
     test_session.add(_chat_row())

@@ -362,7 +362,10 @@ async def chat_offer(db) -> ChatOffer | None:
     if primary is None or not primary.provider or not primary.model:
         return None
     try:
-        model = litellm_model_string(primary.provider, primary.model)
+        # THE TYPE DECIDES THE HANDLER, not the name (measured 2026-11-20: a row named
+        # "Deepseek" with type "deepseek" produced `Deepseek/deepseek-flash`, which no
+        # handler answers — litellm's prefixes are lowercase).
+        model = litellm_model_string(primary.provider, primary.model, primary.provider_type)
     except Exception:  # a string litellm cannot build is still the row's own answer
         model = primary.model
     return ChatOffer(provider=primary.provider, model=model, base_url=primary.endpoint)
