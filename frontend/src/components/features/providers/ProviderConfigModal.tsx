@@ -181,6 +181,20 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
     ? allProviderTypes.filter(t => t.location === location)
     : allProviderTypes;
 
+  // THE DEFAULT MUST BE AN OPTION (measured 2026-11-20): the form defaults to `ollama`, and
+  // the cloud page filters `ollama` out — so the select rendered BLANK, with six options and
+  // none selected, and the prefill had no type to work from. On add, snap the default to the
+  // page's first option.
+  useEffect(() => {
+    if (mode !== 'add') return;
+    const allowed = providerTypes.map(t => t.value);
+    if (allowed.length === 0) return;
+    if (!allowed.includes(getValues('provider_type'))) {
+      setValue('provider_type', allowed[0], { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, location, providerTypes.length]);
+
   return (
     <div
       className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/50"
