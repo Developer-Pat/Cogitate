@@ -63,12 +63,26 @@ set, otherwise the project-root file.
 ## 3. Verify
 
 ```bash
+./cogitate.sh verify
+```
+
+One line, read from `GET /api/v1/setup/readiness`: `READY — 3 of 3 checks pass, 0 remaining.` An
+unmet item is named with the page that fixes it and the command exits non-zero, so a scripted
+install can gate on it; `--json` prints the payload.
+
+It asks whether the install can **answer** — a provider with a key or a local server, a chat model
+that resolves, the agents seeded behind it. Exa's runtime is reported and not counted: activating
+Exa is a decision, not a requirement. The three URLs are the liveness smoke test, and `start` waits
+for both services before it returns:
+
+```bash
 curl -s -o /dev/null -w "frontend %{http_code}\n" http://localhost:5173/
 curl -s -o /dev/null -w "api      %{http_code}\n" http://localhost:8000/api/v1/health
 curl -s -o /dev/null -w "docs     %{http_code}\n" http://localhost:8000/docs
 ```
 
-All three `200`. No API keys are required for any of it — the app starts and runs without them.
+All three `200`, with no API keys set — the app starts and serves without them. A key (or a local
+model server) is what makes `verify` say ready, because it is what makes an agent answer.
 
 ## 4. The two decisions the install leaves to you
 

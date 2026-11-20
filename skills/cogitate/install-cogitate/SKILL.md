@@ -1,6 +1,6 @@
 ---
 name: cogitate-install-cogitate
-description: "Install Cogitate on a Linux box and leave it running: clone, one bootstrap command, verify the three URLs, then decide about Exa. Use when asked to install, set up, or run Cogitate for the first time."
+description: "Install Cogitate on a Linux box and leave it running: clone, one bootstrap command, one readiness check, then decide about Exa. Use when asked to install, set up, or run Cogitate for the first time."
 version: 2.0.0
 author: Cogitate Team
 license: MIT
@@ -51,7 +51,19 @@ Two facts that decide how you work here:
    matches `.python-version`, `app.main` imports, node/npm on PATH). It uses `sudo` for apt. Exit 0 means
    every check passed; a failure names the step it stopped at.
 
-4. **Start and verify.** `./cogitate.sh start`, then check all three surfaces:
+4. **Start and verify.** `./cogitate.sh start`, then the acceptance check:
+
+   ```bash
+   ./cogitate.sh verify          # exit 0 = the install can answer; --json for the payload
+   ```
+
+   One line, from `GET /api/v1/setup/readiness`: `READY — 3 of 3 checks pass, 0 remaining.` When an
+   item is unmet it is NAMED with the page that fixes it and the command exits non-zero, so quote
+   `remaining` and the unmet items — never a paraphrase of them. Readiness asks whether the install
+   can ANSWER (a provider with a key or a local server, a chat model that resolves, the agents behind
+   it); Exa's runtime is reported and not counted.
+
+   The three URLs are the separate liveness smoke test:
 
    ```bash
    curl -s -o /dev/null -w "frontend %{http_code}\n" http://localhost:5173/
@@ -100,6 +112,8 @@ Two facts that decide how you work here:
 - [ ] `./cogitate.sh install` exits 0 and prints "Install complete"
 - [ ] `.venv/bin/python --version` matches `.python-version` (3.14)
 - [ ] the installer's import check passed — or `cd backend && ../.venv/bin/python -c "from app.main import app"`
+- [ ] `./cogitate.sh verify` exits 0 and prints `0 remaining` — or, on a non-zero exit, every unmet
+      item is reported to the user verbatim with its page
 - [ ] frontend `/`, `/api/v1/health`, `/docs` all answer `200`
 - [ ] `cogitate.db` exists at the project root and carries tables (first start built it)
 - [ ] `uv run python scripts/core/activate_exa.py --json` prints a truthful report, and Exa's state is

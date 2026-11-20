@@ -11,6 +11,7 @@
 #   ./cogitate.sh stop      - Stop all services
 #   ./cogitate.sh restart   - Restart all services
 #   ./cogitate.sh status    - Show service status
+#   ./cogitate.sh verify    - Check the install can actually answer (readiness)
 #   ./cogitate.sh logs      - Show recent logs
 #   ./cogitate.sh help      - Show this help
 # =============================================================================
@@ -614,6 +615,24 @@ cmd_status() {
     echo ""
 }
 
+# ── VERIFY ───────────────────────────────────────────────────────────────────
+# The acceptance check: ONE readiness read of the RUNNING backend, quoted by the
+# install page and the agent skill. It prints `remaining` — the single number a
+# stranger is told — and exits non-zero when something is still unmet.
+#
+# It lives in a script (scripts/core/verify_readiness.py) rather than in this
+# file so the Python-side measurement, the JSON payload and the exit codes are
+# testable on their own; this is only the door.
+cmd_verify() {
+    local py="$SCRIPT_DIR/.venv/bin/python"
+
+    if [ ! -x "$py" ]; then
+        log_error "No .venv here — run ./cogitate.sh install first."
+        return 2
+    fi
+    "$py" "$SCRIPT_DIR/scripts/core/verify_readiness.py" --url "$BACKEND_URL" "$@"
+}
+
 cmd_logs() {
     echo ""
     echo "╔══════════════════════════════════════════════════════════╗"
@@ -932,6 +951,7 @@ cmd_help() {
     echo "  restart   - Stop then start all services"
     echo "  mode      - Switch the frontend: development | production"
     echo "  status    - Show service status and health"
+    echo "  verify    - Check the install can actually answer (one readiness verdict)"
     echo "  logs      - Show recent logs from all services"
     echo "  help      - Show this help message"
     echo ""
@@ -986,6 +1006,9 @@ main() {
             ;;
         status)
             cmd_status
+            ;;
+        verify)
+            cmd_verify "${@:2}"
             ;;
         logs)
             cmd_logs

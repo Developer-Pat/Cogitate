@@ -3,7 +3,7 @@ title: Script Catalog
 type: atlas-docs
 path: wiki/docs/script-catalog.md
 confidence: medium
-updated: 2026-11-18
+updated: 2026-11-20
 tags: [type/docs, domain/docs]
 ---
 
@@ -16,7 +16,7 @@ is its documented `Usage:` line or the project default for that file type.
 Regenerate with `python3 scripts/dev/generate_script_catalog.py`; `--check`
 fails when the page is stale.
 
-**105 scripts** in 10 directories.
+**106 scripts** in 10 directories.
 
 ---
 
@@ -27,7 +27,7 @@ fails when the page is stale.
 | `scripts/analysis/` | Trace and log analysis, metric collection. | 10 |
 | `scripts/` | Top-level verification helpers. | 2 |
 | `scripts/bench/` | THE BENCH: the fixed job set and its driver. | 1 |
-| `scripts/core/` | Seeding, RAG ingestion, backup, export, sweep, docs. | 32 |
+| `scripts/core/` | Seeding, RAG ingestion, backup, export, sweep, docs. | 33 |
 | `scripts/dev/` | Developer tools: metrics, codemods, API limit probes. | 6 |
 | `scripts/diagnostics/` | Health checks, model probes, conflict detection. | 3 |
 | `scripts/maintenance/` | Migrations, cleanup, database recovery. | 9 |
@@ -115,6 +115,7 @@ Seeding, RAG ingestion, backup, export, sweep, docs.
 | [`sweep.py`](scripts/core/sweep.py) | Sweep Script — Comprehensive Error & Warning Detection — Thin entry point that delegates to the sweep package CLI. | `uv run python scripts/core/sweep.py` |
 | [`test_nucleus.py`](scripts/core/test_nucleus.py) | Quick verification script: test Nucleus harness with seeded agents. | `uv run python scripts/core/test_nucleus.py` |
 | [`update_help_docs.py`](scripts/core/update_help_docs.py) | Update in-app help documents to reflect the current UI state. — Updates the `data/cogitate_docs_en.db` database with accurate help content for Dashboard, Agent Chat, Sessions, and Logs… | `uv run python scripts/core/update_help_docs.py` |
+| [`verify_readiness.py`](scripts/core/verify_readiness.py) | The install's acceptance check — one readiness sentence, from the one verdict. | `uv run python scripts/core/verify_readiness.py` |
 
 ---
 
