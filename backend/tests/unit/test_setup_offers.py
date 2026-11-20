@@ -13,7 +13,7 @@ What these tests defend:
 """
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.domain.providers import setup_offers
 from app.domain.providers.capabilities import (
@@ -118,15 +118,23 @@ async def test_an_unknown_accept_writes_nothing(test_session):
     assert [s.to_dict() for s in before.states] == [s.to_dict() for s in after.states]
 
 
-async def test_accepting_chat_puts_the_model_on_the_default_provider_row(test_session, monkeypatch):
-    """The inheritance must be REAL: the resolver's last rung reads `config.default_model`.
+async def _isolate_provider(db, name: str = "deepseek") -> None:
+    """Put the database in a state this test can NAME, instead of inheriting one.
 
-    Measured on a fresh install (2026-11-19): `--accept-defaults` printed
-    `✓ title deepseek (global default)` while the provider row's config was `{}`, so every
-    session's title generation 500'd with "TitleService has no model configured".
+    `apply()` COMMITS, so a row written by an earlier test can survive in the test database
+    and silently flip which branch is exercised — measured: this file passed 10/10 on three
+    consecutive runs while its own acceptance test, run alone, was red on the log assertion.
+    Every test below therefore deletes the row it is about and clears any default provider,
+    because the inheritance branch fires only when NONE exists.
     """
-    await ensure_capability_rows(test_session)
-    offer = setup_offers.Offer(
+    await db.execute(delete(Provider).where(Provider.name == name))
+    for row in (await db.execute(select(Provider))).scalars().all():
+        row.is_default = False
+    await db.commit()
+
+
+def _chat_offer() -> setup_offers.Offer:
+    return setup_offers.Offer(
         key="chat-deepseek",
         capability="chat",
         provider="deepseek",
@@ -135,7 +143,10 @@ async def test_accepting_chat_puts_the_model_on_the_default_provider_row(test_se
         reason="the test's offer",
         needs="key:DEEPSEEK_API_KEY",
     )
-    report = setup_offers.SetupReport(
+
+
+def _report_with(offer: setup_offers.Offer) -> setup_offers.SetupReport:
+    return setup_offers.SetupReport(
         states=[
             setup_offers.CapabilityState(
                 capability="chat",
@@ -148,8 +159,33 @@ async def test_accepting_chat_puts_the_model_on_the_default_provider_row(test_se
         ]
     )
 
+
+async def test_accepting_chat_puts_the_model_on_the_default_provider_row(test_session, monkeypatch):
+    """The inheritance must be REAL: the resolver's last rung reads `config.default_model`.
+
+    Measured on a fresh install (2026-11-19): `--accept-defaults` printed
+    `✓ title deepseek (global default)` while the provider row's config was `{}`, so every
+    session's title generation 500'd with "TitleService has no model configured".
+
+    This is the row ALREADY EXISTS, bare — the shape the live install had.
+    """
+    await ensure_capability_rows(test_session)
+    await _isolate_provider(test_session)
+    test_session.add(
+        Provider(
+            name="deepseek",
+            display_name="Deepseek",
+            provider_type="deepseek",
+            base_url="https://api.deepseek.com",
+            is_active=True,
+            config={},
+        )
+    )
+    await test_session.commit()
+
+    offer = _chat_offer()
     async def fake_probe(db, env_path=None):
-        return report
+        return _report_with(offer)
 
     monkeypatch.setattr(setup_offers, "probe", fake_probe)
     _report, log = await setup_offers.apply(test_session, ["chat-deepseek"])
@@ -162,4 +198,35 @@ async def test_accepting_chat_puts_the_model_on_the_default_provider_row(test_se
         "without the model on the row, the other LLM capabilities resolve to a provider that "
         "cannot be called — the '✓ title' that 500'd on the fresh install"
     )
-    assert any("default model" in line for line in log)
+    assert any("default model" in line for line in log), (
+        "the accept must SAY it named the default and put the model there — the line a "
+        "person reads while accepting is part of the behaviour"
+    )
+
+
+async def test_a_created_provider_row_carries_the_model_and_becomes_the_default(
+    test_session, monkeypatch
+):
+    """The other shape: NO row at all, so `apply` creates it — and the model must ride it.
+
+    The creation path is a separate write (`_provider_row`), so a bare-row test cannot prove
+    it: this one deletes the row first and asserts the row that comes back is dialable.
+    """
+    await ensure_capability_rows(test_session)
+    await _isolate_provider(test_session)
+    assert (
+        await test_session.execute(select(Provider).where(Provider.name == "deepseek"))
+    ).scalar_one_or_none() is None, "the fixture cleanup left a row — the create path is untested"
+
+    offer = _chat_offer()
+    async def fake_probe(db, env_path=None):
+        return _report_with(offer)
+
+    monkeypatch.setattr(setup_offers, "probe", fake_probe)
+    _report, _log = await setup_offers.apply(test_session, ["chat-deepseek"])
+
+    row = (
+        await test_session.execute(select(Provider).where(Provider.name == "deepseek"))
+    ).scalars().one()
+    assert row.is_default
+    assert (row.config or {}).get("default_model") == "deepseek-v4-flash"
