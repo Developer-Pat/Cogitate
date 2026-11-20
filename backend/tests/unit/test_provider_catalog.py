@@ -31,10 +31,19 @@ def test_the_two_types_the_registry_declines_keep_a_declared_display_value():
 
 
 def test_the_catalog_keeps_the_shape_its_readers_observe():
-    """Exa's surface map reads `{id, name, type, base_url, configured}` — the shape is a contract."""
-    from app.api.v1.providers.router import PROVIDERS
+    """Exa's surface map reads `{id, name, type, base_url, configured}` — the shape is a contract.
 
-    assert set(PROVIDERS) == {"ollama", "openai", "anthropic", "openrouter", "deepseek"}
+    The MEMBERSHIP is a contract too, but it is the REGISTRY's to state: the catalog covers every
+    type the registry answers for, plus the two it declines by design (`openai`, `anthropic` —
+    each names a hosted vendor AND any self-hosted compatible server). Written out as a copy of
+    the names, this assertion went red the day `groq` and `ollama_cloud` were added — a
+    chore for whoever adds a provider, not a broken contract.
+    """
+    from app.api.v1.providers.router import PROVIDERS
+    from app.domain.providers.provider_endpoints import PROVIDER_ENDPOINTS
+
+    declined_by_design = {"openai", "anthropic"}
+    assert set(PROVIDERS) == set(PROVIDER_ENDPOINTS) | declined_by_design
     for slug, entry in PROVIDERS.items():
         assert set(entry) == {"name", "base_url", "type"}, slug
         assert entry["type"] in ("local", "cloud"), slug
