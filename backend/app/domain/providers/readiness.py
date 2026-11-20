@@ -41,7 +41,10 @@ OPTIONAL = "optional"
 
 # Where each item's fix lives, in the app's own vocabulary. The href is what a button on the
 # card (or a tile in the checklist) navigates to; nothing here writes anything.
-HREF_KEY = "/setup?tab=keys"
+# The Keys tab lists provider ROWS — on a fresh install there are none, so it is an empty
+# table with nothing to click (measured). The door that can CREATE one is the Provider
+# Dashboard's "Add Provider", so that is where the provider item sends a stranger.
+HREF_PROVIDER = "/provider-dashboard"
 HREF_MODEL = "/provider-dashboard"
 HREF_AGENTS = "/agent-profiles"
 HREF_RUNTIME = "/exa"
@@ -124,10 +127,11 @@ async def _provider_item(db: AsyncSession) -> ReadinessItem:
             label="Provider + key",
             state=UNMET,
             detail=(
-                "No provider yet. Add an API key — deepseek or openrouter are the two this "
-                "build offers — or point Cogitate at a local model server."
+                "No provider yet. Add one on the Provider Dashboard (deepseek and openrouter "
+                "are the two this build offers) and paste its key — or point Cogitate at a "
+                "local model server."
             ),
-            href=HREF_KEY,
+            href=HREF_PROVIDER,
         )
     if not dialable:
         return ReadinessItem(
@@ -135,17 +139,17 @@ async def _provider_item(db: AsyncSession) -> ReadinessItem:
             label="Provider + key",
             state=UNMET,
             detail=(
-                f"{len(rows)} provider row(s), none with a key. Add one on the Keys tab and "
-                "nothing else needs to change."
+                f"{len(rows)} provider row(s), none with a key. Paste one on the Setup page's "
+                "API Keys tab and nothing else needs to change."
             ),
-            href=HREF_KEY,
+            href=HREF_PROVIDER,
         )
     return ReadinessItem(
         key="provider",
         label="Provider + key",
         state=OK,
         detail=f"{len(dialable)} of {len(rows)} provider(s) can be dialled.",
-        href=HREF_KEY,
+        href=HREF_PROVIDER,
     )
 
 
