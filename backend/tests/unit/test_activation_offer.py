@@ -53,7 +53,7 @@ async def test_a_resolved_chat_model_is_offered_and_named_in_the_fix(test_sessio
 
     report = await activation.probe(test_session, home=tmp_path / "exa-home")
     assert report.offer is not None
-    assert report.offer.provider == "llama"
+    assert report.offer.provider in ("llama", "openai"), "a litellm key, never a display name"
     assert report.offer.model, "the offer carries the row's own model string"
     model_check = next(c for c in report.checks if c.name == "model")
     assert not model_check.ok, "nothing is set for you — the offer is still an offer"
@@ -82,6 +82,7 @@ async def test_the_offer_names_the_type_not_the_rows_capitalised_name(test_sessi
     offer = await activation.chat_offer(test_session)
     assert offer is not None
     assert offer.model == "deepseek/deepseek-flash", offer.model
+    assert offer.provider == "deepseek", "the provider field is a litellm key, not a display name"
 
 
 async def test_from_default_accepts_the_offer_and_writes_the_section(test_session, tmp_path):

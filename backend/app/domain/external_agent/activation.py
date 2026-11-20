@@ -368,7 +368,14 @@ async def chat_offer(db) -> ChatOffer | None:
         model = litellm_model_string(primary.provider, primary.model, primary.provider_type)
     except Exception:  # a string litellm cannot build is still the row's own answer
         model = primary.model
-    return ChatOffer(provider=primary.provider, model=model, base_url=primary.endpoint)
+    # THE PROVIDER FIELD IS A litellm KEY, not the row's display name (measured 2026-11-20:
+    # a row named "Deepseek" offered `via Deepseek`, which is not a provider key). The TYPE
+    # is what the handler map knows; the name is what a human reads.
+    return ChatOffer(
+        provider=primary.provider_type or primary.provider,
+        model=model,
+        base_url=primary.endpoint,
+    )
 
 
 async def probe(db, home: Path | None = None) -> ActivationReport:
