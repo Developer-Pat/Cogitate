@@ -50,6 +50,13 @@ def _print_report(report, log: list[str]) -> None:
         if not check.ok and check.fix:
             print(f"             → {check.fix}")
     print()
+    offer = getattr(report, "offer", None)
+    if offer is not None:
+        print(
+            f"This install's chat model: {offer.model} via {offer.provider} "
+            "— accept it with --from-default (nothing is set for you)."
+        )
+        print()
     print("READY — Exa can answer." if report.ready else "NOT READY — see the fixes above.")
 
 
@@ -70,6 +77,7 @@ async def _run(args) -> int:
                 provider=args.provider,
                 base_url=args.base_url,
                 reasoning_effort=args.reasoning,
+                from_default=args.from_default,
             )
         else:
             report = await activation.probe(db, home=home)
@@ -93,6 +101,12 @@ def main() -> int:
     p.add_argument("--apply", action="store_true", help="provision the home, set the model, activate")
     p.add_argument("--model", help="the model id to write into Exa's config (with --apply)")
     p.add_argument("--provider", help="the provider NAME for --model")
+    p.add_argument(
+        "--from-default",
+        dest="from_default",
+        action="store_true",
+        help="accept this install's chat model as Exa's (the offer, accepted explicitly)",
+    )
     p.add_argument("--base-url", dest="base_url", help="optional endpoint override for --model")
     p.add_argument(
         "--reasoning",
@@ -106,8 +120,14 @@ def main() -> int:
     if bool(args.model) != bool(args.provider):
         print("--model and --provider go together.", file=sys.stderr)
         return 2
-    if (args.model or args.reasoning or args.base_url) and not args.apply:
-        print("--model/--provider/--base-url/--reasoning need --apply.", file=sys.stderr)
+    if args.model and args.from_default:
+        print("--model/--provider and --from-default are alternatives, not together.", file=sys.stderr)
+        return 2
+    if (args.model or args.reasoning or args.base_url or args.from_default) and not args.apply:
+        print(
+            "--model/--provider/--from-default/--base-url/--reasoning need --apply.",
+            file=sys.stderr,
+        )
         return 2
 
     return asyncio.run(_run(args))

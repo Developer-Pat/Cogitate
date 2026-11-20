@@ -53,8 +53,27 @@ class ActivationCheck:
 
 
 @dataclass
+class ChatOffer:
+    """This install's chat answer, OFFERED to Exa — never written without an accept.
+
+    Exa's model lives in its own config.yaml, and the rule that it is not copied from the
+    operator's home is about SILENT decisions, not about using the same model. So the app's
+    resolved chat model is offered here: `--from-default` (or the Exa page's button) accepts
+    it, and nothing writes it otherwise.
+    """
+
+    provider: str
+    model: str
+    base_url: str | None = None
+
+    def to_dict(self) -> dict:
+        return {"provider": self.provider, "model": self.model, "base_url": self.base_url}
+
+
+@dataclass
 class ActivationReport:
     checks: list[ActivationCheck] = field(default_factory=list)
+    offer: ChatOffer | None = None
 
     @property
     def ready(self) -> bool:
@@ -72,6 +91,7 @@ class ActivationReport:
                 {"name": c.name, "ok": c.ok, "detail": c.detail, "fix": c.fix}
                 for c in self.checks
             ],
+            "offer": self.offer.to_dict() if self.offer is not None else None,
         }
 
 
@@ -269,18 +289,31 @@ def _check_home(home: Path) -> ActivationCheck:
     return ActivationCheck("home", True, f"{home} is provisioned")
 
 
-def _check_model(home: Path) -> ActivationCheck:
+def _check_model(home: Path, offer: ChatOffer | None = None) -> ActivationCheck:
+    """The model step, with this install's chat answer named when it differs.
+
+    A configured model is still `ok` — Exa may deliberately run on something else. What the
+    detail adds is the OFFER, because on a fresh install the user has already chosen a chat
+    model and should not have to choose twice.
+    """
     m = read_model_config(home)
-    if m.get("model") and m.get("provider"):
-        return ActivationCheck(
-            "model", True, f"{m['model']} via {m['provider']}"
-        )
-    return ActivationCheck(
-        "model",
-        False,
-        "no model section in config.yaml",
-        fix="Set it on the Exa page (or pass --model/--provider with --apply).",
+    have = (m.get("model"), m.get("provider"))
+    if have[0] and have[1]:
+        if offer is not None and have != (offer.model, offer.provider):
+            return ActivationCheck(
+                "model",
+                True,
+                f"{have[0]} via {have[1]} (this install's chat model is "
+                f"{offer.model} via {offer.provider})",
+            )
+        return ActivationCheck("model", True, f"{have[0]} via {have[1]}")
+    fix = (
+        f"Take this install's chat model — {offer.model} via {offer.provider} (--from-default, "
+        "or the Exa page). Nothing is set for you."
+        if offer is not None
+        else "Set it on the Exa page (or pass --model/--provider with --apply)."
     )
+    return ActivationCheck("model", False, "no model section in config.yaml", fix=fix)
 
 
 def _check_keys(home: Path) -> ActivationCheck:
@@ -315,18 +348,40 @@ def _check_decision(cfg: ExternalAgentConfig) -> ActivationCheck:
     )
 
 
+async def chat_offer(db) -> ChatOffer | None:
+    """This install's resolved chat answer, as Exa would need it — or None.
+
+    The resolver is the one place that knows what answers chat here; Exa's config wants the
+    litellm model string for that row, which `litellm_model_string` is the one home of.
+    """
+    from app.domain.providers.capabilities import resolve
+    from app.domain.providers.litellm_route import litellm_model_string
+
+    resolved = await resolve(db, "chat")
+    primary = resolved.primary
+    if primary is None or not primary.provider or not primary.model:
+        return None
+    try:
+        model = litellm_model_string(primary.provider, primary.model)
+    except Exception:  # a string litellm cannot build is still the row's own answer
+        model = primary.model
+    return ChatOffer(provider=primary.provider, model=model, base_url=primary.endpoint)
+
+
 async def probe(db, home: Path | None = None) -> ActivationReport:
     """Report every step of the activation sequence. Writes nothing."""
     cfg = await get_config(db)
     target = _home(home)
+    offer = await chat_offer(db)
     return ActivationReport(
+        offer=offer,
         checks=[
             _check_runtime(cfg),
             _check_home(target),
-            _check_model(target),
+            _check_model(target, offer),
             _check_keys(target),
             _check_decision(cfg),
-        ]
+        ],
     )
 
 
@@ -343,8 +398,13 @@ async def apply(
     provider: str | None = None,
     base_url: str | None = None,
     reasoning_effort: str | None = None,
+    from_default: bool = False,
 ) -> tuple[ActivationReport, list[str]]:
     """Provision the home, optionally set the brain, and take the decision.
+
+    `from_default` takes THIS INSTALL'S chat model — the accept for the offer. Without it and
+    without an explicit --model/--provider, no model is written: inventing one is the silent
+    decision this path refuses.
 
     Returns the post-apply report and the provisioning log. The DECISION is
     taken last, so a half-provisioned home is never left switched on.
@@ -352,6 +412,21 @@ async def apply(
     log = provision_home(
         home=home, seed_dir=seed_dir, operator_home=operator_home, project_env=project_env
     )
+    if from_default and not (model and provider):
+        offer = await chat_offer(db)
+        if offer is None:
+            log.append(
+                "no chat model resolves on this install yet — nothing to take; set the "
+                "default provider and model first (or pass --model/--provider)"
+            )
+        else:
+            model, provider = offer.model, offer.provider
+            # A local row's address is part of the answer; a cloud provider keeps the
+            # client's own default rather than a copied URL.
+            base = offer.base_url or ""
+            if "localhost" in base or "127.0.0.1" in base:
+                base_url = base_url or base
+            log.append(f"model offered by this install and accepted: {model} via {provider}")
     if model and provider:
         write_model_config(
             model,

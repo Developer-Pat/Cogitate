@@ -329,9 +329,19 @@ def _write_exa_model_config(
 
 
 @router.get("/model")
-async def external_agent_model():
-    """The Exa model/provider (read from Exa's private config)."""
-    return _read_exa_model_config()
+async def external_agent_model(db=Depends(_db)):
+    """Exa's model/provider (from its private config) PLUS this install's offer.
+
+    The offer is what makes one configuration do the work twice: a stranger has already
+    chosen a chat model by the time they reach the Exa page, so the card can prefill it and
+    ask for one accept instead of a second decision. Nothing here writes it.
+    """
+    from app.domain.external_agent import activation
+
+    model_config = _read_exa_model_config()
+    offer = await activation.chat_offer(db)
+    model_config["offer"] = offer.to_dict() if offer is not None else None
+    return model_config
 
 
 @router.put("/model")

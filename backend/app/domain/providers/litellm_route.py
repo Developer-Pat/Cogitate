@@ -76,6 +76,12 @@ def litellm_model_string(provider: str, model: str, provider_type: Optional[str]
     and ``library/llama3`` are real model ids, so they are prefixed like any other.
     """
     name = (model or "").strip()
+    # A LEADING TILDE is litellm's own "use exactly this provider" form (~deepseek/…,
+    # ~anthropic/…). It is already a complete model string, so prefixing it again produced
+    # `deepseek/~deepseek/deepseek-v4-flash-latest` — measured while offering a chat model to
+    # Exa, and a string no handler can dial.
+    if name.startswith("~"):
+        return name
     if "/" in name:
         head, _, rest = name.partition("/")
         if head == _OLLAMA_FAMILY_HANDLER:

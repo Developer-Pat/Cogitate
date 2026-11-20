@@ -56,6 +56,14 @@ class TestTheHandlerTheProviderSpeaks:
         assert litellm_model_string("groq", "llama-3.3-70b", "groq") == "groq/llama-3.3-70b"
         assert litellm_model_string("mistral", "mistral-large", "mistral") == "mistral/mistral-large"
 
+    def test_a_tilde_model_is_already_complete_and_is_not_prefixed_again(self):
+        """`~deepseek/…` is litellm's own explicit-provider form. Measured while offering the
+        install's chat model to Exa: prefixing it produced
+        `deepseek/~deepseek/deepseek-v4-flash-latest`, which no handler can dial."""
+        assert litellm_model_string("deepseek", "~deepseek/deepseek-v4-flash-latest", "deepseek") == (
+            "~deepseek/deepseek-v4-flash-latest"
+        )
+
     def test_the_name_is_the_fallback_when_no_type_is_handed(self):
         """The chat path builds its string before it reads the row; for the names in the map the two
         answers coincide, which is why the fallback is safe."""
