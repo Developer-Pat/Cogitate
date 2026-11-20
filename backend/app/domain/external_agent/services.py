@@ -40,6 +40,26 @@ logger = logging.getLogger(__name__)
 # first-class, inspectable object (study 11).
 EXTERNAL_AGENT_ID = "external"
 
+# THE PERMISSION REPLY (2026-08-21, corrected 2026-11-20): an ACP
+# RequestPermissionResponse's `outcome` is a discriminated UNION, so the reply is
+# NESTED — `{"outcome": {"outcome": "selected", "optionId": ...}}`. Verified live
+# 2026-08-21: the FLAT form died with "Input should be a valid dictionary or object
+# to extract fields from". The cancelled branch kept answering the flat form after
+# that fix and killed the session on a ValidationError (measured 2026-11-20), so
+# BOTH replies now come from these two functions — one shape, one home.
+def selected_outcome(option_id: str) -> dict:
+    return {"outcome": {"outcome": "selected", "optionId": option_id}}
+
+
+def cancelled_outcome() -> dict:
+    return {"outcome": {"outcome": "cancelled"}}
+
+
+# How long the client waits for the user before answering `cancelled` — the
+# adapter's own requester timeout (60s default), so the reply never lands after
+# the agent gave up. A module constant so a test can shorten it.
+PERMISSION_TIMEOUT_SECONDS = 60
+
 
 class ExternalAgentInactive(RuntimeError):
     """Exa has not been activated — refuse instead of spawning anything.
@@ -341,9 +361,13 @@ class AcpClient:
         try:
             # match the adapter's requester timeout (60s default) so
             # the response never lands after the adapter gave up
-            result = await asyncio.wait_for(fut, timeout=60)
+            result = await asyncio.wait_for(fut, timeout=PERMISSION_TIMEOUT_SECONDS)
         except (asyncio.TimeoutError, asyncio.CancelledError):
-            result = {"outcome": "cancelled"}
+            # THE SAME SHAPE AS A DENY (2026-11-20): this branch used to answer
+            # {"outcome": "cancelled"} — a bare string where the schema wants an
+            # object — and the response died on a ValidationError, taking the
+            # session with it. Every reply now goes through the one builder.
+            result = cancelled_outcome()
         finally:
             self._pending_permissions.pop(req_id, None)
         # reply with the selected option (the adapter's requester
@@ -371,18 +395,11 @@ class AcpClient:
         if fut is None or fut.done():
             return False
         if option_id == "deny":
-            # the OUTER outcome holds the discriminated union — the
-            # adapter reads getattr(outcome, 'outcome') on the outer
-            # object, so the shape must be NESTED (schema.py:
-            # RequestPermissionResponse.outcome = DeniedOutcome |
-            # SelectedPermissionOutcome). Verified live 2026-08-21:
-            # the flat form failed 'Input should be a valid
-            # dictionary or object to extract fields from'.
-            fut.set_result({"outcome": {"outcome": "cancelled"}})
+            # deny IS cancelled in ACP's vocabulary — the same builder the
+            # timeout branch uses, so the two can never disagree on the shape.
+            fut.set_result(cancelled_outcome())
         else:
-            fut.set_result({
-                "outcome": {"outcome": "selected", "optionId": option_id},
-            })
+            fut.set_result(selected_outcome(option_id))
         return True
 
     def _session_new_params(self) -> dict:

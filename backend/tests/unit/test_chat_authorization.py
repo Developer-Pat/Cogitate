@@ -111,6 +111,33 @@ async def test_resolve_permission_allow_once(fake_permission_acp, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_permission_timeout_answers_the_nested_cancelled_outcome(
+    fake_permission_acp, tmp_path, monkeypatch
+):
+    """The timeout branch answered `{"outcome": "cancelled"}` — a bare string where
+    the schema wants an object — and the reply died on a ValidationError, taking the
+    session with it. It now sends the same nested shape a deny does, and the fake
+    echoes the exact JSON-RPC result the agent received, so the WIRE shape is the
+    assertion.
+    """
+    from app.domain.external_agent import services as svc
+
+    monkeypatch.setattr(svc, "PERMISSION_TIMEOUT_SECONDS", 0.2)
+    client = AcpClient(command=fake_permission_acp, cwd=str(tmp_path))
+    await client.start()
+    texts: list[str] = []
+    async for ev in client.stream_prompt("hi"):
+        if ev.kind == "message":
+            texts.append(ev.text)
+        if ev.kind == "usage":
+            break
+    sent = json.loads("".join(texts))
+    assert sent["id"] == 999
+    assert sent["result"] == {"outcome": {"outcome": "cancelled"}}
+    await client.close()
+
+
+@pytest.mark.asyncio
 @pytest.mark.skip(
     reason="PRE-EXISTING HANG (2026-08-24): the client lifecycle "
     "stalls against the fake ACP server for unknown ids — the "
