@@ -87,13 +87,13 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
     if (mode !== 'add') return
     let live = true
     apiClient
-      .get<Record<string, { base_url?: string }>>('/api/v1/providers')
+      .get<{ providers?: Array<{ id?: string; base_url?: string }> }>('/api/v1/providers')
       .then((resp) => {
         if (!live) return
-        const rows = (resp.data ?? {}) as Record<string, { base_url?: string }>
+        const rows = resp.data?.providers ?? []
         const table: Record<string, string> = {}
-        for (const [slug, row] of Object.entries(rows)) {
-          if (row?.base_url) table[slug] = row.base_url
+        for (const row of rows) {
+          if (row?.id && row.base_url) table[row.id] = row.base_url
         }
         setCatalog(table)
       })
