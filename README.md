@@ -120,6 +120,10 @@ writes `.env` from `.env.example` (never overwriting an existing one), builds `.
 `frontend/node_modules`, and then proves its own work: the venv interpreter matches `.python-version`,
 `app.main` imports with every runtime dependency, and `node`/`npm` are on `PATH`.
 
+`./cogitate.sh verify` is the acceptance check: one line and one number from the readiness verdict —
+`READY — 3 of 3 checks pass, 0 remaining` — or every unmet item named with the page that fixes it. It
+exits non-zero when something is unmet, so a scripted install can gate on it.
+
 [`wiki/help/setup-install.md`](wiki/help/setup-install.md) is the same path with the two decisions the install leaves to
 you — which model, and whether to activate Exa — plus the storage note and the honest limits.
 
@@ -131,7 +135,7 @@ provisions its home and takes the decision).
 
 **Installing with an agent?** The repo carries the instructions an agent needs — clone it and point your
 agent at [`skills/cogitate/install-cogitate/SKILL.md`](skills/cogitate/install-cogitate/SKILL.md). It
-runs the same `./cogitate.sh install`, verifies the same three URLs, and reports Exa's state instead of
+runs the same `./cogitate.sh install` and the same one readiness check, and reports Exa's state instead of
 switching it on.
 
 The database schema is built on first start — the app creates every table its models declare, so there is
