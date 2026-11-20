@@ -5,6 +5,7 @@ import { CacheBuster } from '../components/CacheBuster'
 import BuildModeBadge from '../components/BuildModeBadge'
 import BuildModeSwitch from '../components/BuildModeSwitch'
 
+import ReadinessCard from '../components/dashboard/ReadinessCard'
 import MessagePreviewCard from '../components/dashboard/MessagePreviewCard'
 import NavigationCards from '../components/dashboard/NavigationCards'
 import VisualCheckCard from '../components/dashboard/VisualCheckCard'
@@ -47,6 +48,12 @@ export default function Dashboard() {
             <CacheBuster />
             <HelpButton context="dashboard" tooltipPosition="bottom" />
           </div>
+        </div>
+
+        {/* THE SYSTEM VERDICT (2026-11-20) — first, because a fresh install that
+            cannot answer used to look completely healthy on this page. */}
+        <div className="mb-4">
+          <ReadinessCard />
         </div>
 
         {/* Quick Navigation Cards */}

@@ -1,44 +1,35 @@
 /**
- * SetupPage — first-run setup wizard (tabs, not a tunnel).
+ * SetupPage — first-run setup (tabs, not a tunnel).
  *
  * Design (local/roadmaps/setup-page-proposal.md v2, LOCKED 2026-08-04):
  * - Tabbed sections, each with per-tab help (HelpModal machinery)
- * - Overview = live "doctor" checklist (✅/⚠️/⏳ per item)
+ * - Overview = live "doctor" checklist
  * - Keys decision: .env is THE secrets store (Keys tab writes .env)
- * - First-run: auto-redirect (Option A) when unconfigured
+ *
+ * THE VERDICT MOVED TO THE BACKEND (2026-11-20). This page used to compute its own checklist
+ * from three calls in the browser — including a POST to provider id 1 to guess whether Ollama
+ * was up — with `agentReady` hardcoded true. So its icons reported FACTS ("0 of 0 providers
+ * have keys") instead of DEFECTS, it asked a stranger to pick a profile while none could
+ * exist, and the Dashboard could show nothing at all. The facts are now measured once in
+ * `domain/providers/readiness.py` and both surfaces render the same verdict.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { AlertTriangle, CheckCircle2, CircleDashed, Hourglass, XCircle } from 'lucide-react'
 import ProviderKeyManager from '../components/features/providers/ProviderKeyManager'
-import { apiClient } from '../services/apiClient'
+import { readinessService, type ReadinessItem, type ReadinessState } from '../services/readinessService'
 import { HelpButton } from '../components/help'
 import { AskExaButton } from '../components/agentPanel/AskExaButton'
 
 type SetupTab = 'overview' | 'local' | 'keys' | 'model' | 'agent'
 
-interface ChecklistItem {
-  key: string
-  label: string
-  detail: string
-  status: 'ok' | 'warn' | 'pending'
-  tab: SetupTab
-}
-
-interface SetupStatus {
-  ollamaRunning: boolean
-  keysConfigured: number
-  keysTotal: number
-  defaultModelSet: boolean
-  agentReady: boolean
-}
-
-const TABS: { id: SetupTab; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'local', label: 'Local LLM' },
-  { id: 'keys', label: 'API Keys' },
-  { id: 'model', label: 'Default Model' },
-  { id: 'agent', label: 'Agent' },
+const TABS: { id: SetupTab; label: string; tip: string }[] = [
+  { id: 'overview', label: 'Overview', tip: 'What this install still needs, in order' },
+  { id: 'local', label: 'Local LLM', tip: 'Run a model on this machine instead of using a key' },
+  { id: 'keys', label: 'API Keys', tip: "Where a provider key goes — the project's .env" },
+  { id: 'model', label: 'Default Model', tip: 'Which model answers, and what inherits it' },
+  { id: 'agent', label: 'Agent', tip: 'The agents a configured install carries' },
 ]
 
 const HELP_CONTEXT: Record<SetupTab, string> = {
@@ -49,88 +40,41 @@ const HELP_CONTEXT: Record<SetupTab, string> = {
   agent: 'setup-agent',
 }
 
+/** The icon and the tone are the STATE's, not decoration: red = the user must act. */
+const STATE_LOOK: Record<ReadinessState, { Icon: typeof AlertTriangle; tone: string; tip: string }> = {
+  unmet: { Icon: XCircle, tone: 'text-error', tip: 'Not configured — this needs you.' },
+  blocked: { Icon: Hourglass, tone: 'text-warning', tip: 'Waiting on an earlier step — nothing to do here yet.' },
+  ok: { Icon: CheckCircle2, tone: 'text-success', tip: 'Configured.' },
+  optional: { Icon: CircleDashed, tone: 'text-readout', tip: 'Optional — not needed for the app to answer.' },
+}
+
 export default function SetupPage() {
-  const [activeTab, setActiveTab] = useState<SetupTab>('overview')
-  const [status, setStatus] = useState<SetupStatus | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [params] = useSearchParams()
+  const requested = params.get('tab')
+  const initialTab = TABS.find((t) => t.id === requested)?.id ?? 'overview'
+  const [activeTab, setActiveTab] = useState<SetupTab>(initialTab)
+  const [items, setItems] = useState<ReadinessItem[] | null>(null)
+  const [remaining, setRemaining] = useState<number | null>(null)
+  const [failed, setFailed] = useState(false)
 
-  const loadStatus = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const [keysResp, defaultResp] = await Promise.allSettled([
-        apiClient.get('/api/v1/providers/managed/keys'),
-        apiClient.get('/api/v1/providers/default'),
-      ])
-      const keysData = (keysResp as PromiseFulfilledResult<{ data?: { providers?: Array<{ has_key: boolean }> } }>).value?.data
-      const providers = keysData?.providers ?? []
-      const keysConfigured = providers.filter((p: { has_key: boolean }) => p.has_key).length
-
-      const defaultData = (defaultResp as PromiseFulfilledResult<{ data?: { provider_name?: string; model?: string } }>).value?.data
-      const defaultModelSet = Boolean(defaultData?.provider_name && defaultData?.model)
-
-      // Ollama check via the test endpoint (provider id 1)
-      let ollamaRunning = false
-      try {
-        const ollamaResp = await apiClient.post('/api/v1/providers/managed/1/test')
-        ollamaRunning = (ollamaResp.data as { status?: string })?.status === 'connected'
-      } catch {
-        ollamaRunning = false
-      }
-
-      setStatus({
-        ollamaRunning,
-        keysConfigured,
-        keysTotal: providers.length,
-        defaultModelSet,
-        agentReady: true, // seeded agents exist; refined below
-      })
-    } finally {
-      setLoading(false)
+      const report = await readinessService.get()
+      setItems(report.items)
+      setRemaining(report.remaining)
+      setFailed(false)
+    } catch {
+      setFailed(true)
     }
   }, [])
 
-  useEffect(() => { loadStatus() }, [loadStatus])
+  useEffect(() => {
+    void load()
+  }, [load])
 
-  const checklist: ChecklistItem[] = [
-    {
-      key: 'ollama',
-      label: 'Local LLM running',
-      detail: status?.ollamaRunning
-        ? 'Ollama is running — session titles will work'
-        : 'Ollama not detected — session titles may be disabled',
-      status: status?.ollamaRunning ? 'ok' : 'warn',
-      tab: 'local',
-    },
-    {
-      key: 'keys',
-      label: 'API keys',
-      detail: status
-        ? `${status.keysConfigured} of ${status.keysTotal} providers have keys`
-        : 'Checking…',
-      status: status && status.keysConfigured > 0 ? 'ok' : 'pending',
-      tab: 'keys',
-    },
-    {
-      key: 'model',
-      label: 'Default model',
-      detail: status?.defaultModelSet
-        ? 'Default provider + model configured'
-        : 'No default model set yet',
-      status: status?.defaultModelSet ? 'ok' : 'pending',
-      tab: 'model',
-    },
-    {
-      key: 'agent',
-      label: 'Starter agent',
-      detail: 'Pick a capability profile to start chatting',
-      status: 'pending',
-      tab: 'agent',
-    },
-  ]
-
-  const statusIcon = (s: ChecklistItem['status']) =>
-    s === 'ok' ? '✅' : s === 'warn' ? '⚠️' : '⏳'
-
-  const incompleteCount = checklist.filter(i => i.status !== 'ok').length
+  useEffect(() => {
+    if (TABS.some((t) => t.id === requested)) setActiveTab(requested as SetupTab)
+  }, [requested])
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -139,9 +83,13 @@ export default function SetupPage() {
         <div>
           <h1 className="text-2xl font-semibold text-base-content">Setup</h1>
           <p className="text-sm text-readout mt-1">
-            Get Cogitate running in a few steps. {incompleteCount > 0
-              ? `${incompleteCount} item${incompleteCount > 1 ? 's' : ''} remaining — the checklist below is what's next.`
-              : 'Everything looks configured — you can jump to Chat.'}
+            {failed
+              ? 'The setup check did not answer — this page cannot say what is configured.'
+              : remaining === null
+                ? 'Checking what this install needs…'
+                : remaining > 0
+                  ? `${remaining} thing${remaining > 1 ? 's' : ''} left before an agent can answer.`
+                  : 'Everything this app needs is configured — you can go to Chat.'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -163,11 +111,12 @@ export default function SetupPage() {
 
       {/* Tabs */}
       <nav className="flex gap-1 border-b border-base-300 overflow-x-auto">
-        {TABS.map(tab => (
+        {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`pb-2 px-3 font-medium text-sm whitespace-nowrap rounded-t transition-colors ${
+            data-tip={tab.tip}
+            className={`tooltip tooltip-bottom pb-2 px-3 font-medium text-sm whitespace-nowrap rounded-t transition-colors ${
               activeTab === tab.id
                 ? 'border-b-2 border-primary text-primary'
                 : 'text-base-content/60 hover:text-base-content'
@@ -181,31 +130,47 @@ export default function SetupPage() {
       {/* Overview — the doctor */}
       {activeTab === 'overview' && (
         <div className="space-y-3">
-          {loading ? (
+          {failed && (
+            <p className="text-sm text-warning">
+              The readiness check failed. Nothing here is a verdict about your install — re-open
+              this page, or read the logs.
+            </p>
+          )}
+          {!failed && !items && (
             <div className="flex justify-center py-10">
               <span className="loading loading-spinner loading-md text-primary" />
             </div>
-          ) : (
+          )}
+          {!failed && items && (
             <div className="grid gap-3 sm:grid-cols-2">
-              {checklist.map(item => (
-                <button
-                  key={item.key}
-                  onClick={() => setActiveTab(item.tab)}
-                  className="text-left bg-base-200 rounded-lg border border-base-300 p-4 hover:border-primary transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{statusIcon(item.status)}</span>
-                    <span className="font-medium text-base-content">{item.label}</span>
-                  </div>
-                  <p className="text-sm text-readout mt-1">{item.detail}</p>
-                </button>
-              ))}
+              {items.map((item) => {
+                const look = STATE_LOOK[item.state] ?? STATE_LOOK.optional
+                return (
+                  <Link
+                    key={item.key}
+                    to={item.href}
+                    data-tip={look.tip}
+                    className="tooltip tooltip-top text-left bg-base-200 rounded-lg border border-base-300 p-4 hover:border-primary transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <look.Icon className={`h-4 w-4 shrink-0 ${look.tone}`} aria-hidden="true" />
+                      <span className="font-medium text-base-content">{item.label}</span>
+                      {!item.counted && (
+                        <span className="badge badge-ghost badge-xs ml-auto">optional</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-readout mt-1">{item.detail}</p>
+                  </Link>
+                )
+              })}
             </div>
           )}
           <p className="text-xs text-readout">
-            Click an item to jump to its tab. See{' '}
-            <Link to="/provider-dashboard" className="link link-primary">Provider Dashboard</Link>{' '}
-            for the full management view.
+            Each item opens where it is fixed. The full management view is the{' '}
+            <Link to="/provider-dashboard" className="link link-primary">
+              Provider Dashboard
+            </Link>
+            .
           </p>
         </div>
       )}
@@ -215,36 +180,50 @@ export default function SetupPage() {
         <div className="bg-base-200 rounded-lg border border-base-300 p-5 space-y-3">
           <h3 className="font-semibold text-base-content">Local LLM (Ollama)</h3>
           <p className="text-sm text-readout">
-            Ollama powers session titles and can serve local models. It needs to be
-            running on this machine (<code className="font-mono text-xs bg-base-300 px-1 rounded">ollama serve</code>).
+            A local server can be the default instead of a cloud key. Nothing needs it: session
+            titles take whatever answers chat. If you want one, it must be running on this
+            machine (
+            <code className="font-mono text-xs bg-base-300 px-1 rounded">ollama serve</code>).
           </p>
-          <div className={`badge ${status?.ollamaRunning ? 'badge-success badge-outline' : 'badge-warning badge-outline'}`}>
-            {status?.ollamaRunning ? '✅ Running' : '⚠️ Not detected'}
-          </div>
           <ul className="text-sm text-readout list-disc list-inside space-y-1">
-            <li>Install: <code className="font-mono text-xs bg-base-300 px-1 rounded">curl -fsSL https://ollama.com/install.sh | sh</code></li>
-            <li>Pull a model: <code className="font-mono text-xs bg-base-300 px-1 rounded">ollama pull llama3.2</code></li>
-            <li>Start the daemon: <code className="font-mono text-xs bg-base-300 px-1 rounded">ollama serve</code></li>
+            <li>
+              Install:{' '}
+              <code className="font-mono text-xs bg-base-300 px-1 rounded">
+                curl -fsSL https://ollama.com/install.sh | sh
+              </code>
+            </li>
+            <li>
+              Pull a model:{' '}
+              <code className="font-mono text-xs bg-base-300 px-1 rounded">ollama pull llama3.2</code>
+            </li>
+            <li>
+              Start the daemon:{' '}
+              <code className="font-mono text-xs bg-base-300 px-1 rounded">ollama serve</code>
+            </li>
           </ul>
         </div>
       )}
 
       {/* API Keys — reuse the Keys tab */}
-      {activeTab === 'keys' && (
-        <ProviderKeyManager />
-      )}
+      {activeTab === 'keys' && <ProviderKeyManager />}
 
       {/* Default Model */}
       {activeTab === 'model' && (
         <div className="bg-base-200 rounded-lg border border-base-300 p-5 space-y-3">
           <h3 className="font-semibold text-base-content">Default Model</h3>
           <p className="text-sm text-readout">
-            Pick the provider and model used as the system default. Manage it fully
-            on the{' '}
-            <Link to="/provider-dashboard" className="link link-primary">Provider Dashboard</Link>{' '}
-            (Overview tab → Default Provider).
+            Pick the provider and model used as the system default — chat, title, summary,
+            workflow and memory all take it from there. Manage it fully on the{' '}
+            <Link to="/provider-dashboard" className="link link-primary">
+              Provider Dashboard
+            </Link>
+            .
           </p>
-          <Link to="/provider-dashboard" className="btn btn-primary btn-sm rounded-[var(--button-radius)]">
+          <Link
+            to="/provider-dashboard"
+            className="btn btn-primary btn-sm rounded-[var(--button-radius)]"
+            data-tip="Opens the Provider Dashboard, where the default provider and model are set"
+          >
             Choose Default Model
           </Link>
         </div>
@@ -253,15 +232,19 @@ export default function SetupPage() {
       {/* Agent */}
       {activeTab === 'agent' && (
         <div className="bg-base-200 rounded-lg border border-base-300 p-5 space-y-3">
-          <h3 className="font-semibold text-base-content">Starter Agent</h3>
+          <h3 className="font-semibold text-base-content">Agents</h3>
           <p className="text-sm text-readout">
-            Agents use capability profiles (not roles) to pick strategies. Choose a
-            profile that matches how you work, then start chatting.
+            The two shipped reporters — Bob and Lois — arrive once a chat model resolves, and
+            take their service from this install's chat answer. More agents are yours to add.
           </p>
-          <Link to="/agent-profiles" className="btn btn-primary btn-sm rounded-[var(--button-radius)]">
-            Pick a Profile
+          <Link
+            to="/agent-profiles"
+            className="btn btn-primary btn-sm rounded-[var(--button-radius)]"
+            data-tip="Open the agents page"
+          >
+            Open Agents
           </Link>
-          <Link to="/agent-interaction" className="btn btn-ghost btn-sm ml-2">
+          <Link to="/agent-interaction" className="btn btn-ghost btn-sm ml-2" data-tip="Open chat">
             Go to Chat
           </Link>
         </div>

@@ -73,6 +73,7 @@ from app.api.v1.ab_tests_router import router as ab_tests_router
 
 from app.api.v1.wiki.router import router as wiki_router
 from app.api.v1.knowledge.router import router as knowledge_router
+from app.api.v1.setup.router import router as setup_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -84,6 +85,7 @@ router.include_router(macros_router)  # /api/v1/macros/*
 # Include all feature routers
 # Note: Order matters! More specific routes must be registered before dynamic routes
 router.include_router(health_router)
+router.include_router(setup_router)  # /api/v1/setup/readiness — the install's one verdict
 router.include_router(settings_router)
 router.include_router(agent_lists_router)  # Before agents_router (has /agent-lists routes)
 router.include_router(agents_router)
