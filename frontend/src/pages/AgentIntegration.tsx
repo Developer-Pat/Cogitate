@@ -18,7 +18,7 @@ import {
   deactivateExa,
   getExternalAgentConfig,
   getExternalAgentStatus,
-  restartExternalAgent, getExaModel, updateExaModel,
+  restartExternalAgent, getExaModel, updateExaModel, seededFileCount,
   updateExternalAgentConfig,
   type ExternalAgentConfig,
   type ExternalAgentStatus,
@@ -150,11 +150,16 @@ export default function AgentIntegration() {
         s ? { ...s, enabled: res.enabled, runnable: res.runnable, blocked_reason: res.blocked_reason ?? null } : s
       );
       if (res.enabled) {
+        // WHAT IT SEEDED (2026-11-20): activation provisions Exa's home first, so the
+        // toast can say the switch actually did something instead of promising a brain.
+        const seeded = seededFileCount(res.provisioned);
         addNotification({
           type: res.runnable ? 'success' : 'warning',
           title: res.runnable ? 'Exa activated' : 'Exa activated — but it cannot run here yet',
           message: res.runnable
-            ? 'Open the Exa chat to talk to it.'
+            ? (seeded > 0
+                ? `${seeded} skill files seeded into its home. Open the Exa chat to talk to it.`
+                : 'Open the Exa chat to talk to it.')
             : (res.blocked_reason ?? 'The runtime it needs is missing from this machine.'),
         });
       } else {

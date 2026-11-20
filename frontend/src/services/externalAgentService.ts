@@ -84,6 +84,15 @@ export interface ExaActivation {
   enabled: boolean;
   runnable: boolean;
   blocked_reason?: string | null;
+  /** What the activation SEEDED, line by line (only the activate answer carries it). */
+  provisioned?: string[];
+}
+
+/** How many files activation seeded into Exa's home (0 = it was already provisioned). */
+export function seededFileCount(log?: string[]): number {
+  const line = log?.find((l) => l.startsWith('skills seeded'));
+  const m = line?.match(/\((\d+) file\(s\) added\)/);
+  return m ? Number(m[1]) : 0;
 }
 
 /** THE ACTIVATION (2026-11-18): the user's decision, in one call. */

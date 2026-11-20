@@ -172,16 +172,33 @@ async def activate_external_agent(db=Depends(_db)) -> dict:
     user's call, not a capability test — but the answer CARRIES the probe, so
     the page can say "'hermes' is not on PATH" instead of showing a switch that
     does nothing. `runnable: false` is a fact to report, not a refusal.
+
+    THE HOME IS PROVISIONED FIRST (2026-11-20): the switch used to flip and
+    spawn against whatever already sat in Exa's home, and on a fresh install
+    that was one skill and no model section — measured: the agent answered as
+    plain Hermes. `activation.apply` is the sequence's ONE implementation (the
+    CLI and the docs read the same one), it provisions IDEMPOTENTLY (an edited
+    skill or an existing config is kept), and it takes the decision LAST — so a
+    home that could not be provisioned is never left switched on.
     """
-    cfg = await get_config(db)
-    activated = cfg.model_copy(update={"enabled": True})
-    await save_config(db, activated)
-    get_acp_client(enabled=True)
-    blocked = probe_runnable(activated)
+    from app.domain.external_agent import activation
+
+    try:
+        _report, provisioned = await activation.apply(db)
+    except Exception as e:
+        logger.error("external-agent: provisioning Exa's home failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Exa's home could not be provisioned ({e}) — it was not activated.",
+        ) from e
+    blocked = probe_runnable(await get_config(db))
     return {
         "enabled": True,
         "runnable": blocked is None,
         "blocked_reason": blocked,
+        # WHAT IT SEEDED, line by line — the page says what activation did
+        # instead of promising a brain that still has no model.
+        "provisioned": provisioned,
     }
 
 

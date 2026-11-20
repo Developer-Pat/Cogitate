@@ -102,17 +102,59 @@ def test_probe_is_quiet_when_the_binary_exists():
 
 
 @pytest.mark.asyncio
-async def test_activate_reports_whether_this_box_can_run_it(test_session):
+async def test_activate_reports_whether_this_box_can_run_it(test_session, monkeypatch):
     """Activation is the user's call, not a capability test — but the answer
-    carries the probe so a page can say WHY nothing answers."""
+    carries the probe so a page can say WHY nothing answers, and the
+    provisioning log so it can say what the switch DID.
+
+    Provisioning is stubbed: the real one writes into the install's own
+    `.hermes`, and a test may not touch the repo (`test_exa_activation.py`
+    covers the real sequence on a tmp home).
+    """
+    from app.domain.external_agent import activation
+
+    calls: list[dict] = []
+
+    def fake_provision(**kwargs):
+        calls.append(kwargs)
+        return ["skills seeded into .hermes/skills/cogitate (2 file(s) added)"]
+
+    monkeypatch.setattr(activation, "provision_home", fake_provision)
+
     result = await activate_external_agent(db=test_session)
+    assert calls, "activation must provision the home"
     assert result["enabled"] is True
     assert result["runnable"] is (result["blocked_reason"] is None)
-    assert set(result) == {"enabled", "runnable", "blocked_reason"}
+    # the seeded lines AND the decision, in the order the sequence took them
+    assert result["provisioned"] == [
+        "skills seeded into .hermes/skills/cogitate (2 file(s) added)",
+        "activated: Exa will spawn on the next chat",
+    ]
+    assert set(result) == {"enabled", "runnable", "blocked_reason", "provisioned"}
 
     off = await deactivate_external_agent(db=test_session)
     assert off["enabled"] is False
     assert set(off) == {"enabled", "runnable", "blocked_reason"}
+
+
+@pytest.mark.asyncio
+async def test_a_home_that_cannot_be_provisioned_is_not_activated(test_session, monkeypatch):
+    """The decision is taken LAST: a switch whose provisioning failed must not
+    come back on, or the user gets an agent with no identity and no explanation."""
+    from fastapi import HTTPException
+
+    from app.domain.external_agent import activation
+
+    def boom(**kwargs):
+        raise PermissionError("read-only home")
+
+    monkeypatch.setattr(activation, "provision_home", boom)
+
+    with pytest.raises(HTTPException) as exc:
+        await activate_external_agent(db=test_session)
+    assert exc.value.status_code == 500
+    assert "read-only home" in exc.value.detail
+    assert (await get_config(test_session)).enabled is False
 
 
 def test_ws_answers_inactive_instead_of_spawning(monkeypatch):
