@@ -21,10 +21,9 @@
 >
 > * **Want to contribute?** Open an issue — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Cogitate is a research framework for one question: **how do you combine LLMs of different capabilities into
-dependable workflows?**
+Cogitate™, is a new open source agentic development platform.
 
-The working hypothesis — the *factoring hypothesis* — is that a smaller or local model looks incompetent at
+Its working hypothesis — the *factoring hypothesis* — is that a smaller or local model looks incompetent at
 "trivial" tasks because those tasks are really multi-step, carry hidden state, and have no verification. A
 workflow can supply the missing machinery: skills carry the *how*, workflows carry the *when / if / verify*.
 The testable claim is that a workflow turns a small model's failures into bounded, verifiable outcomes — and
