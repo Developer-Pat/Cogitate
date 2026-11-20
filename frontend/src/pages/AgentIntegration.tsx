@@ -51,6 +51,9 @@ export default function AgentIntegration() {
   // THE EXA MODEL CARD (2026-08-22): the model/provider live in Exa's
   // private config (.hermes/config.yaml) — the API is the view/editor.
   const [exaModel, setExaModel] = useState('');
+  // The offer (2026-11-20): what THIS install answers chat with, so Exa's brain is one
+  // accept instead of a second decision. Nothing is written until the button is pressed.
+  const [exaOffer, setExaOffer] = useState<{ provider: string; model: string; base_url?: string | null } | null>(null);
   const [exaProvider, setExaProvider] = useState('');
   const [exaBaseUrl, setExaBaseUrl] = useState('');
   const [exaEffort, setExaEffort] = useState('medium');
@@ -71,6 +74,7 @@ export default function AgentIntegration() {
       // the model card reads Exa's private config via the model endpoint
       const m = await getExaModel();
       setExaModel(m.model ?? '');
+      setExaOffer(m.offer ?? null);
       setExaProvider(m.provider ?? '');
       setExaVisionModel(m.vision_model ?? '');
       setExaBaseUrl(m.base_url ?? '');
@@ -263,6 +267,36 @@ export default function AgentIntegration() {
         <div className="card bg-base-200/60 border border-base-300">
           <div className="card-body">
             <h2 className="card-title text-base">Model</h2>
+            {/* THE INSTALL'S OWN ANSWER, OFFERED (2026-11-20): by the time a user reaches
+                this page they have already chosen a chat model, so Exa names it and asks for
+                ONE accept. The button is the accept; nothing here writes on its own. */}
+            {exaOffer && (exaOffer.model !== exaModel || exaOffer.provider !== exaProvider) && (
+              <div className="alert py-2 text-sm flex items-center gap-2 bg-base-300 border border-base-300">
+                <span>
+                  This install answers chat with{' '}
+                  <span className="font-mono">{exaOffer.model}</span> via{' '}
+                  <span className="font-mono">{exaOffer.provider}</span>.
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-xs ml-auto"
+                  data-tip="Write this install's chat model into Exa — one model, one key, one place"
+                  disabled={savingModel}
+                  onClick={() => {
+                    setExaModel(exaOffer.model);
+                    setExaProvider(exaOffer.provider);
+                    setExaBaseUrl(exaOffer.base_url ?? '');
+                    saveModel({
+                      model: exaOffer.model,
+                      provider: exaOffer.provider,
+                      base_url: exaOffer.base_url ?? '',
+                    });
+                  }}
+                >
+                  Use this model
+                </button>
+              </div>
+            )}
             {/* THE BRAIN QUICK-SWITCH (2026-08-22, user): a curated dropdown
                 of the tested brains — pick one, it fills the fields below,
                 Save applies it (the swap infra is crash-free). */}

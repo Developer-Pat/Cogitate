@@ -893,6 +893,20 @@ async def set_default_provider(
         await db.flush()
         logger.info(f"✅ Set default provider: {provider.name} (ID: {provider.id})")
 
+        # THE VALUE'S CONSUMER (measured 2026-11-20). Setting the default model HERE is the
+        # same event as the CLI accept: the shipped agents were waiting for a chat model, and
+        # the only other seeding caller was app startup — so a model configured in the browser
+        # left the Agents page empty until a restart nobody had a reason to expect. Idempotent:
+        # an install that already has its agents reports that and re-creates nothing.
+        from app.domain.agents.shipped import seed_shipped_agents
+
+        await db.commit()
+        try:
+            for outcome in await seed_shipped_agents(db):
+                logger.info("news desk — %s", outcome.describe())
+        except Exception as exc:  # a setup step must not fail on a seed
+            logger.warning("news desk — not seeded: %s", exc)
+
         return DefaultProviderResponse(
             provider_id=provider.id,
             provider_name=provider.name,

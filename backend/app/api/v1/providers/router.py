@@ -79,6 +79,11 @@ _CATALOG_TYPES: dict[str, tuple[str, str]] = {
     "anthropic": ("Anthropic", "cloud"),
     "openrouter": ("OpenRouter", "cloud"),
     "deepseek": ("Deepseek", "cloud"),
+    # Both have a registry address, so `canonical_endpoint` answers and the add-provider
+    # form can prefill them. `llama` is deliberately absent: a llama.cpp server's address is
+    # the user's, so the field has to be typed — a catalogue entry would be a guess.
+    "groq": ("Groq", "cloud"),
+    "ollama_cloud": ("Ollama Cloud", "cloud"),
 }
 
 PROVIDERS = {

@@ -205,8 +205,8 @@ async def _agents_item(db: AsyncSession, chat: ReadinessItem) -> ReadinessItem:
         label="Agents",
         state=UNMET,
         detail=(
-            "A model answers and no agents exist yet. The shipped reporters seed on the next "
-            "start — restart to bring them in now."
+            "A model answers and no agents exist yet. The shipped reporters seed the moment a "
+            "chat model is set — set the default model again to seed now, or restart."
         ),
         href=HREF_AGENTS,
     )

@@ -108,6 +108,8 @@ export async function getExaModel(): Promise<{
   base_url?: string
   reasoning_effort?: string
   vision_model?: string
+  /** THIS INSTALL'S chat answer, offered — the field names what accepting it would write. */
+  offer?: { provider: string; model: string; base_url?: string | null } | null
 }> {
   const { data } = await apiClient.get('/api/v1/external-agent/model');
   return data!;
