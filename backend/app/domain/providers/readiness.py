@@ -24,7 +24,7 @@ capability profile" while zero profiles existed, because the seed was waiting fo
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -153,6 +153,20 @@ async def _provider_item(db: AsyncSession) -> ReadinessItem:
     )
 
 
+def _chat_model_string(primary: Any) -> str:
+    """The model string for the resolved chat row, built where every other caller builds it.
+
+    A model that already carries its handler (`~deepseek/…`) is printed as it stands; one that does
+    not gets the provider's prefix. A string the client cannot build is still the row's own answer.
+    """
+    from app.domain.providers.litellm_route import litellm_model_string
+
+    try:
+        return str(litellm_model_string(primary.provider, primary.model, primary.provider_type))
+    except Exception:
+        return str(primary.model)
+
+
 async def _chat_item(db: AsyncSession) -> ReadinessItem:
     resolved = await resolve(db, "chat")
     primary = resolved.primary
@@ -161,7 +175,10 @@ async def _chat_item(db: AsyncSession) -> ReadinessItem:
             key="chat",
             label="Chat model",
             state=OK,
-            detail=f"{primary.provider}/{primary.model} answers chat; title, summary, "
+            # THE ONE HOME FOR THE STRING (2026-11-20): `provider/model` printed a doubled prefix
+            # for a row whose model already carries one (`deepseek/~deepseek/…`). The route module
+            # builds this string everywhere else, so it builds it here too.
+            detail=f"{_chat_model_string(primary)} answers chat; title, summary, "
             "workflow and memory inherit it.",
             href=HREF_MODEL,
         )

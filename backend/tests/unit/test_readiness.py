@@ -57,6 +57,34 @@ async def test_a_fresh_install_reads_as_unconfigured(test_session):
     assert runtime.state in (readiness.OPTIONAL, readiness.OK)
 
 
+async def test_a_model_that_carries_its_own_prefix_is_not_prefixed_twice(test_session):
+    """The chat detail is the string the route module builds — not `provider/model`.
+
+    Measured on a live install: `deepseek/~deepseek/deepseek-v4-flash-latest answers chat`. The
+    row's model already carried its handler, and the detail glued the provider on again.
+    """
+    await _bare(test_session)
+    test_session.add(
+        Provider(
+            name="Deepseek",
+            display_name="Deepseek",
+            provider_type="deepseek",
+            base_url="https://api.deepseek.com",
+            is_active=True,
+            is_default=True,
+            config={"default_model": "~deepseek/deepseek-v4-flash-latest"},
+        )
+    )
+    await test_session.commit()
+
+    report = await readiness.measure(test_session)
+    chat = _item(report, "chat")
+    assert chat.state == readiness.OK
+
+    assert chat.detail.startswith("~deepseek/deepseek-v4-flash-latest answers chat"), chat.detail
+    assert "deepseek/~deepseek/" not in chat.detail
+
+
 async def test_a_dialable_provider_and_a_chat_model_turn_both_items_ok(test_session):
     await _bare(test_session)
     test_session.add(
