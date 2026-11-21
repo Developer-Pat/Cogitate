@@ -650,24 +650,83 @@ const ProviderDashboard: React.FC = () => {
                 )}
               </>
             ) : (
-              <div className="alert alert-warning">
-                <svg className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <h3 className="font-semibold">No Default Provider Configured</h3>
-                  <p className="text-sm">
-                    Set a default provider to use for workflows and title generation.
-                  </p>
-                  <div className="mt-2">
-                    <button
-                      onClick={handleInitializeDefaultProvider}
-                      className="btn btn-sm btn-primary"
-                    >
-                      Initialize Default (Ollama)
-                    </button>
+              <div className="space-y-4">
+                <div className="alert alert-warning">
+                  <svg className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <h3 className="font-semibold">No Default Provider Configured</h3>
+                    <p className="text-sm">
+                      Pick the provider and model that answer chat. Title, summary, workflow and
+                      memory all inherit it.
+                    </p>
                   </div>
                 </div>
+
+                {providers.length === 0 ? (
+                  // THE EMPTY DOOR (2026-11-21): a default needs a provider to point at, and a fresh
+                  // install has none — so the page asks for the thing it is missing instead of
+                  // offering a choice among zero options.
+                  <div className="bg-base-200 rounded-lg border border-base-300 p-4 space-y-3">
+                    <p className="text-sm text-readout">
+                      No provider on this install yet, and a default provider is a choice among
+                      providers. Add one first — it carries its own key.
+                    </p>
+                    <button
+                      onClick={handleAddProvider}
+                      className="btn btn-primary btn-sm rounded-[var(--button-radius)]"
+                      data-tip="Open the add-provider form; the key rides the same form"
+                    >
+                      Add your first provider
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-base-200 rounded-lg border border-base-300 p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <DefaultProviderConfig
+                        onProviderChange={handleDefaultProviderChange}
+                        onModelChange={handleDefaultModelChange}
+                      />
+                    </div>
+                    <div className="mt-4 flex items-center justify-between">
+                      {pendingProvider ? (
+                        <div className="text-sm text-info">
+                          Pending: <strong>{pendingProvider.providerName}</strong> /{' '}
+                          <strong>{pendingProvider.model || 'Select a model'}</strong>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-readout">Choose a provider and a model, then save.</div>
+                      )}
+                      <div className="tooltip tooltip-left" data-tip={pendingProvider?.model ? 'Make this the default provider and model' : 'Choose a model first'}>
+                        <button
+                          onClick={handleSaveDefaultConfiguration}
+                          disabled={savingDefault || !pendingProvider?.model}
+                          className={`btn btn-sm ${pendingProvider?.model ? 'btn-primary' : 'btn-disabled'}`}
+                        >
+                          {savingDefault ? 'Saving...' : 'Set as Default'}
+                        </button>
+                      </div>
+                    </div>
+                    {defaultError && (
+                      <div className="mt-3 p-2 bg-error/10 border border-error/20 rounded text-xs text-error">
+                        ⚠️ {defaultError}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* The one-click path stays, but only where it can WORK: it points the install at a
+                    local Ollama, which is meaningless on a box that has no ollama row. */}
+                {providers.some((p) => p.provider_type === 'ollama') && (
+                  <div className="text-xs text-readout">
+                    Or{' '}
+                    <button onClick={handleInitializeDefaultProvider} className="link link-primary">
+                      initialize the default from the local Ollama server
+                    </button>
+                    .
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -206,18 +206,18 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
 
   useEffect(() => { load() }, [load])
 
-  const providersList = providers.length > 0
-    ? providers
-    : [{ id: 0, name: 'openrouter', display_name: 'OpenRouter' },
-       { id: 0, name: 'ollama', display_name: 'Ollama' },
-       { id: 0, name: 'deepseek', display_name: 'DeepSeek' },
-       { id: 0, name: 'ollama_cloud', display_name: 'Ollama Cloud' }]
-
+  // THE INSTALL'S OWN PROVIDERS, NEVER A FABRICATED LIST (2026-11-21). This used to invent four
+  // providers (openrouter first) whenever the install had none, and `openAdd` defaulted the form to
+  // `openrouter` — so the first "Add Model" on a fresh install posted a curated model for a provider
+  // that did not exist and the API answered `400 Provider not found: openrouter`. A curated model is
+  // a recommendation ABOUT a provider row; with none, the page says what is missing.
+  const providersList = providers
   const providerNames = [...new Set([...providersList.map(p => p.name), ...models.map(m => m.provider)])].sort()
   const filtered = filter === 'all' ? models : models.filter(m => m.provider === filter)
 
   const openAdd = (providerName?: string) => {
-    setForm({ ...EMPTY_FORM, provider: providerName || (filter !== 'all' ? filter : 'openrouter') })
+    const fallback = filter !== 'all' ? filter : (providersList[0]?.name ?? '')
+    setForm({ ...EMPTY_FORM, provider: providerName || fallback })
     setEditing(null)
     setShowAddModal(true)
   }
@@ -363,13 +363,18 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
             (config seed is fallback only).
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => openAdd()}
-          className="btn btn-primary btn-sm rounded-[var(--button-radius)] px-[var(--button-padding)] transition-all duration-[var(--button-transition)]"
-        >
-          + Add Model
-        </button>
+        <span className="tooltip tooltip-left" data-tip={providersList.length === 0
+          ? 'A curated model is a recommendation about a provider — add a provider first'
+          : 'Add a model to the human-owned recommendation list'}>
+          <button
+            type="button"
+            onClick={() => openAdd()}
+            disabled={providersList.length === 0}
+            className="btn btn-primary btn-sm rounded-[var(--button-radius)] px-[var(--button-padding)] transition-all duration-[var(--button-transition)]"
+          >
+            + Add Model
+          </button>
+        </span>
       </div>
 
       {/* Provider filter — a SELECT, not a pill row: the pills' selection differed only by a
@@ -406,7 +411,9 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-10 text-readout text-sm bg-base-200 rounded-lg">
-          No curated models{filter !== 'all' ? ` for ${filter}` : ''}. Add one to get started.
+          {providersList.length === 0
+            ? 'No provider on this install yet. A curated model is a recommendation about a provider — add one on the API Keys tab first.'
+            : `No curated models${filter !== 'all' ? ` for ${filter}` : ''}. Add one to get started.`}
         </div>
       ) : (
         <div className="overflow-x-auto bg-base-200 rounded-lg border border-base-300">

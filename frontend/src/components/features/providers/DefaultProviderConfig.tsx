@@ -36,9 +36,9 @@ interface ModelInfo {
  */
 export const DefaultProviderConfig: React.FC<DefaultProviderConfigProps> = ({
   currentProviderId,
-  currentProviderName = 'ollama',
-  currentProviderType: _currentProviderType = 'ollama',
-  currentModel = 'llama3.2:latest',
+  currentProviderName = '',
+  currentProviderType: _currentProviderType = '',
+  currentModel = '',
   onProviderChange,
   onModelChange,
   className = '',
@@ -47,7 +47,7 @@ export const DefaultProviderConfig: React.FC<DefaultProviderConfigProps> = ({
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [selectedProviderId, setSelectedProviderId] = useState<number>(currentProviderId || 1);
+  const [selectedProviderId, setSelectedProviderId] = useState<number>(currentProviderId ?? 0);
   const [selectedModel, setSelectedModel] = useState<string>(currentModel);
   const [modelSearch, setModelSearch] = useState('');
   const [, setSelectedProviderName] = useState<string>(currentProviderName);
@@ -59,10 +59,23 @@ export const DefaultProviderConfig: React.FC<DefaultProviderConfigProps> = ({
 
   // Sync internal state with props when they change
   useEffect(() => {
-    setSelectedProviderId(currentProviderId || 1);
+    setSelectedProviderId(currentProviderId ?? 0);
     setSelectedProviderName(currentProviderName);
     setSelectedModel(currentModel);
   }, [currentProviderId, currentProviderName, currentModel]);
+
+  // THE FIRST PROVIDER IS THE DEFAULT SELECTION (2026-11-21). This component is also the way a
+  // fresh install CHOSES its default, and there is no `currentProviderId` then — the selects
+  // used to seed themselves with `1` and `llama3.2:latest`, guesses about a machine nobody had
+  // looked at. Now an unset selection takes the install's first real provider.
+  useEffect(() => {
+    if (loadingProviders || providers.length === 0) return
+    if (providers.some((p) => p.id === selectedProviderId)) return
+    const first = providers[0]
+    setSelectedProviderId(first.id)
+    setSelectedProviderName(first.name)
+    onProviderChange(first.id, first.name, first.provider_type)
+  }, [providers, loadingProviders, selectedProviderId, onProviderChange]);
 
   // Load models when provider changes
   useEffect(() => {
