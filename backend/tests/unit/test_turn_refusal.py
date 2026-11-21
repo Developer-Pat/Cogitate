@@ -227,7 +227,7 @@ async def test_a_cold_memo_refuses_nothing_and_the_turn_reaches_the_provider(tes
     seen = {"llm": False}
 
     async def fake_stream(request_kwargs, context, logger_service, start_time, service,
-                          result_holder, path=""):
+                          result_holder, path="", supersedes=False):
         seen["llm"] = True
         result_holder["result"] = None
         result_holder["empty_completion"] = True

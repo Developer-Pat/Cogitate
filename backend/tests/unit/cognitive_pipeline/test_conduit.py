@@ -25,7 +25,7 @@ class TestConduitRoute:
         assert decision.route == Route.SHALLOW
 
     def test_delegate_investigate_keyword(self):
-        """Auto-delegation is disabled — investigate triggers HYBRID (short content + hybrid strategy)."""
+        """An intent word routes HYBRID on a hybrid strategy."""
         decision = conduit_route(
             message="Investigate the latest climate data",
             executor_strategy="hybrid",
@@ -34,15 +34,45 @@ class TestConduitRoute:
         )
         assert decision.route == Route.HYBRID
 
+    def test_a_complete_short_answer_earns_no_second_call(self):
+        """THE BREVITY-TRIGGER REMOVAL (2026-11-20, the duplicate-answer issue).
+
+        A short answer that ANSWERS is a complete answer. Measured live: "Bob, one word: ready?"
+        was answered `Ready.` and re-asked at a 6,086-token prompt, twice, because the first pass
+        was under 500 characters. Length is not evidence of insufficiency.
+
+        This test used to assert the opposite (`test_hybrid_short_response`: "Hello" -> "Hi" ->
+        HYBRID). The rule changed by ruling, not by accident.
+        """
+        decision = conduit_route(
+            message="Bob, one word: ready?",
+            executor_strategy="hybrid",
+            accumulated_content="Ready.",
+            tools_were_used=False,
+        )
+        assert decision.route == Route.SHALLOW
+
+    def test_an_answer_cut_at_the_budget_earns_a_second_call(self):
+        """The replacement signal for brevity: the provider CUT the answer at the output budget."""
+        decision = conduit_route(
+            message="Bob, one word: ready?",
+            executor_strategy="hybrid",
+            accumulated_content="Ready, and here is the beginning of a much longer answ",
+            tools_were_used=False,
+            answer_truncated=True,
+        )
+        assert decision.route == Route.HYBRID
+        assert "truncated=True" in decision.reason
+
     def test_hybrid_tool_usage(self):
-        """Short response + tools used still triggers HYBRID (content short)."""
+        """Short response + tools used routes SHALLOW: the tool loop already synthesised."""
         decision = conduit_route(
             message="What is the weather?",
             executor_strategy="hybrid",
             accumulated_content="Short response",
             tools_were_used=True,
         )
-        assert decision.route == Route.HYBRID
+        assert decision.route == Route.SHALLOW
 
     def test_tools_alone_does_not_trigger_hybrid(self):
         """THE DOUBLE-GLITCH DISCRIMINATOR (2026-09-02): tools used with
@@ -75,14 +105,14 @@ class TestConduitRoute:
         assert decision.route == Route.SHALLOW
 
     def test_hybrid_short_response(self):
-        """Short response triggers HYBRID."""
+        """Brevity alone does NOT route HYBRID (ruled 2026-11-20 — the duplicate-answer issue)."""
         decision = conduit_route(
             message="Hello",
             executor_strategy="hybrid",
             accumulated_content="Hi",
             tools_were_used=False,
         )
-        assert decision.route == Route.HYBRID
+        assert decision.route == Route.SHALLOW
 
     def test_hybrid_keywords(self):
         """Analysis keywords without delegate words trigger HYBRID."""

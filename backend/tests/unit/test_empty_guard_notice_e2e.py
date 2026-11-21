@@ -50,7 +50,7 @@ async def test_generate_stream_surfaces_the_empty_guard(test_session, monkeypatc
     # Pass 1 (the main stream): chunks but NO content, NO tool calls —
     # the wrapper flags the empty completion.
     async def fake_stream(request_kwargs, context, logger_service, start_time, service,
-                     result_holder, path=""):
+                     result_holder, path="", supersedes=False):
         result_holder["result"] = None
         result_holder["empty_completion"] = True
         result_holder["empty_chunk_count"] = 3

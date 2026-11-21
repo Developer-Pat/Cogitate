@@ -296,7 +296,7 @@ async def test_generate_stream_done_frame_reports_truncation(test_session, monke
     await test_session.refresh(agent)
 
     async def fake_stream(request_kwargs, context, logger_service, start_time, service,
-                     result_holder, path=""):
+                     result_holder, path="", supersedes=False):
         result_holder["result"] = StreamResult(
             chunk_count=357, accumulated_content="## 10-Day Forecast\n\n| Sun 9",
             tool_calls=[], has_content=True, finish_reason="length",

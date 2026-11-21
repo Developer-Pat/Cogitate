@@ -785,6 +785,28 @@ export class StreamingService {
           const reasoningChunk = parsed.choices[0].delta.reasoning
           const finishReason = parsed.choices[0].finish_reason
 
+          // THE REPLACE (the duplicate-answer fix, 2026-11-20): the server has SUPERSEDED the answer
+          // this bubble holds — a deep pass, a deep answer pass, or the loop's answer pass wrote the
+          // text the saved row keeps. Drop what we have before the new text arrives, or both answers
+          // sit in one message (`Ready.Ready.` measured beside a row of `Ready.`). The backend sends
+          // this only when the superseding pass actually has content, so an empty pass never blanks
+          // the answer already on screen.
+          if (parsed.choices[0].delta.replace) {
+            accumulatedContent = ''
+            // The throttle still holds the PRE-replace text and its timer would flush it back over
+            // this reset — the frame and its pending flush are one event, so both are cleared, and
+            // the clock is zeroed so the empty text lands immediately rather than 50 ms later.
+            this.pendingUpdate = false
+            this.pendingContent = ''
+            this.lastUpdateTime = 0
+            this.throttledUpdate(messageId, accumulatedContent, sessionId, callbacks)
+            frontendLoggingService.debug('StreamingService', 'Answer superseded — the bubble was reset', {
+              messageId,
+              sessionId,
+            })
+            return { accumulatedContent }
+          }
+
           // THE THINKING SEGREGATION (2026-08-24): the reasoning
           // chunks accumulate separately and ride the message
           // metadata — the bubble's Thinking fold fills live; the

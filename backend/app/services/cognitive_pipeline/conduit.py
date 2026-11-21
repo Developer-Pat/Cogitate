@@ -94,6 +94,7 @@ def conduit_route(
     executor_strategy: str,
     accumulated_content: Optional[str],
     tools_were_used: bool,
+    answer_truncated: bool = False,
 ) -> ConduitDecision:
     """Decide the execution route for a query.
 
@@ -110,24 +111,33 @@ def conduit_route(
     # router the tool loop runs until the model writes its final text
     # answer (no more tool calls) — the synthesis ALREADY happened,
     # so re-answering duplicates the whole report (Bob's session:
-    # two full reports glued into one message). Deep pass fires only
-    # when the first pass is genuinely insufficient: short content,
-    # or the query asks for depth (deep keywords).
+    # two full reports glued into one message).
+    #
+    # THE BREVITY-TRIGGER REMOVED (2026-11-20, the duplicate-answer issue):
+    # `len(content) < 500` used to route every short answer HYBRID, on the
+    # assumption that a short answer must be a stub. It is not evidence of
+    # anything — measured on a live install, "Bob, one word: ready?" was
+    # answered `Ready.` and then re-asked at a 6,086-token prompt, twice.
+    # A short answer that answers is a COMPLETE answer, and the case brevity
+    # was invented for (a loop that spent every round on tools and never
+    # wrote) now has its own instrument: the answer pass (gap L).
+    #
+    # What earns a second call is INTENT (the user asked for depth) or a
+    # MEASURED SHORTFALL (the provider cut the answer at the output budget).
+    # Both are properties of the turn, not guesses about the text's length.
     if executor_strategy == "hybrid" and accumulated_content:
-        is_short = len(accumulated_content) < 500
-
         matched_deep_kws = [kw for kw in DEEP_KEYWORDS if kw in query_lower]
         needs_deep = bool(matched_deep_kws)
 
-        if is_short or needs_deep:
+        if needs_deep or answer_truncated:
             logger.info(
-                "Conduit: HYBRID route — short=%s, deep=%s, kws=%s, content_len=%d, tools=%s",
-                is_short, needs_deep, matched_deep_kws if needs_deep else [],
+                "Conduit: HYBRID route — deep=%s, kws=%s, truncated=%s, content_len=%d, tools=%s",
+                needs_deep, matched_deep_kws if needs_deep else [], answer_truncated,
                 len(accumulated_content), tools_were_used,
             )
             return ConduitDecision(
                 route=Route.HYBRID,
-                reason=f"short={is_short}, deep_keywords={needs_deep}",
+                reason=f"deep_keywords={needs_deep}, truncated={answer_truncated}",
             )
 
     # Default: shallow

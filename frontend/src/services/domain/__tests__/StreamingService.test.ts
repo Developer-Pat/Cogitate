@@ -278,6 +278,67 @@ describe('StreamingService', () => {
       )
     })
 
+    it('a replace frame clears the answer the bubble holds (the duplicate-answer fix)', async () => {
+      // THE MEASURED DEFECT (2026-11-20): one turn answered twice and the bubble read
+      // `Ready.Ready.` while the saved row held `Ready.`. The server now sends a REPLACE delta
+      // before the superseding pass's first content chunk; the accumulator must drop what it has.
+      const mockResponse = {
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Ready."}}]}\n\n'))
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"replace":true}}]}\n\n'))
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Yes, I am here."}}]}\n\n'))
+            controller.enqueue(new TextEncoder().encode('data: {"done":true,"metadata":{"tokenCount":5}}\n\n'))
+            controller.close()
+          }
+        })
+      }
+
+      vi.mocked(chatService.createStreamingChatCompletion).mockResolvedValue(mockResponse as unknown as Response)
+
+      await service.startStream('Hello', {
+        agent: mockAgent,
+        sessionId: mockSession.id,
+        callbacks: mockCallbacks
+      })
+
+      const texts = vi.mocked(mockCallbacks.onUpdateMessage!).mock.calls.map((c) => String(c[1]))
+      expect(texts).not.toContain('Ready.Yes, I am here.')
+      expect(texts[texts.length - 1]).toBe('Yes, I am here.')
+      // and the turn that ended is the superseding answer, which is what the row keeps
+      expect(mockCallbacks.onStreamComplete).toHaveBeenCalledWith(
+        expect.objectContaining({ content: 'Yes, I am here.' })
+      )
+    })
+
+    it('content chunks without a replace frame still concatenate — the behaviour the frame exists for', async () => {
+      // The reference test for the client's own rule: an append-only accumulator is correct ONLY
+      // while nothing supersedes the answer. Two passes, no frame, one glued message — this is the
+      // defect, reproduced here so the frame's job is a measurement rather than a claim.
+      const mockResponse = {
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Ready."}}]}\n\n'))
+            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Ready."}}]}\n\n'))
+            controller.enqueue(new TextEncoder().encode('data: {"done":true,"metadata":{"tokenCount":5}}\n\n'))
+            controller.close()
+          }
+        })
+      }
+
+      vi.mocked(chatService.createStreamingChatCompletion).mockResolvedValue(mockResponse as unknown as Response)
+
+      await service.startStream('Hello', {
+        agent: mockAgent,
+        sessionId: mockSession.id,
+        callbacks: mockCallbacks
+      })
+
+      expect(mockCallbacks.onStreamComplete).toHaveBeenCalledWith(
+        expect.objectContaining({ content: 'Ready.Ready.' })
+      )
+    })
+
     it('should handle session title event', async () => {
       const mockResponse = {
         body: new ReadableStream({

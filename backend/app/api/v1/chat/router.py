@@ -514,6 +514,26 @@ def _content_frame(text: str) -> str:
     return f"data: {json.dumps({'choices': [{'delta': {'content': text}}]})}\n\n"
 
 
+def _replace_frame() -> str:
+    """One REPLACE frame: the answer the client holds is SUPERSEDED — drop it before appending.
+
+    Measured live (2026-11-20): one turn answered twice and the bubble showed both — `Ready.Ready.`
+    beside a saved row of `Ready.` — because the server reassigns `accumulated_content` whenever a
+    later pass answers (a deep round, a deep answer pass, the main loop's answer pass) and the client
+    can only append. The server was right; the wire was silent.
+
+    It rides `_content_frame`'s shape for that function's reason — a frame in any other shape renders
+    NOTHING. The flag is a member of the same delta, so a reader that only looks for `content` sees an
+    empty delta and appends nothing.
+
+    LAZY BY DESIGN: it is emitted immediately before the FIRST content chunk of the pass that
+    supersedes, never at the decision to run that pass. A deep pass that comes back empty therefore
+    replaces nothing and the answer already on screen survives — which is the server's own rule
+    ("an empty deep pass keeps the first pass", see the HYBRID branch below).
+    """
+    return f"data: {json.dumps({'choices': [{'delta': {'replace': True}}]})}\n\n"
+
+
 def _nothing_to_show_sentence(
     context: Any, accumulated_content: str, tool_rounds: int
 ) -> Optional[str]:
@@ -1999,6 +2019,11 @@ async def generate_stream(
 
                 path=_output_budget_path(executor_strategy),
 
+                # ROUND 2 ONWARD SUPERSEDES ROUND 1 (the duplicate-answer fix): every round's result
+                # becomes the turn's answer, so a narration round must not survive beside the answer
+                # the row keeps. Round 1 has nothing on screen to replace.
+                supersedes=iteration > 0,
+
             ):
 
                 yield chunk
@@ -2599,7 +2624,7 @@ async def generate_stream(
         # Conduit Router — decide shallow / hybrid / delegate
         # ------------------------------------------------------------------
         from app.services.cognitive_pipeline.conduit import (
-            ConduitDecision, Route, conduit_route,
+            DEEP_KEYWORDS, ConduitDecision, Route, conduit_route,
         )
 
         # A TURN THAT HIT ITS PLUG STARTS NOTHING FURTHER (D.3): the deep pass is
@@ -2608,6 +2633,13 @@ async def generate_stream(
         # decision, the log line below and the branch structure stay exactly as
         # they are — a stopped turn finalises the answer it already has.
         _stopped_state = _turn_state_of(context)
+
+        # THE MEASURED SHORTFALL (the duplicate-answer ruling, 2026-11-20): an answer the provider CUT
+        # at the output budget is genuinely insufficient, and the deep pass is the remedy. This is the
+        # second half of what replaced the old 500-character test — a fact about the turn, not a guess
+        # about how long the text looks. Read from the answer on screen, so an answer pass's own cut
+        # counts too.
+        _answer_cut_at_budget = getattr(stream_result, "finish_reason", "") == "length"
 
         decision = (
             ConduitDecision(
@@ -2620,6 +2652,7 @@ async def generate_stream(
                 executor_strategy=executor_strategy,
                 accumulated_content=accumulated_content,
                 tools_were_used=_twu_ if isinstance(_twu_, bool) else False,
+                answer_truncated=_answer_cut_at_budget,
             )
         )
         logger.info(
@@ -2671,12 +2704,16 @@ async def generate_stream(
             # tool loop (the turn-death fix), the reasoning replay and the
             # replace-over-append semantics — adopting it would have
             # regressed all three. One copy, this one.
-            is_short = len(accumulated_content or "") < 500
-            query_lower = message.lower()
-            matched = [kw for kw in ["analyze", "explain", "compare", "contrast", "why", "how",
-                                     "difference", "pros and cons", "evaluate", "summarize"]
-                       if kw in query_lower]
-            logger.info("Conduit: HYBRID pass triggered — short=%s, matched=%s", is_short, matched)
+            #
+            # The log names the keyword set from the ROUTER's own constant (`DEEP_KEYWORDS`), not a
+            # second spelling of it: the old inline list carried 9 of the 15 words, so a turn routed on
+            # "research" or "investigate" logged `matched=[]` — a line that argues with the decision
+            # above it. The 500-character `is_short` read is gone with the brevity trigger.
+            matched = [kw for kw in DEEP_KEYWORDS if kw in message.lower()]
+            logger.info(
+                "Conduit: HYBRID pass triggered — matched=%s, cut_at_budget=%s",
+                matched, _answer_cut_at_budget,
+            )
             accumulated_messages = list(request_kwargs.get("messages", []))
             first_pass_content = accumulated_content or ""
             request_kwargs = build_llm_request(context, stream=True)
@@ -2739,6 +2776,10 @@ async def generate_stream(
                 async for chunk in _stream_llm_response(
                     request_kwargs, context, logger_service, start_time, service, deep_holder,
                     path=PATH_DEEP,
+                    # THE DEEP PASS SUPERSEDES THE FIRST (replace-over-append, 2761-2769): every
+                    # round's answer is the answer, so the first pass's text goes as soon as this
+                    # pass has one of its own.
+                    supersedes=True,
                 ):
                     yield chunk
                 result = deep_holder.get("result")
@@ -3462,6 +3503,9 @@ async def _stream_answer_pass(
     result_holder: Optional[Dict],
     path: str,
     rounds: int,
+    # THE ANSWER PASS BY DEFINITION REPLACES WHAT THE LOOP HAD (gap L): the rounds were work, this
+    # call is the deliverable. Default true because there is no other reason to run it.
+    supersedes: bool = True,
 ) -> AsyncGenerator[str, None]:
     """Ask for the answer with the tools withheld — the loop's last round, given a voice (gap L).
 
@@ -3496,6 +3540,7 @@ async def _stream_answer_pass(
         result_holder["result"] = None
     async for chunk in _stream_llm_response(
         answer_kwargs, context, logger_service, start_time, service, result_holder, path=path,
+        supersedes=supersedes,
     ):
         yield chunk
 
@@ -3648,6 +3693,11 @@ async def _stream_llm_response(
     # budget log can never name two different paths (Phase D.1).
     path: str = "",
 
+    # WHETHER THIS CALL'S TEXT SUPERSEDES THE ANSWER ON SCREEN. Every one of these calls becomes the
+    # turn's `accumulated_content`, so the row and the bubble part company unless the client is told to
+    # drop what it holds. The frame is emitted below, lazily, before this call's first content chunk.
+    supersedes: bool = False,
+
 ) -> AsyncGenerator[str, None]:
 
     """
@@ -3771,6 +3821,11 @@ async def _stream_llm_response(
         stream_start_time = time.time()
 
 
+
+        # THE REPLACE, ARMED (the duplicate-answer fix): the flag is spent on this call's first
+        # content chunk — see `_replace_frame`. A call that streams no content never spends it, so
+        # nothing on screen is cleared for an answer that never arrived.
+        _replace_pending = supersedes
 
         async for chunk in stream:
 
@@ -3918,6 +3973,12 @@ async def _stream_llm_response(
             # Accumulate content and yield in real-time
 
             if hasattr(delta, 'content') and delta.content:
+
+                if _replace_pending:
+
+                    _replace_pending = False
+
+                    yield _replace_frame()
 
                 accumulated_content += delta.content
 
