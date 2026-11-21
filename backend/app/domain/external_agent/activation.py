@@ -38,8 +38,15 @@ HERMES_INSTALL_COMMAND = "curl -fsSL https://hermes-agent.nousresearch.com/insta
 # What a provider key looks like in a .env — matched on the NAME only. The
 # copy set also carries BASE_URL lines (a custom endpoint is part of a
 # provider's config), but a base URL is not a key and never counts as one.
-_CARRIED_ENV_MARKERS = ("API_KEY", "BASE_URL", "TOKEN", "SECRET")
-_KEY_MARKERS = ("API_KEY", "TOKEN", "SECRET")
+#
+# NO "SECRET" (2026-11-20, measured). The marker carried LANGFUSE_SECRET_KEY into
+# the agent's home — a TRACING credential, which this module's own rule says must
+# not cross ("an app secret crossing that boundary is a leak, not a convenience"),
+# and the test only asserted the PUBLIC half of the pair. A provider key is an
+# API_KEY or a TOKEN; a SECRET is an application credential. Unknown names still
+# do not carry a bare `*_KEY`, which is what keeps COGITATE_ENCRYPTION_KEY out.
+_CARRIED_ENV_MARKERS = ("API_KEY", "BASE_URL", "TOKEN")
+_KEY_MARKERS = ("API_KEY", "TOKEN")
 
 
 @dataclass
@@ -103,29 +110,46 @@ def _home(home: Path | None) -> Path:
 
 
 def _env_keys(dst: Path, src: Path) -> list[str]:
-    """Copy ONLY the provider-key lines from src to dst; return the NAMES.
+    """Copy ONLY the provider-key lines from src into dst; return the NAMES.
+
+    MERGE, never truncate (2026-11-20, measured): activation now runs this on every
+    switch, and `dst` is Exa's OWN store — `AUXILIARY_VISION_MODEL` is written there by
+    the Model card and a hand-added variable is the user's. So a carried name is
+    REPLACED in place, a new one is appended, and every other line survives; the old
+    write-everything-else-away behaviour silently emptied the file on activation.
 
     Never returns or logs a value: the house rule is that .env is parsed in
     Python, never sourced and never printed.
     """
-    names: list[str] = []
-    lines: list[str] = []
+    carried: dict[str, str] = {}
     if src.exists():
         for raw in src.read_text(encoding="utf-8", errors="replace").splitlines():
             line = raw.strip()
-            if not line or line.startswith("#"):
+            if not line or line.startswith("#") or "=" not in line:
                 continue
             key = line.split("=", 1)[0].strip()
             # THE ORIGINAL FILTER, deliberately NOT widened: a `*_KEY` suffix
-            # would also carry COGITATE_ENCRYPTION_KEY and the tracing keys into
-            # the agent's home, and an app secret crossing that boundary is a
-            # leak, not a convenience.
+            # would also carry COGITATE_ENCRYPTION_KEY into the agent's home, and
+            # an app secret crossing that boundary is a leak, not a convenience.
             if any(w in key.upper() for w in _CARRIED_ENV_MARKERS):
-                lines.append(line)
-                if line.split("=", 1)[1].strip():
-                    names.append(key)
-    dst.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return names
+                carried[key] = line
+
+    existing = dst.read_text(encoding="utf-8").splitlines() if dst.exists() else []
+    merged: list[str] = []
+    replaced: set[str] = set()
+    for raw in existing:
+        stripped = raw.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            key = stripped.split("=", 1)[0].strip()
+            if key in carried:
+                merged.append(carried[key])
+                replaced.add(key)
+                continue
+        merged.append(raw)
+    merged.extend(line for key, line in carried.items() if key not in replaced)
+    dst.write_text("\n".join(merged).rstrip("\n") + "\n", encoding="utf-8")
+
+    return [key for key, line in carried.items() if line.split("=", 1)[1].strip()]
 
 
 def provision_home(

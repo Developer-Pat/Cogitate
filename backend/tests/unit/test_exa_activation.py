@@ -38,13 +38,14 @@ def test_provision_creates_the_home_and_seeds_skills(tmp_path):
 
 
 def test_provision_carries_provider_keys_and_nothing_else(tmp_path):
-    """A key name is not a provider key. The app's own encryption key must never
-    cross into the agent's home."""
+    """A key name is not a provider key. The app's own credentials must never
+    cross into the agent's home — the encryption key, nor a tracing SECRET."""
     home = tmp_path / ".hermes"
     env = tmp_path / "project.env"
     env.write_text(
         "# comment\nDEEPSEEK_API_KEY=sk-test\nEMPTY_KEY=\nCOGITATE_ENCRYPTION_KEY=app-secret\n"
-        "LANGFUSE_PUBLIC_KEY=lf-public\nOPENROUTER_BASE_URL=https://example.invalid\n",
+        "LANGFUSE_PUBLIC_KEY=lf-public\nLANGFUSE_SECRET_KEY=lf-secret\n"
+        "OPENROUTER_BASE_URL=https://example.invalid\n",
         encoding="utf-8",
     )
     log = activation.provision_home(
@@ -55,9 +56,45 @@ def test_provision_carries_provider_keys_and_nothing_else(tmp_path):
     assert "OPENROUTER_BASE_URL=" in written
     assert "COGITATE_ENCRYPTION_KEY" not in written
     assert "LANGFUSE_PUBLIC_KEY" not in written
+    # THE MEASURED LEAK (2026-11-20): a SECRET-named tracing credential crossed,
+    # because "SECRET" was in the carry markers. Both halves of the pair stay out.
+    assert "LANGFUSE_SECRET_KEY" not in written
     # and the log names keys, never values
     assert any("DEEPSEEK_API_KEY" in line for line in log)
     assert all("sk-test" not in line for line in log)
+    assert all("lf-secret" not in line for line in log)
+
+
+def test_provisioning_merges_the_env_and_keeps_exas_own_lines(tmp_path):
+    """Activation runs provisioning on every switch, and this file is Exa's own.
+
+    THE MEASURED BUG (2026-11-20): provisioning wrote ONLY the carried lines, so a
+    live activation emptied `AUXILIARY_VISION_MODEL` (written by the Model card) and
+    any variable a user added. Carried names are replaced in place; everything else
+    survives, and an older value for the same name is refreshed rather than doubled.
+    """
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    (home / ".env").write_text(
+        "# Exa's own store\n"
+        "AUXILIARY_VISION_MODEL=deepseek-vision\n"
+        "DEEPSEEK_API_KEY=stale\n"
+        "MY_OWN_VAR=keep-me\n",
+        encoding="utf-8",
+    )
+    env = tmp_path / "project.env"
+    env.write_text("DEEPSEEK_API_KEY=sk-fresh\nOPENROUTER_API_KEY=or-fresh\n", encoding="utf-8")
+
+    log = activation.provision_home(home=home, seed_dir=None, project_env=env)
+    written = (home / ".env").read_text(encoding="utf-8")
+
+    assert "AUXILIARY_VISION_MODEL=deepseek-vision" in written, "Exa's own line must survive"
+    assert "MY_OWN_VAR=keep-me" in written
+    assert "DEEPSEEK_API_KEY=sk-fresh" in written and "stale" not in written
+    assert "OPENROUTER_API_KEY=or-fresh" in written, "a new key is appended"
+    assert written.count("DEEPSEEK_API_KEY") == 1
+    assert "# Exa's own store" in written
+    assert any("DEEPSEEK_API_KEY" in line for line in log)
 
 
 def test_provisioning_never_invents_a_model(tmp_path):
