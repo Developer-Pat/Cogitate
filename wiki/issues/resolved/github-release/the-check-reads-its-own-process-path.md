@@ -11,9 +11,9 @@ tags: [type/issue, domain/install, domain/external-agent]
 
 # The check reads its own process's PATH — one install, two verdicts, and two capabilities that vanish
 
-**Status**: **OPEN — needs a ruling.** What is open: which layer owns the backend's environment — the
-launcher that gives it one, or the app that resolves binaries without it. What constrains it: the verdict
-is already correct about the process it runs in, so there is nothing to "fix" in the check itself.
+**Status**: **LANDED — `46845da`** *(ruled 2026-11-21: "let'sgo with C", stage A; stage B measured and not
+taken)*. Measured on the box that was wrong — the same frozen clone at `a3e1ccc`, the same bare-PATH SSH
+start — Exa's runtime read `optional`, the one term made it `ok`, the revert made it `optional` again.
 **Found**: 2026-11-21, breaking one fact on the frozen guest (`a3e1ccc`) and restarting its backend over a
 non-login SSH shell. Every line number below was re-measured today, not carried over.
 **Where**: `cogitate.sh`, `backend/app/domain/providers/readiness.py`,
@@ -50,6 +50,10 @@ exactly why the install's headline number stays silent about a capability it has
 | 11 | `backend/app/domain/tts/providers/edge_provider.py:25` | `shutil.which("edge-tts") or "edge-tts"` — falls back to the bare name, so the dial fails later instead of here | the speech provider |
 | 12 | `ls -l ~/.local/bin/` (*measured*) | `hermes` (70 bytes, `#!/bin/sh` → `~/.hermes/hermes-agent/.hermes/bin/hermes`) · `edge-tts` · `uv` — **all three user-local, none in `.venv/bin`** | the installer's convention |
 | 13 | `grep -rn "on PATH" README.md wiki/dev-notes/` (*measured*) | **0 hits** — nothing tells a user the starting shell matters | a reader following the docs |
+| 14 | `cogitate.sh:251-259` with the term applied (`46845da`), guest (*measured*) | the backend's env reads `PATH=$HOME/.local/bin:/usr/local/sbin:…`, and `hermes` resolves **inside that process** (`$HOME/.local/bin/hermes`) | every start |
+| 15 | the same clone `a3e1ccc`, the same bare-PATH SSH start, the term applied (*measured*) | `runtime → state: ok`, *"Exa's runtime is on PATH. Activation is still your decision."* | the two screens |
+| 16 | the same, the term reverted (`git checkout -- cogitate.sh`, tree clean at `a3e1ccc`) (*measured*) | back to `optional`, same detail — so the term is the cause, not the restart | the two screens |
+| 17 | the guest's `~/.local/bin` (*measured*) | `hermes` and `uv` are there; **`edge-tts` is not installed on that box at all** — this fix hands the process the directory, and whether a binary is in it is the install's own business | the speech provider |
 
 **How far the defaults actually travel** — the check this page owes, since a resolver a caller overrides
 would be harmless:
@@ -119,8 +123,8 @@ flowchart TB
   style C fill:#1f3a24,stroke:#4caf50,color:#c8f7c5
 ```
 
-**Fig. 2 — the options, grouped vertically with the recommendation marked.** Navy: what each option
-changes · green: the recommendation. No amber — nothing is being decided here beyond the staging.
+**Fig. 2 — the options, grouped vertically with the ruled option marked.** Navy: what each option
+changes · green: the ruling — C, staged.
 
 | | A — export at launch | B — resolve in the process | C — A now, B conditional |
 |---|---|---|---|
@@ -129,11 +133,12 @@ changes · green: the recommendation. No amber — nothing is being decided here
 | agrees with earlier rulings | provisioning merges, never truncates (`0df7318`): the launcher hands the app the environment the installer assumes, and changes nothing the user set | the verdict has one home (`064b5cb`): the resolver becomes that home's input, not a second answer | both, in order |
 | cost | one term on one line; proven by one restart from a bare PATH | a resolver, its tests, and an audit of every shell-out | one commit, then a measurement |
 
-**Recommendation: A now, B only on a measurement.** A is mechanical and it fixes the case that raised the
-page. B is the half that survives someone else's supervisor, and it is worth its cost **only if** a start
-that bypasses `cogitate.sh` is a shape to support — measured today: **0** docs mention PATH, **0** tests
-touch `cogitate.sh` (`scripts/testing/generate_report.py` mentions it, nothing exercises it), and the
-guest's only starts are `cogitate.sh`. So the second stage is a decision, not a default.
+**RULED: C, staged** *(the user's words, 2026-11-21)*. **Stage A landed as `46845da`** — one term on the
+launch line, and the proof is the A/B/A above: the frozen clone read `optional`, the term made it `ok`, the
+revert made it `optional` again. **Stage B is held, not refused**: it is taken only if a start that bypasses
+`cogitate.sh` is a shape to support — measured today, **0** docs mention PATH, **0** tests touch
+`cogitate.sh` (`scripts/testing/generate_test_report.py` names it, nothing exercises it), and every start on
+the guest is `cogitate.sh`.
 
 **The page's own lead, which is NOT this defect:** the provider keys arrive the same way — `readiness.py:101-106`
 reads `settings.*_api_key`, and pydantic loads `.env` at process start (*measured* today: blanking
@@ -151,9 +156,14 @@ boundary; it belongs on its own page if it is taken up.
 - **Provisioning merges, never truncates** (`0df7318`); activation provisions Exa's home before it flips
   (`b8d181a`). A launcher that adds `~/.local/bin` adds a directory, it does not replace an environment.
 
-## Where the work would live if this is taken up
+## Where the work landed
 
-`cogitate.sh:251` for stage A (the same block carries the two `export PATH` lines at `:770` and `:907` that
-already prove the convention). Stage B would live beside `probe_runnable` in
-`backend/app/domain/external_agent/services.py`, with the edge-tts caller (`edge_provider.py:25`) audited in
-the same pass. Nothing in `todo/master.md` carries this yet.
+`cogitate.sh:251-259` — the launch line sets `PATH="$HOME/.local/bin:$PATH"` in the `setsid env` block
+(`46845da`), beside the two `export PATH` lines at `:770` and `:907` that already proved the convention. The
+comment above it names the two binaries and the measured symptom, so the next reader does not have to find
+this page to know why the line is there.
+
+**Stage B — not taken.** No page, no item: the trigger is named instead. If a start that bypasses
+`cogitate.sh` ever appears (a unit file, an image entrypoint), the resolver belongs beside `probe_runnable`
+in `backend/app/domain/external_agent/services.py`, with `edge_provider.py:25` audited in the same pass —
+and at that point the fix is not a PATH term but one resolution used by **both** the probe and the spawn.
