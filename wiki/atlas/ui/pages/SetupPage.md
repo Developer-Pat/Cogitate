@@ -24,8 +24,8 @@ First-run setup page (tabbed, not a wizard). Design locked in
 
 | Tab | Content |
 |---|---|
-| Overview | Live "doctor" checklist: Local LLM / API keys / Default model / Starter agent, ✅⚠️⏳ statuses from existing endpoints; click to jump |
-| Local LLM | Ollama check (test endpoint on provider 1) + install/pull/serve commands |
+| Overview | The readiness verdict: `GET /api/v1/setup/readiness` (one call, measured in `domain/providers/readiness.py`) → four items — provider+key, chat model, agents, Exa's runtime (optional, never counted). Each item links to where it is fixed; a failed call says it cannot say |
+| Local LLM | Instructions only (install / pull / serve) — the old test-endpoint probe on provider id 1 is gone |
 | API Keys | Reuses `ProviderKeyManager` (writes .env — the secrets store) |
 | Default Model | Link to Provider Dashboard picker |
 | Agent | Link to Agent Profiles + Chat |
@@ -40,4 +40,6 @@ Per-tab HelpButton contexts: `setup-overview`, `setup-local`,
 
 - Keys decision: .env is THE secrets store (2026-08-04); the Keys
   tab here is the same component as the dashboard's.
-- Tested: `src/pages/__tests__/SetupPage.test.tsx` (5 tests).
+- THE VERDICT MOVED TO THE BACKEND (2026-11-20): the page computes
+  nothing of its own (no POST to provider id 1, no `agentReady`).
+- Tested: `src/pages/__tests__/SetupPage.test.tsx` (7 tests).
