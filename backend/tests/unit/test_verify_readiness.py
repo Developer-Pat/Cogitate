@@ -116,3 +116,18 @@ def test_json_mode_prints_the_payload_unchanged(monkeypatch, capsys):
 
     assert verify_readiness.main(["--json"]) == 0
     assert json.loads(capsys.readouterr().out) == payload
+
+
+def test_a_fix_it_link_names_the_TAB_that_fixes_it():
+    """A page-level link is one tab away from its fix — measured on a from-zero install.
+
+    The Provider Dashboard opens on CURATED (recommendations), so a chat item that linked to
+    `/provider-dashboard` landed a stranger on a page about curated models, with the default-model
+    picker one tab away. Each href must name the tab, not the page.
+    """
+    from app.domain.providers import readiness
+
+    assert readiness.HREF_PROVIDER.endswith("?tab=keys")
+    assert readiness.HREF_MODEL.endswith("?tab=default")
+    # the bare page is never the answer: its landing tab is Curated
+    assert "/provider-dashboard" not in (readiness.HREF_PROVIDER, readiness.HREF_MODEL)

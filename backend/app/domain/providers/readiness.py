@@ -41,11 +41,13 @@ OPTIONAL = "optional"
 
 # Where each item's fix lives, in the app's own vocabulary. The href is what a button on the
 # card (or a tile in the checklist) navigates to; nothing here writes anything.
-# The Keys tab lists provider ROWS — on a fresh install there are none, so it is an empty
-# table with nothing to click (measured). The door that can CREATE one is the Provider
-# Dashboard's "Add Provider", so that is where the provider item sends a stranger.
-HREF_PROVIDER = "/provider-dashboard"
-HREF_MODEL = "/provider-dashboard"
+# THE DOOR IS THE TAB, NOT THE PAGE (2026-11-21, measured on a from-zero install). The Provider
+# Dashboard opens on CURATED — recommendations, not the chat model — so an item pointing at
+# `/provider-dashboard` landed a stranger one tab away from the thing it named. Each href names the
+# tab that fixes the item, and both tabs can now do their job from nothing: the Keys tab creates the
+# first provider (key and row in one form), the Default tab offers the provider+model picker.
+HREF_PROVIDER = "/providers/cloud?tab=keys"
+HREF_MODEL = "/providers/cloud?tab=default"
 HREF_AGENTS = "/agent-profiles"
 HREF_RUNTIME = "/exa"
 
