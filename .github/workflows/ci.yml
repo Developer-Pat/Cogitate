@@ -1,0 +1,86 @@
+# The gate the repository answers to on its own.
+#
+# The house already trusts three things on a laptop — the four fast test groups, `tsc -b`, and the
+# frontend build — and this workflow runs exactly those on a runner instead. Nothing here is paid
+# and nothing needs a provider key: the suite builds its own database (a fresh checkout has none, so
+# `create_all` plus the fixture rows are what the tests see).
+#
+# Node is pinned to the minimum `cogitate.sh` installs (NODE_MAJOR_MIN), so a break in the runtime a
+# user actually gets fails here rather than in a stranger's terminal.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend · ${{ matrix.group }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # The four fast groups: ~3 minutes together on a 12-core laptop, and each one owns a
+        # different partition, so a failure names the subsystem rather than "the suite".
+        group: [unit, workflows, api, components]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install the project's Python (the version pinned in .python-version)
+        run: uv python install
+
+      - name: Install dependencies from the lockfile
+        run: uv sync --frozen
+
+      - name: ${{ matrix.group }}
+        run: >
+          uv run python scripts/testing/run_tests.py --group ${{ matrix.group }}
+          --parallel --runs-dir "$RUNNER_TEMP/test-runs"
+
+      # The hard copy is the evidence: report.md, report.xml and events.jsonl ride along even when
+      # the job fails, which is the only way to read what a red run actually did.
+      - name: Keep the run's artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-run-${{ matrix.group }}
+          path: ${{ runner.temp }}/test-runs
+          if-no-files-found: ignore
+
+  frontend:
+    name: frontend · typecheck, tests, build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies from the lockfile
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc -b
+
+      - name: Tests
+        working-directory: frontend
+        run: npx vitest run
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
