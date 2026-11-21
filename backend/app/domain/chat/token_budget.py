@@ -37,7 +37,15 @@ logger = logging.getLogger(__name__)
 # nothing constrains it. See the module docstring: this is NOT the model's
 # context window, and a window smaller than this LOWERS it (never raises it). The
 # ceiling is a policy number; the window is physics (roadmap §2).
-DEFAULT_INPUT_BUDGET: int = 16000
+#
+# 2026-11-21, the user's ruling: "16K looks pitiful these days. he should get
+# 100k mini[mum]." Sixteen thousand was sized for small local models; the models
+# this install actually offers answer 1M-token windows, and a ceiling that low
+# made every real turn drop history it did not have to drop (measured: a Bob turn
+# on a fresh install warned at 25,693 tokens against a 12,800 threshold, three
+# times in one turn). The window still LOWERS this — a 32K driver is clamped to
+# ~24K — so the ceiling is safe to state at the size of the models we ship with.
+DEFAULT_INPUT_BUDGET: int = 100_000
 
 # Deprecated alias — the same number under the name that read as "the model's
 # context window", kept for the importers that still use it
