@@ -553,4 +553,17 @@ describe('CuratedModelsManager', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Curated model not found')
     expect(screen.getByRole('dialog', { name: 'Verify NVIDIA: Nemotron 3 Super' })).toBeInTheDocument()
   })
+
+  it('refuses to invent a provider on an install that has none', async () => {
+    // Measured on a from-zero install (2026-11-21): this list fabricated four providers with
+    // `openrouter` first and pre-filled it in the form, so the first "Add Model" posted a curated
+    // model for a provider that did not exist — `400 Provider not found: openrouter`.
+    vi.mocked(fetchCuratedModels).mockResolvedValue([] as never)
+    render(<CuratedModelsManager providers={[]} loading={false} />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/No provider on this install yet/)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: /Add Model/ })).toBeDisabled()
+  })
 })
