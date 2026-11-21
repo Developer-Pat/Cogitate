@@ -59,6 +59,11 @@ export default function AgentIntegration() {
   const [exaEffort, setExaEffort] = useState('medium');
   const [exaVisionModel, setExaVisionModel] = useState('');
   const [savingModel, setSavingModel] = useState(false);
+  // THE ACTIVATION ASK (2026-11-20): activating provisions Exa's home, and a home
+  // with no model answers as plain Hermes — the measured failure. So when the answer
+  // says `needs_model`, the page asks ONE question with this install's chat model
+  // already in it. Nothing is written without that press.
+  const [modelAsk, setModelAsk] = useState<{ provider: string; model: string; base_url?: string | null } | null>(null);
   const { addNotification } = useNotificationStore();
 
   const load = useCallback(async () => {
@@ -110,6 +115,18 @@ export default function AgentIntegration() {
     }
   }, [exaModel, exaProvider, exaBaseUrl, exaEffort, exaVisionModel, addNotification]);
 
+  // THE ASK'S ACCEPT: the same write the Model card's button makes, so the two
+  // paths can never disagree about what "use this model" means.
+  const acceptOfferedModel = useCallback(() => {
+    if (!modelAsk) return;
+    const chosen = modelAsk;
+    setModelAsk(null);
+    setExaModel(chosen.model);
+    setExaProvider(chosen.provider);
+    setExaBaseUrl(chosen.base_url ?? '');
+    saveModel({ model: chosen.model, provider: chosen.provider, base_url: chosen.base_url ?? '' });
+  }, [modelAsk, saveModel]);
+
   const save = useCallback(async () => {
     setSaving(true);
     try {
@@ -153,15 +170,35 @@ export default function AgentIntegration() {
         // WHAT IT SEEDED (2026-11-20): activation provisions Exa's home first, so the
         // toast can say the switch actually did something instead of promising a brain.
         const seeded = seededFileCount(res.provisioned);
-        addNotification({
-          type: res.runnable ? 'success' : 'warning',
-          title: res.runnable ? 'Exa activated' : 'Exa activated — but it cannot run here yet',
-          message: res.runnable
-            ? (seeded > 0
-                ? `${seeded} skill files seeded into its home. Open the Exa chat to talk to it.`
-                : 'Open the Exa chat to talk to it.')
-            : (res.blocked_reason ?? 'The runtime it needs is missing from this machine.'),
-        });
+        // THE ASK (2026-11-20): a model-less Exa answers as plain Hermes. When the
+        // answer says so, the page offers THIS install's chat model — one press, and
+        // it is the accept; nothing was inherited on the user's behalf.
+        if (res.needs_model) {
+          if (res.offer) {
+            setModelAsk(res.offer);
+            addNotification({
+              type: 'warning',
+              title: 'Exa activated — it needs a model',
+              message: 'One press on the card below and it can answer.',
+            });
+          } else {
+            addNotification({
+              type: 'warning',
+              title: 'Exa activated — but it has no model',
+              message: 'Nothing on this install answers chat yet. Set a provider and model first.',
+            });
+          }
+        } else {
+          addNotification({
+            type: res.runnable ? 'success' : 'warning',
+            title: res.runnable ? 'Exa activated' : 'Exa activated — but it cannot run here yet',
+            message: res.runnable
+              ? (seeded > 0
+                  ? `${seeded} skill files seeded into its home. Open the Exa chat to talk to it.`
+                  : 'Open the Exa chat to talk to it.')
+              : (res.blocked_reason ?? 'The runtime it needs is missing from this machine.'),
+          });
+        }
       } else {
         addNotification({
           type: 'info',
@@ -619,6 +656,37 @@ export default function AgentIntegration() {
           </div>
         </div>
       </div>
+
+      {/* THE ACTIVATION ASK (2026-11-20) — DaisyUI v5 needs the <dialog> wrapper.
+          Activation provisions Exa's home; a home with no model answers as plain
+          Hermes. So the one thing the switch cannot decide is asked here, with this
+          install's chat model already named: one press and Exa can answer. */}
+      <dialog className="modal" open={!!modelAsk}>
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">Exa is on — it has no model yet</h3>
+          <p className="py-3 text-sm">
+            Without one it answers as a plain agent with none of its own character. This
+            install answers chat with{' '}
+            <span className="font-mono">{modelAsk?.model}</span> via{' '}
+            <span className="font-mono">{modelAsk?.provider}</span>.
+          </p>
+          <div className="modal-action">
+            <div className="tooltip tooltip-top" data-tip="Pick any provider and model on the Model card instead">
+              <button className="btn btn-ghost btn-sm" onClick={() => setModelAsk(null)}>
+                Choose on the card
+              </button>
+            </div>
+            <div className="tooltip tooltip-top" data-tip="Write this install's chat model into Exa — one model, one key, one place">
+              <button className="btn btn-primary btn-sm" onClick={acceptOfferedModel} disabled={savingModel}>
+                {savingModel ? 'Saving…' : 'Use this model'}
+              </button>
+            </div>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button onClick={() => setModelAsk(null)}>close</button>
+        </form>
+      </dialog>
     </PageContainer>
   );
 }

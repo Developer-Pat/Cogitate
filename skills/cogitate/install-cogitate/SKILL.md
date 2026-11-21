@@ -83,7 +83,9 @@ Two facts that decide how you work here:
    ```
 
    The report lists runtime / home / model / keys / decision, each with the fix that is missing. `--apply`
-   provisions the home and takes the activation decision; it never installs a runtime — if `hermes` is
+   provisions the home and takes the activation decision; `--from-default` also writes THIS install's chat
+   model. Provisioning never chooses a model — that is a decision, and a home that already has one keeps it
+   (the page makes the same offer in one press). `--apply` never installs a runtime — if `hermes` is
    absent the report hands you the installer command, and installing it is the user's call.
 
 6. **Report back** — versions (Python, Node, vite), the three URLs, and Exa's state in one line with the

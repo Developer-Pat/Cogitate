@@ -131,19 +131,17 @@ def _env_keys(dst: Path, src: Path) -> list[str]:
 def provision_home(
     home: Path | None = None,
     seed_dir: Path | None = None,
-    operator_home: Path | None = None,
     project_env: Path | None = None,
 ) -> list[str]:
     """Create Exa's isolated home. Idempotent; existing files are preserved.
 
     Returns the log lines rather than printing them, so the CLI can format and
-    a test can assert. The model section is NOT written from the operator's
-    home: on a stranger's machine there is no operator home, and inventing a
-    model is exactly the kind of silent decision this project refuses.
+    a test can assert. NO MODEL is ever written here, and none is copied from an
+    operator's home: Exa's brain is a decision, taken on the Exa page or with
+    `--from-default`/`--model`. A home that arrived with a model keeps it.
     """
     target = _home(home)
     seed = Path(seed_dir) if seed_dir is not None else Paths.skills_dir / "exa"
-    op_home = Path(operator_home) if operator_home is not None else Path.home() / ".hermes"
     env_src = Path(project_env) if project_env is not None else Paths.root / ".env"
     log: list[str] = []
 
@@ -172,17 +170,15 @@ def provision_home(
                 seeded += 1
         log.append(f"skills seeded into {dest_cat} ({seeded} file(s) added)")
 
-    # The config: an existing one is kept. A COPY of the operator's home is the
-    # developer convenience, not the release path — it is reported as inherited
-    # so nobody mistakes it for a probe.
+    # The config: an existing one is kept — and that is the ONLY way a model
+    # arrives here. Copying the operator's ~/.hermes was the developer
+    # convenience, and on any box where Hermes is installed it handed Exa a
+    # brain nobody chose (the offer-is-not-an-inheritance rule, 2026-11-20).
     cfg_dst = target / "config.yaml"
     if cfg_dst.exists():
         log.append("config.yaml present (kept)")
-    elif (op_home / "config.yaml").exists():
-        shutil.copy2(op_home / "config.yaml", cfg_dst)
-        log.append("config.yaml copied from the operator's home (~/.hermes)")
     else:
-        log.append("config.yaml NOT created — set a model on the Exa page")
+        log.append("config.yaml not created — Exa's model is a decision (the Exa page offers this install's chat model)")
 
     # The keys: only the provider-key lines, and only their NAMES are reported.
     names = _env_keys(target / ".env", env_src)
@@ -402,7 +398,6 @@ async def apply(
     db,
     home: Path | None = None,
     seed_dir: Path | None = None,
-    operator_home: Path | None = None,
     project_env: Path | None = None,
     model: str | None = None,
     provider: str | None = None,
@@ -414,14 +409,13 @@ async def apply(
 
     `from_default` takes THIS INSTALL'S chat model — the accept for the offer. Without it and
     without an explicit --model/--provider, no model is written: inventing one is the silent
-    decision this path refuses.
+    decision this path refuses. When nothing is set, the log NAMES the offer, because a model-less
+    Exa answers as plain Hermes and that is the failure this path exists to prevent.
 
     Returns the post-apply report and the provisioning log. The DECISION is
     taken last, so a half-provisioned home is never left switched on.
     """
-    log = provision_home(
-        home=home, seed_dir=seed_dir, operator_home=operator_home, project_env=project_env
-    )
+    log = provision_home(home=home, seed_dir=seed_dir, project_env=project_env)
     if from_default and not (model and provider):
         offer = await chat_offer(db)
         if offer is None:
@@ -446,6 +440,19 @@ async def apply(
             home=home,
         )
         log.append(f"model set: {model} via {provider}")
+    elif read_model_config(home).get("model"):
+        # Provisioning never touches an existing brain; say so rather than let the
+        # absence of a "model set" line read as "it has none".
+        m = read_model_config(home)
+        log.append(f"model unchanged: {m.get('model')} via {m.get('provider')}")
+    else:
+        offer = await chat_offer(db)
+        if offer is not None:
+            log.append(
+                f"no model yet — this install offers {offer.model} via {offer.provider}"
+            )
+        else:
+            log.append("no model yet, and nothing on this install can answer chat to offer")
 
     cfg = await get_config(db)
     if not cfg.enabled:

@@ -86,6 +86,13 @@ export interface ExaActivation {
   blocked_reason?: string | null;
   /** What the activation SEEDED, line by line (only the activate answer carries it). */
   provisioned?: string[];
+  /** Exa's model after activation — null until someone chooses one. */
+  model?: string | null;
+  provider?: string | null;
+  /** True when Exa has no model of its own: it cannot answer until one is chosen. */
+  needs_model?: boolean;
+  /** This install's chat model, offered as the one press that fills that gap. */
+  offer?: { provider: string; model: string; base_url?: string | null } | null;
 }
 
 /** How many files activation seeded into Exa's home (0 = it was already provisioned). */

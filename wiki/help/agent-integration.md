@@ -27,6 +27,16 @@ default Exa agent.
 - **Restart agent** — stops Exa and starts it fresh with the saved
   settings. Use this after changing the configuration.
 
+## Activating Exa
+
+Exa ships switched off. **Activate Exa** provisions its private home — its seeded skills and the
+provider keys from the project's `.env` — and switches it on, in one press.
+
+A fresh home has **no model**, so the page then asks one question, with this install's chat model
+already named; **Use this model** writes it. Without a model Exa answers as a plain agent with none
+of its own character, which is why the question is asked rather than assumed. A home that already
+has a model keeps it — nothing is overwritten, and nothing is inherited from another Hermes home.
+
 ## Copying the conversation
 
 The **⋮ More actions** menu (top-right of the panel) holds **Copy**,

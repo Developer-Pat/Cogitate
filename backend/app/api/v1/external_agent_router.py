@@ -184,13 +184,14 @@ async def activate_external_agent(db=Depends(_db)) -> dict:
     from app.domain.external_agent import activation
 
     try:
-        _report, provisioned = await activation.apply(db)
+        report, provisioned = await activation.apply(db)
     except Exception as e:
         logger.error("external-agent: provisioning Exa's home failed: %s", e)
         raise HTTPException(
             status_code=500,
             detail=f"Exa's home could not be provisioned ({e}) — it was not activated.",
         ) from e
+    current = _read_exa_model_config()
     blocked = probe_runnable(await get_config(db))
     return {
         "enabled": True,
@@ -199,6 +200,14 @@ async def activate_external_agent(db=Depends(_db)) -> dict:
         # WHAT IT SEEDED, line by line — the page says what activation did
         # instead of promising a brain that still has no model.
         "provisioned": provisioned,
+        # THE MODEL IS THE ONE THING ACTIVATION CANNOT DECIDE (2026-11-20): a home with
+        # no model answers as plain Hermes, so the answer says whether it has one and
+        # hands over THIS INSTALL'S chat model as an offer. Accepting it is the page's
+        # one press — nothing is written here on the user's behalf.
+        "model": current.get("model"),
+        "provider": current.get("provider"),
+        "needs_model": not current.get("model"),
+        "offer": report.offer.to_dict() if report.offer is not None else None,
     }
 
 

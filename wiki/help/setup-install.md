@@ -110,13 +110,16 @@ that reaches for it answers that it is not active. Turning it on is a decision, 
 it:
 
 ```bash
-uv run python scripts/core/activate_exa.py          # report: runtime, home, model, keys, decision
-uv run python scripts/core/activate_exa.py --apply  # provision the home and activate
+uv run python scripts/core/activate_exa.py                    # report: runtime, home, model, keys, decision
+uv run python scripts/core/activate_exa.py --apply             # provision the home and activate
+uv run python scripts/core/activate_exa.py --apply --from-default  # ...and take this install's chat model
 ```
 
 The runtime is the one thing the CLI will not install for you: Exa runs on the Hermes agent runtime, and if
-`hermes` is not on `PATH` the report hands you the installer command. It also needs a model of its own and a
-provider key — both are reported before anything is switched on.
+`hermes` is not on `PATH` the report hands you the installer command. Provisioning creates Exa's own home
+and its skills, and carries the provider keys across — it never chooses a **model**: that is a decision,
+taken by `--from-default`/`--model` here or by one press on the Exa page, which offers this install's chat
+model. A home that already has a model keeps it.
 
 ## 5. What ships: the news desk
 

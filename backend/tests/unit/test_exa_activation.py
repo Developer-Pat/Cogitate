@@ -27,7 +27,7 @@ def test_provision_creates_the_home_and_seeds_skills(tmp_path):
     home = tmp_path / ".hermes"
     seed = tmp_path / "seed"
     _seed_skill(seed)
-    log = activation.provision_home(home=home, seed_dir=seed, operator_home=tmp_path / "none", project_env=tmp_path / "none.env")
+    log = activation.provision_home(home=home, seed_dir=seed, project_env=tmp_path / "none.env")
 
     for sub in ("memories", "skills", "sessions", "cron", "hooks"):
         assert (home / sub).is_dir(), sub
@@ -48,7 +48,7 @@ def test_provision_carries_provider_keys_and_nothing_else(tmp_path):
         encoding="utf-8",
     )
     log = activation.provision_home(
-        home=home, seed_dir=tmp_path / "none", operator_home=tmp_path / "none", project_env=env
+        home=home, seed_dir=tmp_path / "none", project_env=env
     )
     written = (home / ".env").read_text(encoding="utf-8")
     assert "DEEPSEEK_API_KEY=sk-test" in written
@@ -60,15 +60,31 @@ def test_provision_carries_provider_keys_and_nothing_else(tmp_path):
     assert all("sk-test" not in line for line in log)
 
 
-def test_provision_keeps_an_existing_config(tmp_path):
+def test_provisioning_never_invents_a_model(tmp_path):
+    """A fresh home has NO model — not its own, and not the operator's.
+
+    Copying `~/.hermes/config.yaml` was the developer convenience; with
+    provision-on-activate it fired on every fresh home on any box with Hermes
+    installed, handing Exa a brain nobody chose. The model is a decision, so the
+    log says so and the config is not written.
+    """
     home = tmp_path / ".hermes"
-    home.mkdir()
-    (home / "config.yaml").write_text("model:\n  default: keep-me\n", encoding="utf-8")
     operator = tmp_path / "op"
     operator.mkdir()
     (operator / "config.yaml").write_text("model:\n  default: operator\n", encoding="utf-8")
 
-    log = activation.provision_home(home=home, seed_dir=None, operator_home=operator, project_env=tmp_path / "none.env")
+    log = activation.provision_home(home=home, seed_dir=None, project_env=tmp_path / "none.env")
+
+    assert not (home / "config.yaml").exists(), "a model must never be inherited"
+    assert any("Exa's model is a decision" in line for line in log)
+
+
+def test_provision_keeps_an_existing_config(tmp_path):
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    (home / "config.yaml").write_text("model:\n  default: keep-me\n", encoding="utf-8")
+
+    log = activation.provision_home(home=home, seed_dir=None, project_env=tmp_path / "none.env")
     assert "keep-me" in (home / "config.yaml").read_text(encoding="utf-8")
     assert any("kept" in line for line in log)
 
@@ -117,7 +133,6 @@ async def test_apply_provisions_and_takes_the_decision(tmp_path, test_session):
         test_session,
         home=home,
         seed_dir=seed,
-        operator_home=tmp_path / "none",
         project_env=env,
         model="deepseek/x",
         provider="deepseek",
@@ -127,6 +142,30 @@ async def test_apply_provisions_and_takes_the_decision(tmp_path, test_session):
     assert report.ready is True, [c for c in report.missing]
     assert any("model set" in line for line in log)
     assert any("activated" in line for line in log)
+
+
+@pytest.mark.asyncio
+async def test_apply_never_takes_the_model_it_was_not_given(tmp_path, test_session, monkeypatch):
+    """The offer is an OFFER. Activation provisions, flips and NAMES this install's
+    chat model — the model itself is written only on `--from-default` (the accept)
+    or with an explicit --model/--provider."""
+    from app.domain.external_agent.activation import ChatOffer
+    from app.domain.external_agent.services import get_config
+
+    async def fake_offer(_db):
+        return ChatOffer(provider="deepseek", model="deepseek-flash", base_url=None)
+
+    monkeypatch.setattr(activation, "chat_offer", fake_offer)
+    home = tmp_path / ".hermes"
+
+    report, log = await activation.apply(
+        test_session, home=home, seed_dir=tmp_path / "none", project_env=tmp_path / "none.env"
+    )
+
+    assert activation.read_model_config(home).get("model") is None, "no model may be invented"
+    assert any("offers deepseek-flash" in line for line in log)
+    assert report.offer is not None and report.offer.model == "deepseek-flash"
+    assert (await get_config(test_session)).enabled is True
 
 
 @pytest.mark.asyncio

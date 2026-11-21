@@ -120,21 +120,79 @@ async def test_activate_reports_whether_this_box_can_run_it(test_session, monkey
         return ["skills seeded into .hermes/skills/cogitate (2 file(s) added)"]
 
     monkeypatch.setattr(activation, "provision_home", fake_provision)
+    # the home's model is read from disk; in a test that is the operator's own
+    # `.hermes`, so it is stubbed — a test may not depend on this box's Exa.
+    monkeypatch.setattr(
+        activation,
+        "read_model_config",
+        lambda home=None: {"model": "deepseek/x", "provider": "deepseek"},
+    )
+    monkeypatch.setattr(
+        rtr, "_read_exa_model_config", lambda: {"model": "deepseek/x", "provider": "deepseek"}
+    )
 
     result = await activate_external_agent(db=test_session)
     assert calls, "activation must provision the home"
     assert result["enabled"] is True
     assert result["runnable"] is (result["blocked_reason"] is None)
-    # the seeded lines AND the decision, in the order the sequence took them
+    # the seeded lines, the brain it already had, and the decision — in order
     assert result["provisioned"] == [
         "skills seeded into .hermes/skills/cogitate (2 file(s) added)",
+        "model unchanged: deepseek/x via deepseek",
         "activated: Exa will spawn on the next chat",
     ]
-    assert set(result) == {"enabled", "runnable", "blocked_reason", "provisioned"}
+    # a home that already has a brain keeps it, and the answer says which
+    assert result["needs_model"] is False
+    assert result["model"] == "deepseek/x"
+    assert set(result) == {
+        "enabled",
+        "runnable",
+        "blocked_reason",
+        "provisioned",
+        "model",
+        "provider",
+        "needs_model",
+        "offer",
+    }
 
     off = await deactivate_external_agent(db=test_session)
     assert off["enabled"] is False
     assert set(off) == {"enabled", "runnable", "blocked_reason"}
+
+
+@pytest.mark.asyncio
+async def test_activate_offers_a_model_instead_of_inheriting_one(test_session, monkeypatch):
+    """THE MEASURED FAILURE (2026-11-20): a fresh home answered as plain Hermes.
+
+    Provisioning fixes the skills and the keys; the BRAIN is a decision, so the
+    answer carries this install's chat model as an offer and writes nothing. The
+    page's one press is the accept.
+    """
+    from app.domain.external_agent import activation
+
+    monkeypatch.setattr(
+        activation, "provision_home", lambda **kw: ["skills seeded into .hermes (2 file(s) added)"]
+    )
+    monkeypatch.setattr(activation, "read_model_config", lambda home=None: {})
+    monkeypatch.setattr(rtr, "_read_exa_model_config", lambda: {})
+    monkeypatch.setattr(
+        activation,
+        "chat_offer",
+        lambda db: _offer("deepseek-flash"),
+    )
+
+    result = await activate_external_agent(db=test_session)
+
+    assert result["needs_model"] is True
+    assert result["model"] is None
+    assert result["offer"] == {"provider": "deepseek", "model": "deepseek-flash", "base_url": None}
+    assert any("offers deepseek-flash" in line for line in result["provisioned"])
+
+
+async def _offer(model: str):
+    from app.domain.external_agent.activation import ChatOffer
+
+    return ChatOffer(provider="deepseek", model=model, base_url=None)
 
 
 @pytest.mark.asyncio
