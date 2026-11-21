@@ -247,8 +247,15 @@ start_backend() {
     # THE 2026-09-01 REFRESH: the project venv (uv-era -> the .venv's
     # python3) + the env-unsets (CORS_ORIGINS breaks pydantic; the
     # sweep/inbox delays the runtime needs).
+    #
+    # PATH is SET, never inherited. The app resolves two external binaries by
+    # name — `hermes` for Exa's runtime and `edge-tts` for speech — and both
+    # live in ~/.local/bin, which a non-login start (SSH, a supervisor, cron)
+    # does not carry. Inherited, the same install read Exa's runtime `ok` from
+    # a terminal and `optional` over SSH, and could not spawn it either.
     cd "$BACKEND_DIR"
     setsid env -u CORS_ORIGINS \
+        PATH="$HOME/.local/bin:$PATH" \
         INBOX_PROCESSOR_INTERVAL_SECONDS=20 SYSTEM_SWEEP_DELAY_SECONDS=15 \
         ../.venv/bin/python3 -m uvicorn app.main:app \
         --host 0.0.0.0 \
