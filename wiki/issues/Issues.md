@@ -43,6 +43,18 @@ the Site Index links this section, never its pages.
 
 ## In flight
 
+- [[issues/the-check-reads-its-own-process-path|The check reads its own process's PATH — one install, two verdicts, and two capabilities that vanish]] —
+  **OPEN — needs a ruling.** The app resolves two binaries by name, `hermes` (Exa's runtime) and `edge-tts`
+  (speech), and both live in `~/.local/bin`, which never reaches the backend: `cogitate.sh:251-259` launches
+  uvicorn with `setsid env -u CORS_ORIGINS …` and no PATH term, so the process inherits its starter's. Measured
+  on ONE clone at `a3e1ccc`: after `restart` from a login terminal the readiness check reads Exa's runtime
+  **`ok`**; after `restart` over an SSH non-login shell the same files read **`optional`** — *"'hermes' is not on
+  PATH"* — and that process cannot spawn Exa at all, since the spawn gate is the same `shutil.which`
+  (`services.py:860`). `ready` is unaffected (`counted: false`), which is why the headline number is silent.
+  Recommendation: **C, staged** — export `$HOME/.local/bin` on the launch line (one term, proven by a bare-PATH
+  restart), and take the in-process resolver only if a start that bypasses `cogitate.sh` is a shape to support
+  (measured today: 0 docs, 0 tests).
+
 - [[issues/seven-levers-one-stable-reading|Seven parked levers, and the set holds one stable reading for them]] —
   **OPEN — needs a ruling.** The reporter arc parked seven levers; the bench holds 3 jobs over **2** of the
   charter's six axes, and the levers land on the four axes with no job. Measured against the instrument's own
