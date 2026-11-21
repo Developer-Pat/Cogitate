@@ -17,6 +17,9 @@ import { apiClient } from '@/services/apiClient'
 import { providerLocationOf } from '@/utils/providerLocation'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { frontendLoggingService } from '@/services/frontendLoggingService'
+import { providerConfigService } from '@/services/domains/providers/providerConfigService'
+import type { ProviderConfigCreate, ProviderConfigUpdate } from '@/types/providers'
+import ProviderConfigModal from './ProviderConfigModal'
 
 interface KeyStatus {
   provider_id: number
@@ -41,11 +44,20 @@ const SOURCE_LABEL: Record<string, { text: string; cls: string; hint: string }> 
 
 export default function ProviderKeyManager({ loading: _loading, location }: ProviderKeyManagerProps) {
   const [rows, setRows] = useState<KeyStatus[]>([])
+  // The INSTALL's total, before the location filter — a local page with no local rows is not
+  // an install with no providers, and must not be invited to create its first one.
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<KeyStatus | null>(null)
   const [keyInput, setKeyInput] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
+  // THE FIRST PROVIDER (2026-11-21): this tab lists keys ON provider rows, so a fresh
+  // install — no rows at all — had an empty table and no way to get the first one, while
+  // the readiness item sent you to the Provider Dashboard instead. The row is created
+  // here, with its key in the same form (the create payload carries api_key).
+  const [adding, setAdding] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -55,6 +67,7 @@ export default function ProviderKeyManager({ loading: _loading, location }: Prov
       // THE CLASS SEAM (2026-09-08, the A1 split): the local rows
       // are keyless by design — the cloud page filters them out
       // (the same derivation the backend uses).
+      setTotal(all.length)
       setRows(location ? all.filter((r) => providerLocationOf(r) === location) : all)
     } catch (err) {
       frontendLoggingService.error('ProviderKeyManager', 'Failed to load key status', err)
@@ -113,6 +126,26 @@ export default function ProviderKeyManager({ loading: _loading, location }: Prov
 
   const sourceInfo = (s: string) => SOURCE_LABEL[s] ?? SOURCE_LABEL.none
 
+  const handleCreate = async (config: ProviderConfigCreate | ProviderConfigUpdate) => {
+    setCreating(true)
+    const created = config as ProviderConfigCreate
+    try {
+      await providerConfigService.createProvider(created)
+      useNotificationStore
+        .getState()
+        .addSuccess('Provider Added', `${created.name}: saved. Its key rides the row it belongs to.`)
+      setAdding(false)
+      await load()
+    } catch (err) {
+      frontendLoggingService.error('ProviderKeyManager', 'Create failed', err)
+      useNotificationStore
+        .getState()
+        .addError('Add Failed', err instanceof Error ? err.message : 'Could not add the provider')
+    } finally {
+      setCreating(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -126,6 +159,21 @@ export default function ProviderKeyManager({ loading: _loading, location }: Prov
       {loading ? (
         <div className="flex items-center justify-center py-10">
           <span className="loading loading-spinner loading-md text-primary" />
+        </div>
+      ) : total === 0 ? (
+        <div className="bg-base-200 rounded-lg border border-base-300 p-6 text-center space-y-3">
+          <p className="text-sm text-readout">
+            No provider on this install yet. A key belongs to a provider row, so the first one is
+            made here — pick the type, fill the address if the type asks for one, then paste the key.
+          </p>
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            data-tip="Create the first provider and give it its key in one form"
+            className="tooltip tooltip-top btn btn-primary btn-sm rounded-[var(--button-radius)]"
+          >
+            Add your first provider
+          </button>
         </div>
       ) : (
         <div className="overflow-x-auto bg-base-200 rounded-lg border border-base-300">
@@ -182,6 +230,21 @@ export default function ProviderKeyManager({ loading: _loading, location }: Prov
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* THE FIRST PROVIDER — the row a key can hang on. The create payload carries
+          api_key, so the add form's key field stores it in the same press. */}
+      {adding && (
+        <ProviderConfigModal
+          provider={null}
+          mode="add"
+          location={location}
+          loading={creating}
+          onSave={handleCreate}
+          onCancel={() => {
+            if (!creating) setAdding(false)
+          }}
+        />
       )}
 
       {/* Set/Rotate modal */}

@@ -19,8 +19,12 @@ Use this form to add a new provider or edit an existing one.
 - **Display Name** — human-friendly label shown in the UI.
 - **Provider Type** — the integration type (openrouter, ollama, deepseek,
   groq, ollama_cloud, openai, anthropic...). Locked when editing.
-- **Base URL** — API endpoint. Pre-filled per type; change only if the
-  provider requires a custom endpoint.
+- **Base URL** — API endpoint. Pre-filled per type from the provider registry;
+  change only if the provider requires a custom endpoint. A type with **no
+  address on file** (llama.cpp — a server you run yourself) gets no prefill:
+  the field is empty and the hint asks for the server's address. Switching to
+  such a type clears a name and address the form filled in, so the row cannot
+  carry the previous type's address.
 - **API Key** — for cloud providers. On edit: if a key is already stored
   the hint says so — leave blank to keep it, or type a new one to
   replace it. Keys are encrypted at rest (DB) or read from .env.

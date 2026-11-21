@@ -17,10 +17,10 @@ print a value).
 
 ## The first row
 
-This tab lists the providers **your install already has**, with the source of each key. On a fresh
-install that list is empty — a key needs a provider to belong to, and the door that creates one is
-**Add Provider on the Provider Dashboard**. Add the provider there, paste its key, and this tab
-starts listing it.
+This tab lists the providers **your install already has**, with the source of each key. A key needs a
+provider to belong to, so when the install has **none** the tab offers **Add your first provider** — the
+add form opens right here, its type picker fills the name and address in, and the key you paste in that
+same form is stored with the row. Once a row exists, keys are managed per row with **Set Key**.
 
 ## Sources
 

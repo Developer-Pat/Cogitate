@@ -106,20 +106,42 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
   }, [mode])
 
   const typeNow = watch('provider_type')
+  // THE ADDRESS IS THE REGISTRY'S (2026-11-21). The prefill reads GET /providers, so a type
+  // with no registry row (llama.cpp — a server the user runs themselves) fills NOTHING in.
+  // The note under the type used to promise otherwise; now it speaks only for types the
+  // catalog answers, and the address field carries the line for the ones it does not.
+  const catalogLoaded = Object.keys(catalog).length > 0
+  const addressOnFile = !catalogLoaded || Boolean(catalog[typeNow ?? ''])
   const prefilled = React.useRef<Record<string, string>>({})
+  // The name we filled in from a type, so a switch to a type with no address clears OUR name
+  // rather than leaving the previous type's label on the form.
+  const autoName = React.useRef<string | null>(null)
   useEffect(() => {
     if (mode !== 'add' || !typeNow) return
     const address = catalog[typeNow]
-    if (!address) return
     const currentUrl = (getValues('base_url') || '').trim()
-    const priorPrefill = Object.values(prefilled.current).includes(currentUrl)
-    if (!currentUrl || priorPrefill) {
+    const urlIsOurs = currentUrl !== '' && Object.values(prefilled.current).includes(currentUrl)
+    const currentName = (getValues('name') || '').trim()
+    const nameIsOurs = autoName.current !== null && currentName === autoName.current
+
+    if (!address) {
+      // THE REGISTRY HAS NO ADDRESS FOR THIS TYPE (llama.cpp — the user's own server).
+      // Clear what WE filled, so the field does not carry another type's address while the
+      // copy asks for one: a llama.cpp row pointing at ollama's port is a silent mis-dial.
+      if (urlIsOurs) setValue('base_url', '', { shouldValidate: true })
+      if (nameIsOurs) {
+        setValue('name', '', { shouldValidate: true })
+        autoName.current = null
+      }
+      return
+    }
+    if (!currentUrl || urlIsOurs) {
       setValue('base_url', address, { shouldValidate: true })
       prefilled.current[typeNow] = address
     }
-    const currentName = (getValues('name') || '').trim()
-    if (!currentName) {
+    if (!currentName || nameIsOurs) {
       setValue('name', typeNow, { shouldValidate: true })
+      autoName.current = typeNow
     }
   }, [typeNow, catalog, mode, getValues, setValue])
 
@@ -279,7 +301,7 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
             {errors.provider_type && (
               <p className="mt-1 text-sm text-error">{errors.provider_type.message}</p>
             )}
-            {mode === 'add' && (
+            {mode === 'add' && addressOnFile && (
               <p className="mt-1 text-xs text-readout">
                 The name and address fill in from the type. Change the address only for a
                 self-hosted server — it is kept exactly as written.
@@ -301,6 +323,11 @@ const ProviderConfigModal: React.FC<ProviderConfigModalProps> = ({
             />
             {errors.base_url && (
               <p className="mt-1 text-sm text-error">{errors.base_url.message}</p>
+            )}
+            {mode === 'add' && !addressOnFile && (
+              <p className="mt-1 text-xs text-readout">
+                No address on file for this type — enter the server's address.
+              </p>
             )}
           </div>
 
