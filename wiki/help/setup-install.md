@@ -175,5 +175,5 @@ index that needs a dialect-specific form declares its Postgres shape, which SQLi
 
 ## Related
 
-- [[docs/testing|Testing Guide]] — running the suite and the sweeps
-- [[docs/script-catalog|Script Catalog]] — every script, including the two above
+- [Testing Guide](/wiki/docs/testing) — running the suite and the sweeps
+- [Script Catalog](/wiki/docs/script-catalog) — every script, including the two above
