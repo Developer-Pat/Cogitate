@@ -1,0 +1,81 @@
+{
+  "_comment": "The packaged configurations a fresh install can adopt in one press. This file is the AUTHORITY; the setup_picks table is its loaded copy (express_setup.load_packaged, run at every start). Edit here, commit, restart. No ':free' models on purpose: free tiers have spotty-to-no support, and a model that stops answering is the opposite of a bullet-proof setup. A user can pick anything else by hand once the box is running.",
+  "version": 1,
+  "picks": [
+    {
+      "key": "deepseek-flash",
+      "label": "DeepSeek · Flash",
+      "provider_name": "deepseek",
+      "provider_type": "deepseek",
+      "model_id": "deepseek-flash",
+      "tier": "strong",
+      "needs_kind": "key",
+      "needs_env": "DEEPSEEK_API_KEY",
+      "needs_url": "https://platform.deepseek.com/api_keys",
+      "why": "The best all-round model tested on this project so far: strong writing, fast, long context, cheap. It is what this install ships expecting.",
+      "verified_on": "2026-11-21",
+      "verified_how": "Listed by the provider's own API and accepted as the default on a fresh install (mint-cogitate-test), with Bob and Lois seeded from it. No chat turn was driven on that install yet.",
+      "sort_order": 10
+    },
+    {
+      "key": "openrouter-deepseek",
+      "label": "OpenRouter · DeepSeek Flash",
+      "provider_name": "openrouter",
+      "provider_type": "openrouter",
+      "model_id": "~deepseek/deepseek-v4-flash-latest",
+      "tier": "strong",
+      "needs_kind": "key",
+      "needs_env": "OPENROUTER_API_KEY",
+      "needs_url": "https://openrouter.ai/keys",
+      "why": "The same family as the DeepSeek pick, through OpenRouter — one key also opens every other model that service carries, so this is the pick for anyone who wants to try others later.",
+      "verified_on": null,
+      "verified_how": "Listed and priced in the install's own curated list; not yet driven end to end here.",
+      "sort_order": 20
+    },
+    {
+      "key": "openrouter-qwen",
+      "label": "OpenRouter · Qwen 3.7 Flash",
+      "provider_name": "openrouter",
+      "provider_type": "openrouter",
+      "model_id": "qwen/qwen3.7-flash",
+      "tier": "strong",
+      "needs_kind": "key",
+      "needs_env": "OPENROUTER_API_KEY",
+      "needs_url": "https://openrouter.ai/keys",
+      "why": "The long-context workhorse: 1M context at about $0.03/M in. A sound second choice behind a DeepSeek key.",
+      "verified_on": null,
+      "verified_how": "Listed and priced in the install's own curated list; not yet driven end to end here.",
+      "sort_order": 30
+    },
+    {
+      "key": "openrouter-gpt-oss-120b",
+      "label": "OpenRouter · GPT-OSS 120B",
+      "provider_name": "openrouter",
+      "provider_type": "openrouter",
+      "model_id": "openai/gpt-oss-120b",
+      "tier": "strong",
+      "needs_kind": "key",
+      "needs_env": "OPENROUTER_API_KEY",
+      "needs_url": "https://openrouter.ai/keys",
+      "why": "OpenAI's open 120B through OpenRouter — cheap, capable, a different family to fall back on if the DeepSeek line ever lets you down.",
+      "verified_on": null,
+      "verified_how": "Listed and priced in the install's own curated list; not yet driven end to end here.",
+      "sort_order": 40
+    },
+    {
+      "key": "ollama-cloud-super",
+      "label": "Ollama Cloud · Nemotron 3 Super",
+      "provider_name": "ollama_cloud",
+      "provider_type": "ollama_cloud",
+      "model_id": "nemotron-3-super",
+      "tier": "strong",
+      "needs_kind": "key",
+      "needs_env": "OLLAMA_CLOUD_API_KEY",
+      "needs_url": "https://ollama.com/settings/keys",
+      "why": "A large reasoning model on a keyed service, for anyone already using Ollama Cloud. The free usage tier is metered, so treat it as a stopgap rather than the plan.",
+      "verified_on": null,
+      "verified_how": "Listed in the install's own curated list; not yet driven end to end here.",
+      "sort_order": 50
+    }
+  ]
+}

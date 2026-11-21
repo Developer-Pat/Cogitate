@@ -55,7 +55,30 @@ def _ask(prompt: str) -> bool:
 
 async def _run(args) -> int:
     from app.infrastructure.database import get_db_session
-    from app.domain.providers import setup_offers
+    from app.domain.providers import express_setup, setup_offers
+
+    # THE EXPRESS PICK (2026-11-21): one packaged model, adopted in one command. Handled before
+    # the per-capability offers because it IS the short path an agent-driven install should take —
+    # `--accept-defaults` stays for the older per-capability flow.
+    if args.list_picks or args.pick:
+        async for db in get_db_session():
+            if args.list_picks:
+                for pick in await express_setup.list_picks(db):
+                    mark = MARK[pick["state"] == "ready"]
+                    print(f"  {mark} [{pick['key']}] {pick['label']}  ({pick['tier']})")
+                    print(f"      {pick['provider_name']}/{pick['model_id']} — {pick['detail']}")
+                return 0
+            try:
+                log = await express_setup.apply_pick(db, args.pick)
+            except ValueError as exc:
+                print(f"cannot apply {args.pick!r}: {exc}", file=sys.stderr)
+                return 2
+            print("Written:")
+            for line in log:
+                print(f"  · {line}")
+            return 0
+        print("could not open a database session", file=sys.stderr)
+        return 2
 
     accepted: list[str] = []
     log: list[str] = []
@@ -122,7 +145,16 @@ def main() -> int:
         help="leave the install bare and report what is off",
     )
     p.add_argument("--json", action="store_true", help="machine-readable report")
+    # The express door: one packaged model, one command.
+    p.add_argument("--list-picks", action="store_true", help="list the packaged express picks")
+    p.add_argument("--pick", metavar="KEY", help="adopt one packaged pick (provider + model + chains)")
     args = p.parse_args()
+    if sum(bool(x) for x in (args.check, args.accept_defaults, args.scratch)) > 0 and (args.list_picks or args.pick):
+        print("--list-picks/--pick do not combine with --check/--accept-defaults/--scratch.", file=sys.stderr)
+        return 2
+    if args.list_picks and args.pick:
+        print("--list-picks reports; --pick writes. Choose one.", file=sys.stderr)
+        return 2
     if sum(bool(x) for x in (args.check, args.accept_defaults, args.scratch)) > 1:
         print("--check, --accept-defaults and --scratch are alternatives.", file=sys.stderr)
         return 2

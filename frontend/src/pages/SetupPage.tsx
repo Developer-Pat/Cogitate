@@ -18,13 +18,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, CircleDashed, Hourglass, XCircle } from 'lucide-react'
 import ProviderKeyManager from '../components/features/providers/ProviderKeyManager'
+import ExpressSetup from '../components/features/setup/ExpressSetup'
 import { readinessService, type ReadinessItem, type ReadinessState } from '../services/readinessService'
 import { HelpButton } from '../components/help'
 import { AskExaButton } from '../components/agentPanel/AskExaButton'
 
-type SetupTab = 'overview' | 'local' | 'keys' | 'model' | 'agent'
+type SetupTab = 'express' | 'overview' | 'local' | 'keys' | 'model' | 'agent'
 
 const TABS: { id: SetupTab; label: string; tip: string }[] = [
+  { id: 'express', label: 'Express', tip: 'One model, one key — the short path to a working install' },
   { id: 'overview', label: 'Overview', tip: 'What this install still needs, in order' },
   { id: 'local', label: 'Local LLM', tip: 'Run a model on this machine instead of using a key' },
   { id: 'keys', label: 'API Keys', tip: "Where a provider key goes — the project's .env" },
@@ -33,6 +35,7 @@ const TABS: { id: SetupTab; label: string; tip: string }[] = [
 ]
 
 const HELP_CONTEXT: Record<SetupTab, string> = {
+  express: 'setup-overview',
   overview: 'setup-overview',
   local: 'setup-local',
   keys: 'setup-keys',
@@ -126,6 +129,9 @@ export default function SetupPage() {
           </button>
         ))}
       </nav>
+
+      {/* Express — one model, one key, one press (2026-11-21) */}
+      {activeTab === 'express' && <ExpressSetup onApplied={() => void load()} />}
 
       {/* Overview — the doctor */}
       {activeTab === 'overview' && (

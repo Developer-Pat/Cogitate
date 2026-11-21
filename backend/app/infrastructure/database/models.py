@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -2291,3 +2292,61 @@ class PromptTemplate(Base):
     def __repr__(self) -> str:
         return f"<PromptTemplate(slug='{self.slug}', v{self.version})>"
 
+
+class SetupPick(Base):
+    """One packaged configuration a fresh install can adopt in ONE press.
+
+    THE PACKAGED FILE IS THE AUTHORITY (2026-11-21, the user's ruling): ``express_setup.json``
+    ships in the repository and this table is its LOADED COPY — ``express_setup.load_packaged()``
+    upserts it on every start, so a fresh install has picks without anyone running a command, and
+    a row a user adds is never deleted by the loader.
+
+    A pick names a MODEL, not a capability set. A model strong enough to drive the box answers
+    chat, titles, summaries, workflows and memory alike; the five-capability split is legacy
+    plumbing (2026-11-21). ``tier`` carries the honesty instead: ``strong`` is what we would run
+    the box on, ``grab bag`` is a local model we cannot vouch for.
+
+    ``needs_kind`` is the ONE thing that decides applicability: ``key`` (an env var that must be
+    set), ``local`` (a server that must answer), ``none``.
+    """
+
+    __tablename__ = "setup_picks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # The packaged id — the stable handle a URL, a CLI flag and a user's note can all name
+    key: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+
+    # The provider this pick dials: a NAME and a TYPE, because the row may not exist yet and the
+    # address comes from PROVIDER_ENDPOINTS, never from this table
+    provider_name: Mapped[str] = mapped_column(String(60), nullable=False)
+    provider_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    tier: Mapped[str] = mapped_column(String(20), nullable=False, default="strong")
+
+    needs_kind: Mapped[str] = mapped_column(String(10), nullable=False, default="key")
+    needs_env: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    needs_url: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+
+    why: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # EVIDENCE, never an adjective: when it was proved and how. A null date is a pick nobody has
+    # driven end to end yet, and every surface must say so rather than hide the row
+    verified_on: Mapped[Optional[Any]] = mapped_column(Date, nullable=True)
+    verified_how: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<SetupPick(key='{self.key}', {self.provider_name}/{self.model_id})>"

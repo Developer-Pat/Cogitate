@@ -238,6 +238,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         from app.domain.macros.seeds import seed_akeys_macros
         await seed_akeys_macros(_seed_db)
 
+        # THE PACKAGED SETUP PICKS (2026-11-21): `express_setup.json` is the authority and the
+        # `setup_picks` table is its loaded copy, so a fresh install can offer "one model, one
+        # key" without anyone running a command. Idempotent; never deletes a row a user added.
+        from app.domain.providers.express_setup import load_packaged
+
+        for _line in await load_packaged(_seed_db):
+            logger.info("express setup — %s", _line)
+
     # Centralized LiteLLM retry defaults (applied once at startup).
     # These control LiteLLM's internal retry loop on transient failures
     # (rate limits, 5xx).  They are module-level globals that affect all
