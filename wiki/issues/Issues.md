@@ -55,6 +55,19 @@ the Site Index links this section, never its pages.
 
 ## Resolved
 
+- [[issues/resolved/github-release/one-turn-answers-twice|One turn answers twice — the server replaces the answer, and the wire never says so]] —
+  **LANDED — `3737198`** *(ruled 2026-11-20: "let's go with A+B", and "brevity never earns a call")*. Measured:
+  *"Bob, one word: ready?"* was answered `Ready.`, the conduit routed HYBRID on **brevity alone**
+  (`content_len=6`, six of the eight profiles are `hybrid`), and a second **6,086-token** prompt answered
+  `Ready.` again — the bubble read `Ready.Ready.` while the saved row held `Ready.`, because the server
+  REPLACES the answer at four sites and the wire never said so. **A**: a lazy `delta.replace` frame before
+  every superseding pass's first content chunk, the client resetting its accumulator (a pass that writes
+  nothing clears nothing, so the empty-deep case needs no re-send). **B**: `is_short` is gone — a short answer
+  that answers is a complete answer; intent (`DEEP_KEYWORDS`) or an answer cut at the output budget
+  (`finish_reason == "length"`) earns the second call. The same class sat on the main loop's rounds, so a
+  tool turn's narration now clears when its answer arrives. Control run: disabling the frame fails exactly
+  the three supersede tests, one of which reproduces `Blue.Blue.`.
+
 - [[issues/resolved/github-release/example-env-file-vs-the-config-surface|The example environment file names 30 keys against a surface of 50]] —
   **LANDED — `a77ea63e`** *(ruled 2026-11-18: "let's go with C")*. The app reads **50** environment keys (42
   `Settings` fields, all defaulted, plus 8 reads that bypass `Settings`); the shipped `.env.example` named
