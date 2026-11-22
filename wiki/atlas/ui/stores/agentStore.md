@@ -15,7 +15,7 @@ tags: [type/store, domain/atlas-ui]
 
 The **agent slice** of the combined Cognitive Hub store. It owns the agent list, the currently selected agent, conversation sessions (list + active session), and session lifecycle (active / inactive / unloaded). Extracted from `cognitiveHubStore.ts` during the Phase C1 refactoring into a focused `StateCreator` slice; this file exports the `AgentSlice` interface and the `createAgentSlice` slice factory.
 
-This is a `create()` slice pattern, not a standalone store: `createAgentSlice(set, get, store)` is spread — alongside `createStreamSlice`, `createProviderHealthSlice`, and `createSyncQueueSlice` — into the singleton `useCognitiveHubStore` in `cognitiveHubStore.ts`, wrapped in `devtools` + `persist` middleware. There is no separate `useAgentStore` hook; consumers access this slice through `useCognitiveHubStore` (see [Selectors / Exports](#selectors--exports)).
+This is a `create()` slice pattern, not a standalone store: `createAgentSlice(set, get, store)` is spread — alongside `createStreamSlice` and `createSyncQueueSlice` — into the singleton `useCognitiveHubStore` in `cognitiveHubStore.ts`, wrapped in `devtools` + `persist` middleware. There is no separate `useAgentStore` hook; consumers access this slice through `useCognitiveHubStore` (see [Selectors / Exports](#selectors--exports)).
 
 **Scope note**: despite the "Agent Store" name, this slice does **not** contain create/update/delete agent actions. Agent CRUD is handled elsewhere — fetching via `AgentService` (driven by `useAgentSelection`), agent-profile UI state in `agentProfilesStore.ts`. This slice provides bulk list replacement (`setAgents`), selection (`setActiveAgent`), and full session/message management.
 
@@ -168,7 +168,7 @@ Exact signatures (from the `AgentSlice` interface) with implementation notes:
 | `setAgents` | `(agents: Agent[]) => void` | Replaces the whole `agents` list. |
 | `setLoadingAgents` | `(loading: boolean) => void` | Toggles `isLoadingAgents`. |
 | `setAgentError` | `(error: string \| null) => void` | Sets/clears `agentError`. |
-| `setActiveAgent` | `(agent: Agent \| null) => void` | Sets `activeAgent` **and cross-slice writes** `activeProvider: agent?.provider \| null` (field owned by `ProviderHealthSlice`). |
+| `setActiveAgent` | `(agent: Agent \| null) => void` | Sets `activeAgent`. |
 | `setActiveSession` | `(session: ConversationSession \| null) => void` | Sets `activeSession`. |
 | `setSessions` | `(sessions: ConversationSession[]) => void` | Replaces the entire `sessions` list. |
 | `upsertSession` | `(session: ConversationSession) => void` | Prepends the session and filters out any existing session with the same id (add-or-update). |
@@ -194,8 +194,8 @@ Exact signatures (from the `AgentSlice` interface) with implementation notes:
 - **Consumption**: through the combined store hook `useCognitiveHubStore` (`cognitiveHubStore.ts`, default export):
   - Hook form: `useCognitiveHubStore((s) => s.sessions)` — reactive per-field selection.
   - Imperative form: `useCognitiveHubStore.getState()` / `useCognitiveHubStore.subscribe()` — used by services and event handlers.
-- `CombinedState = AgentSlice & StreamSlice & ProviderHealthSlice & SyncQueueSlice` — each slice types its `set`/`get` against the full combined store, enabling cross-slice access.
-- `AgentSlice` is also imported as a type by `streamStore.ts`, `providerHealthStore.ts`, `syncQueueStore.ts` (combined-state typing) and `utils/cogitateDevTools.ts` (store inspection).
+- `CombinedState = AgentSlice & StreamSlice & SyncQueueSlice` — each slice types its `set`/`get` against the full combined store, enabling cross-slice access.
+- `AgentSlice` is also imported as a type by `streamStore.ts`, `syncQueueStore.ts` (combined-state typing) and `utils/cogitateDevTools.ts` (store inspection).
 
 ## Dependencies
 
@@ -204,7 +204,6 @@ Exact signatures (from the `AgentSlice` interface) with implementation notes:
 | `zustand` (`StateCreator`) | lib | Slice factory typing for the `create()` slices pattern. |
 | `../types/agentInteraction` | types | `Agent`, `ConversationSession`, `ConversationMessage` domain types. |
 | `../services/frontendLoggingService` | service | `warning()` log on duplicate `addSessionMessage` attempts. |
-| `./providerHealthStore` (`ProviderHealthSlice`) | store (type) | `setActiveAgent` writes the cross-slice `activeProvider` field. |
 | `./streamStore` (`StreamSlice`) | store (type) | Combined-state typing only. |
 | `./syncQueueStore` (`SyncQueueSlice`) | store (type) | Combined-state typing only. |
 | `./cognitiveHubStore.ts` (composing store) | store | Spreads `createAgentSlice` into `useCognitiveHubStore` with `devtools` + `persist`. |
@@ -221,7 +220,7 @@ function AgentSwitcher() {
   const setActiveAgent = useCognitiveHubStore((s) => s.setActiveAgent)
 
   const handleSelect = (agent: Agent) => {
-    setActiveAgent(agent) // also sets activeProvider (ProviderHealth slice)
+    setActiveAgent(agent)
   }
 
   return (
@@ -242,10 +241,9 @@ function AgentSwitcher() {
 
 ## Data Flow / Notes
 
-- **Composition**: `cognitiveHubStore.ts` builds `useCognitiveHubStore = create<CognitiveHubState>()(devtools(persist((set, get, store) => ({ ...createAgentSlice(set, get, store), ...createStreamSlice(...), ...createProviderHealthSlice(...), ...createSyncQueueSlice(...), persistenceScope: 'local', setPersistenceScope }), { name: 'cogitate-hub-storage', partialize, storage: scopedStorage, onRehydrateStorage }), { name: 'CognitiveHubStore', enabled: import.meta.env.DEV }))`. `persist` wraps the whole combined state; `partialize` selects which keys are written.
+- **Composition**: `cognitiveHubStore.ts` builds `useCognitiveHubStore = create<CognitiveHubState>()(devtools(persist((set, get, store) => ({ ...createAgentSlice(set, get, store), ...createStreamSlice(...), ...createSyncQueueSlice(...), persistenceScope: 'local', setPersistenceScope }), { name: 'cogitate-hub-storage', partialize, storage: scopedStorage, onRehydrateStorage }), { name: 'CognitiveHubStore', enabled: import.meta.env.DEV }))`. `persist` wraps the whole combined state; `partialize` selects which keys are written.
 - **Persistence** (`partialize`): `{ agents, activeAgentId: state.activeAgent?.id ?? null, activeSessionId: state.activeSession?.id ?? null, activeSession, persistenceScope, sessions }`. Note `activeAgentId` / `activeSessionId` are derived keys **not** part of `AgentSlice`; only `activeAgentId` (not the full agent object) is persisted "to avoid stale data". Per the comment in `cognitiveHubStore.ts`, `activeAgent` is reconstructed from the persisted agents list on rehydration. `useAgentSelection` reads the persisted `activeAgentId` via `(hubState as unknown as Record<string, unknown>).activeAgentId` to reconcile the selection.
 - **Storage routing**: `scopedStorage` routes to `localStorage` / `sessionStorage` / none based on `persistenceScope`; `onRehydrateStorage` restores the scope and logs restored counts.
-- **Cross-slice write**: `setActiveAgent(agent)` also sets `activeProvider` (owned by `ProviderHealthSlice`) — the only cross-slice write in this file.
 - **Reference-sync pattern**: session-mutating actions (`addSessionMessage`, `updateSessionMessage`, `renameSessionById`, `replaceSessionById`, `closeActiveSession`) build ONE updated session object and assign the same reference to both `sessions[i]` and `activeSession` when the target is active — preventing divergence between the list and the active session.
 - **Lazy/pending sessions**: `pendingSession: true` means a temp session exists client-side but is not yet committed to the backend; `replaceSessionById` later swaps the temp id for the backend id while preserving any messages added in between.
 - **Agent loading flow**: `useAgentSelection.loadAgents()` → `AgentService.getAgents()` → `setLoadingAgents(true)` / `setAgents(list)` / `setAgentError(...)` / `setLoadingAgents(false)`. Selecting an agent calls `setActiveAgent` immediately (responsive UI) then background-refreshes via `AgentService.getAgent(id)` to replace stale cached agents.

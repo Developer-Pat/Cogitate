@@ -51,7 +51,7 @@ Nothing else happens at module scope; all initialization is component-driven ins
 | `QueryProvider` | `frontend/src/providers/QueryProvider.tsx` | TanStack Query client: 5 min staleTime, 10 min gcTime, retry 3× (never on 4xx), devtools in dev |
 | `BrowserRouter` | `react-router-dom` | Client-side routing |
 | `GlobalTheme` | inline in `App.tsx` | Applies `data-theme` (light/dark) to `<html>`; theme source of truth is `useTheme` reading localStorage |
-| `CognitiveHubProvider` | `frontend/src/providers/CognitiveHubProvider.tsx` | Boot component — **not** a React context provider; hydrates the hub store from persisted `cogitate-hub-storage`, starts/stops the offline retry processor, polls provider health |
+| `CognitiveHubProvider` | `frontend/src/providers/CognitiveHubProvider.tsx` | Boot component — **not** a React context provider; hydrates the hub store from persisted `cogitate-hub-storage`, starts/stops the offline retry processor |
 | `Layout` | inline in `App.tsx` | Sidebar + main content shell (plain flexbox, replaced DaisyUI drawer in 2026-06-15) |
 | `Suspense` | `react` | Fallback `PageLoader` while lazy route chunks load |
 | `Routes` | from `frontend/src/config/routes.ts` | Route table, each element wrapped in `RouteGuard` |
@@ -77,7 +77,7 @@ flowchart TD
     app --> router["BrowserRouter"]
 
     router --> gtheme["GlobalTheme — data-theme on html"]
-    router --> hub["CognitiveHubProvider — boot hydration + health polling"]
+    router --> hub["CognitiveHubProvider — boot hydration + offline retry"]
     router --> layout["Layout — sidebar + main"]
 
     hub --> bridge["useUIStateBridge — WebSocket bridge (app lifetime)"]
@@ -338,7 +338,7 @@ hub store so every page sees the same selection).
 
 State lives in 16 Zustand store modules in `frontend/src/stores/` — 15 focused
 stores plus the composite root. The centerpiece is **`cognitiveHubStore.ts`, the
-composite root store**: it composes four slices via the Zustand slices pattern and
+composite root store**: it composes three slices via the Zustand slices pattern and
 wraps them in `devtools` (dev only) + `persist`.
 
 ```mermaid
@@ -347,13 +347,11 @@ flowchart TD
 
     hub --> agent["agentStore — agents, activeAgent, sessions, lifecycle"]
     hub --> stream["streamStore — streaming flags"]
-    hub --> ph["providerHealthStore — health map"]
     hub --> sq["syncQueueStore — offline pending messages"]
     hub --> scope["persistenceScope — local / session / none"]
 
     agent --> persist["persist middleware<br/>cogitate-hub-storage (scoped storage)"]
     stream --> persist
-    ph --> persist
     sq --> persist
 
     ui["uiStore — sidebar, theater mode"]
@@ -377,7 +375,7 @@ Design decisions worth knowing:
   this replaced the old `useState`-in-hook approach in `useSessionManagement` and
   `useChatPersistence`.
 - **Slices are files.** Each slice (`agentStore.ts`, `streamStore.ts`,
-  `providerHealthStore.ts`, `syncQueueStore.ts`) exports a `createXSlice(set, get,
+  `syncQueueStore.ts`) exports a `createXSlice(set, get,
   store)` factory plus its interface; `cognitiveHubStore.ts` only composes and
   configures persistence.
 - **Scoped persistence.** A custom storage routes the persisted snapshot
@@ -387,7 +385,7 @@ Design decisions worth knowing:
   messages for offline access).
 - **Boot hydration.** `CognitiveHubProvider` reads `cogitate-hub-storage` once on
   mount, restores active agent/session, and starts the `offlineSyncQueue` retry
-  processor — plus periodic provider health polling.
+  processor.
 - **Satellite stores** stay independent: UI chrome (`uiStore`, `settingsStore`,
   `notificationStore`), identity (`userStore`), system meta (`systemStore`), and
   domain caches (`topicStore`, `sharedContextStore`, `macroSetsStore`,
@@ -465,7 +463,7 @@ flowchart TD
 1. **Data-driven routing** — one `routes.ts` array feeds `<Routes>`, breadcrumbs,
    navigation helpers, and permission checks; pages are lazy-loaded behind a
    single `Suspense` boundary.
-2. **Composite root store** — four slice files composed into one persisted,
+2. **Composite root store** — three slice files composed into one persisted,
    devtools-enabled singleton; the hub store replaces React context for all
    agent/session state and survives navigation.
 3. **Facade over env switch** — `providerService` swaps real/mock implementations

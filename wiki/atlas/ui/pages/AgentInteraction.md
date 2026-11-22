@@ -28,7 +28,7 @@ The Agent Interaction page is the main chat interface for talking to AI agents. 
 - (The `ToolPicker` modal was REMOVED — no tool-gating modal exists on this page anymore.)
 - **Auto title generation** — after the first assistant message, a background job calls `POST /api/v1/chat/generate-title` (respects `enableAutoTitle` / `titleModelPreference` settings).
 - **Rich rendering** — `ResponseStream` renders markdown (GFM, syntax highlighting, mermaid diagrams), tool-result bubbles, message metrics (time/tokens/tok/s/model), and copy actions.
-- **Provider health gate** — `handleSendMessage` refuses to send if the active provider is marked `down` in the hub store.
+- **Pre-turn refusal is the SERVER's** — a turn that cannot run is refused in `backend/app/api/v1/chat/router.py` before the pipeline starts, via `domain.providers.refusal.refusal_statement`; the sentence arrives on the same `event: error` frame a failed turn uses. The browser holds no provider-health copy, so it decides nothing.
 
 ## Components Used
 
@@ -63,7 +63,7 @@ The Agent Interaction page is the main chat interface for talking to AI agents. 
 
 1. **Mount**: `useAgentSelection` fetches agents (via `AgentService` → `ProfileService`, `GET /api/v1/agents`) into the Cognitive Hub store and restores the persisted selection; `useSessionManagement` loads session titles (`GET /api/v1/sessions?include_messages=false`, lazy message loading); `ChatInterface` loads meta-topics and macro sets.
 2. **Team/agent selection**: the selected team ID filters the agent dropdown via `collectionsService.getCollectionItems(id)` (`GET /api/v1/collections/{id}/items`, keeping `entity_type === 'agent'` ids). Both selections are persisted to `localStorage` and restored on next visit; agent selection is also re-validated against the backend (`GET /api/v1/agents/{id}`).
-3. **Send message** (`handleSendMessage`): provider health check from hub store → optional attachment uploads (`POST /api/v1/chat/{sessionId}/attachments`) → `StreamingService.startStream` → `chatService.createStreamingChatCompletion` → `POST /api/v1/chat/stream` with `{agent_id, message, session_id, stream: true, attachment_ids}`.
+3. **Send message** (`handleSendMessage`): session check → optional attachment uploads (`POST /api/v1/chat/{sessionId}/attachments`) → `StreamingService.startStream` → `chatService.createStreamingChatCompletion` → `POST /api/v1/chat/stream` with `{agent_id, message, session_id, stream: true, attachment_ids}`.
 4. **Streaming**: `StreamingService` creates optimistic user + assistant messages in the store (via `onAddMessage`), parses the SSE body line-by-line: content chunks (`choices[0].delta.content`) accumulate with throttled `onUpdateMessage` updates; a backend `session_id` event replaces the temp session id in the store; `cognitive_*` events update `CognitiveState`; `[DONE]` / `done+metadata` finalize. Truncation (`finish_reason: length`) is flagged in metadata and surfaced as a notification.
 5. **Completion** (`onStreamComplete`): final assistant message replaces the streaming placeholder → if the session was a temp id (`session-{ts}-{rand}`), `commitPendingSession` creates it on the backend (`POST /api/v1/sessions`) and replaces it in the store → auto-title job is queued (`POST /api/v1/chat/generate-title`) once ≥2 messages exist.
 6. **Session switch**: `switchSession` fetches full history (`GET /api/v1/sessions/{id}`), preserves locally-changed titles, and upserts into the hub store; `currentSessionService.setContext` keeps a compatibility context object in sync.
@@ -73,7 +73,7 @@ The Agent Interaction page is the main chat interface for talking to AI agents. 
 
 | Store | Path | Role |
 |---|---|---|
-| `useCognitiveHubStore` | `frontend/src/stores/cognitiveHubStore.ts` | **Central source of truth** — composed of `agentStore` (agents, activeAgent, sessions, activeSession), `streamStore`, `providerHealthStore`, `syncQueueStore`; persisted to `localStorage` (`cogitate-hub-storage`) with a scoped-storage wrapper |
+| `useCognitiveHubStore` | `frontend/src/stores/cognitiveHubStore.ts` | **Central source of truth** — composed of `agentStore` (agents, activeAgent, sessions, activeSession), `streamStore`, `syncQueueStore`; persisted to `localStorage` (`cogitate-hub-storage`) with a scoped-storage wrapper |
 | `useSystemMacrosStore` | `frontend/src/stores/macroSetsStore.ts` | Meta-topics, macro sets, the F selection + the A-source + the active surface (`selectedMetaTopicId`, `aKeysMetaTopicId`, `surface` — persisted surface-scoped: `cogitate_selected_meta_topic` / `cogitate_akeys_meta_topic` + `:exa` suffixes) |
 | `useNotificationStore` | `frontend/src/stores/notificationStore.ts` | Toasts (title generation, truncation, copy, delete, bulk ops) |
 | `useSettingsStore` | `frontend/src/stores/settingsStore.ts` | `showPipelineIndicators`, `enableAutoTitle`, `titleModelPreference`, `titleCustomModel` |

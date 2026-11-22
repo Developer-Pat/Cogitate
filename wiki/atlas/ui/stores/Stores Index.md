@@ -19,7 +19,6 @@ The Zustand stores — the client-side state for agents, chat, workflows, and UI
 - [[atlas/ui/stores/cognitiveHubStore|cognitiveHubStore]]
 - [[atlas/ui/stores/macroSetsStore|macroSetsStore]]
 - [[atlas/ui/stores/notificationStore|notificationStore]]
-- [[atlas/ui/stores/providerHealthStore|providerHealthStore]]
 - [[atlas/ui/stores/settingsStore|settingsStore]]
 - [[atlas/ui/stores/streamStore|streamStore]]
 - [[atlas/ui/stores/syncQueueStore|syncQueueStore]]

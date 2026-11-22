@@ -19,7 +19,7 @@ The frontend uses **Zustand exclusively** for global/client state — there is n
 
 The architecture separates state into two tiers:
 
-1. **The composite root** — `cognitiveHubStore.ts` composes four focused slice modules (`agentStore`, `streamStore`, `providerHealthStore`, `syncQueueStore`) into one store, and wraps the result in `devtools` + `persist`. It is the single source of truth for AI-context state: agent list/selection, chat sessions, streaming flags, provider health, and the offline sync queue.
+1. **The composite root** — `cognitiveHubStore.ts` composes three focused slice modules (`agentStore`, `streamStore`, `syncQueueStore`) into one store, and wraps the result in `devtools` + `persist`. It is the single source of truth for AI-context state: agent list/selection, chat sessions, streaming flags, and the offline sync queue.
 2. **Standalone stores** — ten additional stores, each owning one domain (UI chrome, notifications, settings, system health, user identity, topics, agent-profile page state, shared context, macro sets, chat macros). They do not compose anything and generally do not read from the hub.
 
 A third mechanism, the **`useUIStateBridge` hook**, does not introduce a store: it *reads* from existing stores (`uiStore`, `cognitiveHubStore`, `settingsStore`) plus `useLocation`, and pushes a derived snapshot to the backend over a WebSocket. It is the boundary between React state and the backend's UI-state channel — not a general-purpose state container.
@@ -32,10 +32,9 @@ All 16 files in `frontend/src/stores/`:
 
 | File | Exported hook | Role | Middleware |
 |---|---|---|---|
-| `cognitiveHubStore.ts` | `useCognitiveHubStore` | **Composite root** — composes the 4 slices + `persistenceScope` | `devtools` (DEV) + `persist` |
+| `cognitiveHubStore.ts` | `useCognitiveHubStore` | **Composite root** — composes the 3 slices + `persistenceScope` | `devtools` (DEV) + `persist` |
 | `agentStore.ts` | `createAgentSlice` (no hook) | Slice — agents, active agent, sessions, lifecycle | none (composed into hub) |
 | `streamStore.ts` | `createStreamSlice` (no hook) | Slice — streaming flags | none (composed into hub) |
-| `providerHealthStore.ts` | `createProviderHealthSlice` (no hook) | Slice — provider health map | none (composed into hub) |
 | `syncQueueStore.ts` | `createSyncQueueSlice` (no hook) | Slice — offline sync queue | none (composed into hub) |
 | `uiStore.ts` | `useUIStore` | Standalone — sidebar, theater mode | none |
 | `notificationStore.ts` | `useNotificationStore` | Standalone — toasts/alerts | none |
@@ -47,7 +46,7 @@ All 16 files in `frontend/src/stores/`:
 | `sharedContextStore.ts` | `useSharedContextStore` | Standalone — pinned messages / shared snippets | `devtools` + `persist` |
 | `macroSetsStore.ts` | `useSystemMacrosStore` | Standalone — macro sets, meta-topics, topic selection | none (manual localStorage) |
 | `chatMacrosStore.ts` | `useChatMacrosStore` | Standalone — chat macro slots/config | none (manual localStorage via service) |
-| `types.ts` | — (shared types) | `PersistenceScope`, `ProviderHealthStatus`, `PendingMessage` | — |
+| `types.ts` | — (shared types) | `PersistenceScope`, `PendingMessage` | — |
 
 ### Topology diagram
 
@@ -56,7 +55,6 @@ graph TD
     subgraph SLICES["Slice modules (composed, no standalone hook)"]
         A["agentStore.ts<br/>createAgentSlice"]
         ST["streamStore.ts<br/>createStreamSlice"]
-        PH["providerHealthStore.ts<br/>createProviderHealthSlice"]
         SQ["syncQueueStore.ts<br/>createSyncQueueSlice"]
     end
 
@@ -64,14 +62,12 @@ graph TD
         HUB["cognitiveHubStore.ts<br/>useCognitiveHubStore<br/>devtools + persist"]
     end
 
-    TYPES["types.ts<br/>PersistenceScope / ProviderHealthStatus / PendingMessage"]
+    TYPES["types.ts<br/>PersistenceScope / PendingMessage"]
 
     A -->|"spread into"| HUB
     ST -->|"spread into"| HUB
-    PH -->|"spread into"| HUB
     SQ -->|"spread into"| HUB
     TYPES -.->|imported by| A
-    TYPES -.->|imported by| PH
     TYPES -.->|imported by| SQ
     TYPES -.->|re-exported from| HUB
 
@@ -99,24 +95,13 @@ The hub is the app's shared AI-context state. It uses the Zustand **slices patte
 
 ### Slice contract
 
-Every slice module exports an interface (`AgentSlice`, `StreamSlice`, `ProviderHealthSlice`, `SyncQueueSlice`) and a factory `createXSlice` typed as a `StateCreator<CombinedState, [], [], XSlice>` where:
+Every slice module exports an interface (`AgentSlice`, `StreamSlice`, `SyncQueueSlice`) and a factory `createXSlice` typed as a `StateCreator<CombinedState, [], [], XSlice>` where:
 
 ```typescript
-type CombinedState = AgentSlice & StreamSlice & ProviderHealthSlice & SyncQueueSlice
+type CombinedState = AgentSlice & StreamSlice & SyncQueueSlice
 ```
 
-Because `set`/`get` are typed against the *combined* state, any slice can read or write any other slice's fields. The most visible cross-slice write is in `agentStore.ts`:
-
-```typescript
-setActiveAgent: (agent) => {
-  set({
-    activeAgent: agent,
-    activeProvider: agent?.provider || null, // ← writes ProviderHealthSlice state
-  })
-},
-```
-
-`setActiveAgent` simultaneously updates the agent slice (`activeAgent`) and the provider-health slice (`activeProvider`), keeping the "which provider is active" invariant tied to agent selection in a single atomic update — no separate call, no chance of drift.
+Because `set`/`get` are typed against the *combined* state, any slice can read any other slice's fields; no action in the current slices writes another slice's state.
 
 ### Composition
 
@@ -129,7 +114,6 @@ export const useCognitiveHubStore = create<CognitiveHubState>()(
       (set, get, store) => ({
         ...createAgentSlice(set, get, store),
         ...createStreamSlice(set, get, store),
-        ...createProviderHealthSlice(set, get, store),
         ...createSyncQueueSlice(set, get, store),
 
         // Own state, kept in the composing layer:
@@ -148,17 +132,16 @@ export const useCognitiveHubStore = create<CognitiveHubState>()(
 
 Key properties of the pattern:
 
-- **Own state stays in the composing layer.** `persistenceScope` and `setPersistenceScope` are defined in `CognitiveHubState` itself (which `extends` the four slice interfaces) rather than in a slice, because the scope is tightly coupled to the `persist` configuration — `setPersistenceScope` must reach into the `scopedStorage` wrapper that the persist middleware uses.
+- **Own state stays in the composing layer.** `persistenceScope` and `setPersistenceScope` are defined in `CognitiveHubState` itself (which `extends` the three slice interfaces) rather than in a slice, because the scope is tightly coupled to the `persist` configuration — `setPersistenceScope` must reach into the `scopedStorage` wrapper that the persist middleware uses.
 - **Slice factories are pure composition units.** `createAgentSlice` receives `(set, get, store)` and returns a plain object; it has no knowledge of the persist/devtools wrapper. Slices are unit-testable in isolation (see `stores/__tests__/notificationStore.test.ts` for the standalone-store testing pattern).
 - **Single source of truth is enforced by consumers.** `useAgentSelection` (`frontend/src/hooks/useAgentSelection.ts`) reads `activeAgent`, `agents`, `isLoadingAgents`, and `agentError` exclusively through `useCognitiveHubStore` selectors — its code comment states "Use cognitive hub store for shared state (single source of truth)". Agent selection never forks into a second store.
 
 ### State shape
 
-`CognitiveHubState` = `AgentSlice` + `StreamSlice` + `ProviderHealthSlice` + `SyncQueueSlice` + own `persistenceScope`/`setPersistenceScope`. Highlights:
+`CognitiveHubState` = `AgentSlice` + `StreamSlice` + `SyncQueueSlice` + own `persistenceScope`/`setPersistenceScope`. Highlights:
 
 - **AgentSlice** — `agents: Agent[]`, `activeAgent: Agent | null`, `activeSession`, `sessions`, `pendingSession`, plus CRUD/lifecycle actions (`upsertSession`, `replaceSessionById`, `renameSessionById`, `addSessionMessage`, `updateSessionMessage`, `unloadInactiveSessions`, …). Message mutation actions share the *same object reference* between `sessions` and `activeSession` to prevent the two from diverging.
 - **StreamSlice** — `isStreaming: boolean`, `streamingFor: string | null`.
-- **ProviderHealthSlice** — `providerHealth: Record<string, ProviderHealthStatus>`, `activeProvider: string | null`.
 - **SyncQueueSlice** — `pendingMessages: PendingMessage[]`, `pendingSyncCount`, queue actions with `retryCount`/`lastAttemptAt` tracking.
 
 ## Persistence
@@ -285,7 +268,7 @@ Zustand re-renders the subscribing component only when the *selected* value chan
 
 Writes go through store **actions**. `useAgentSelection.handleSelectAgent` is the canonical example:
 
-1. `setSelectedAgent(agent)` — optimistic, immediate UI response (also sets `activeProvider` via the cross-slice write above).
+1. `setSelectedAgent(agent)` — optimistic, immediate UI response.
 2. `agentServiceRef.current.getAgent(agent.id)` — background refresh *not awaited*, so the UI never blocks; the fresher agent replaces the cached one when the request resolves, and failures fall back to the cached agent with a warning log.
 3. Persist middleware captures the change and writes `activeAgentId` to scoped storage.
 
@@ -302,9 +285,9 @@ const handleSelectAgent = async (agent: Agent) => {
     .then((fresh) => fresh && setSelectedAgent(fresh)) // store write again
 }
 
-// 3. Store action performs the atomic, cross-slice update
+// 3. Store action updates the agent slice
 setActiveAgent: (agent) => {
-  set({ activeAgent: agent, activeProvider: agent?.provider || null })
+  set({ activeAgent: agent })
 }
 
 // 4. persist middleware serializes the new activeAgentId to scoped storage
@@ -331,7 +314,7 @@ Outside React — services, providers, or other stores — state is read and wri
 
 - `macroSetsStore` fires toasts cross-store: `useNotificationStore.getState().addWarning('No Macro Topics', …)`.
 - `useAgentSelection.restoreAgentSelection()` reads `useCognitiveHubStore.getState()` to inspect persisted `activeAgentId` during boot restore.
-- `CognitiveHubProvider` (app root, mounted once) uses `getState()` for boot hydration and for the provider-health polling / offline-retry loops.
+- `CognitiveHubProvider` (app root, mounted once) uses `getState()` for boot hydration and the offline-retry loop.
 
 ### The bridge hook (`useUIStateBridge`)
 
@@ -352,7 +335,7 @@ This is the model for *bridge* state: read from stores, never write into them fr
 - **Store files**: `frontend/src/stores/<domain>Store.ts` — one store per file. The composite root and slices are the exception (multiple files, one store).
 - **Store hooks**: `use<Domain>Store` (`useCognitiveHubStore`, `useUIStore`, `useNotificationStore`, …). Two deliberate deviations: `macroSetsStore` exports `useSystemMacrosStore` (historical name retained), and slice modules export no hook at all — only `createXSlice` factories.
 - **Slice factories**: `create<Domain>Slice` returning an interface named `<Domain>Slice` (`createAgentSlice` → `AgentSlice`).
-- **Types file**: shared slice types (`PersistenceScope`, `ProviderHealthStatus`, `PendingMessage`) live in `stores/types.ts` and are re-exported from `cognitiveHubStore.ts` for backward compatibility.
+- **Types file**: shared slice types (`PersistenceScope`, `PendingMessage`) live in `stores/types.ts` and are re-exported from `cognitiveHubStore.ts` for backward compatibility.
 - **DevTools names**: middleware instances are named after the store (`'CognitiveHubStore'`, `'settings-store'`, `'SharedContextStore'`, `'topic-store'`, …). Most are gated behind `enabled: import.meta.env.DEV` so production builds skip the DevTools overhead.
 
 ### Selector usage
@@ -383,7 +366,7 @@ This is the model for *bridge* state: read from stores, never write into them fr
 
 ### When to create a new store
 
-Add a store (or a slice of the hub) only when the state is (a) shared across components, (b) needed outside React, (c) persisted, or (d) derived from a long-lived subscription. If none of these hold, local state is correct. When the new state is AI-context (agents, sessions, streaming, provider health, sync queue), it belongs in a **slice** of `cognitiveHubStore`; anything else is a **standalone** store. UI-only state must not be added to the hub.
+Add a store (or a slice of the hub) only when the state is (a) shared across components, (b) needed outside React, (c) persisted, or (d) derived from a long-lived subscription. If none of these hold, local state is correct. When the new state is AI-context (agents, sessions, streaming, sync queue), it belongs in a **slice** of `cognitiveHubStore`; anything else is a **standalone** store. UI-only state must not be added to the hub.
 
 ## Anti-patterns to Avoid
 
@@ -394,12 +377,12 @@ Add a store (or a slice of the hub) only when the state is (a) shared across com
 5. **Adding UI-only concerns to the hub.** The hub is AI-context state; sidebar collapse, view modes, and flyout toggles belong in `uiStore`/`agentProfilesStore`/`topicStore`. Mixing them in couples unrelated re-renders to chat state.
 6. **Double persistence for one piece of state.** Either use zustand `persist` *or* an explicit storage service, not both on the same field (compare `sharedContextStore`'s middleware-based persistence with `chatMacrosStore`'s service-based persistence — each is internally consistent).
 7. **Using `useUIStateBridge` as a general state mechanism.** It is a WebSocket connector with a specific job (push UI snapshot, handle navigation). Local `useState` inside it is the pattern for socket-local concerns; do not grow it into a store, and do not use it to push state that isn't UI state.
-8. **Cross-store writes from a slice's `set` without intent.** The `activeProvider` write in `setActiveAgent` is a deliberate, documented invariant. Unplanned cross-slice writes (e.g., touching `pendingMessages` from an agent action) obscure data flow; prefer composing actions or calling the owning slice's action through `get()`.
-9. **Importing a store module just for types.** Consumers that only need `PersistenceScope` / `ProviderHealthStatus` / `PendingMessage` should import from `stores/types.ts`; importing `cognitiveHubStore.ts` for types drags the whole store module (and its storage wiring) into the bundle graph.
+8. **Cross-store writes from a slice's `set` without intent.** Unplanned cross-slice writes (e.g., touching `pendingMessages` from an agent action) obscure data flow; prefer composing actions or calling the owning slice's action through `get()`.
+9. **Importing a store module just for types.** Consumers that only need `PersistenceScope` / `PendingMessage` should import from `stores/types.ts`; importing `cognitiveHubStore.ts` for types drags the whole store module (and its storage wiring) into the bundle graph.
 10. **Silently swallowing rehydration errors.** The hub's `onRehydrateStorage` logs and falls back to defaults; new persisted stores should do the same so corrupted storage never leaves the app in a half-restored state.
 
 ## Related
 
-- Per-store detail: `wiki/atlas/ui/stores/cognitiveHubStore.md`, `agentStore.md`, `streamStore.md`, `providerHealthStore.md`, `syncQueueStore.md`, `uiStore.md`, `notificationStore.md`, `settingsStore.md`, `systemStore.md`, `userStore.md`, `topicStore.md`, `agentProfilesStore.md`, `sharedContextStore.md`, `macroSetsStore.md`, `chatMacrosStore.md`, `types.md`
+- Per-store detail: `wiki/atlas/ui/stores/cognitiveHubStore.md`, `agentStore.md`, `streamStore.md`, `syncQueueStore.md`, `uiStore.md`, `notificationStore.md`, `settingsStore.md`, `systemStore.md`, `userStore.md`, `topicStore.md`, `agentProfilesStore.md`, `sharedContextStore.md`, `macroSetsStore.md`, `chatMacrosStore.md`, `types.md`
 - Consumers: `useAgentSelection` (single source of truth for agent selection), `useUIStateBridge`, `CognitiveHubProvider` (boot hydration), `AgentService`, `SessionsService`, `StreamingService`, `offlineSyncQueue`, `userSettingsService`, `uiStateBridge`, `chatMacroService`
 - Test pattern: `frontend/src/stores/__tests__/notificationStore.test.ts`

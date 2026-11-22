@@ -14,13 +14,13 @@ tags: [type/store, domain/atlas-ui]
 
 ## Purpose
 
-Central singleton Zustand store for AI context state: agents, active agent, chat sessions, streaming flags, provider health, and the offline sync queue. It replaces local `useState` in `useSessionManagement` and `useChatPersistence`, and survives navigation because it is a module-level singleton rather than a component-mounted store.
+Central singleton Zustand store for AI context state: agents, active agent, chat sessions, streaming flags, and the offline sync queue. It replaces local `useState` in `useSessionManagement` and `useChatPersistence`, and survives navigation because it is a module-level singleton rather than a component-mounted store.
 
 Since the Phase C1 refactoring, this file composes focused sub-store slices using the Zustand slices pattern; `cognitiveHubStore.ts` itself is the composition + persistence layer. It is the app's shared agent state — `useAgentSelection` explicitly treats it as the **single source of truth** for agent list/selection state.
 
 ## State Shape
 
-Copied verbatim from the source. The combined store state is `CognitiveHubState`, which extends the four slice interfaces.
+Copied verbatim from the source. The combined store state is `CognitiveHubState`, which extends the three slice interfaces.
 
 ### Combined state (`CognitiveHubState`)
 
@@ -28,7 +28,6 @@ Copied verbatim from the source. The combined store state is `CognitiveHubState`
 interface CognitiveHubState
   extends AgentSlice,
     StreamSlice,
-    ProviderHealthSlice,
     SyncQueueSlice {
   // ─────────────────────────────────────────────────────────────
   // User Preferences (kept here — tightly coupled to persist config)
@@ -135,21 +134,6 @@ export interface StreamSlice {
 }
 ```
 
-### `ProviderHealthSlice` (from `providerHealthStore.ts`)
-
-```typescript
-export interface ProviderHealthSlice {
-  /** Health status per provider */
-  providerHealth: Record<string, ProviderHealthStatus>
-
-  /** Currently active provider (from activeAgent) */
-  activeProvider: string | null
-
-  /** Update provider health map */
-  setProviderHealth: (health: Record<string, ProviderHealthStatus>) => void
-}
-```
-
 ### `SyncQueueSlice` (from `syncQueueStore.ts`)
 
 ```typescript
@@ -179,8 +163,6 @@ export interface SyncQueueSlice {
 ```typescript
 export type PersistenceScope = 'local' | 'session' | 'none'
 
-export type ProviderHealthStatus = 'up' | 'degraded' | 'down'
-
 export interface PendingMessage {
   id: string
   sessionId: string
@@ -204,7 +186,7 @@ Exact signatures, grouped by slice.
 - `setAgents: (agents: Agent[]) => void`
 - `setLoadingAgents: (loading: boolean) => void`
 - `setAgentError: (error: string | null) => void`
-- `setActiveAgent: (agent: Agent | null) => void` — also sets `activeProvider: agent?.provider || null`
+- `setActiveAgent: (agent: Agent | null) => void` — sets `activeAgent`
 - `setActiveSession: (session: ConversationSession | null) => void`
 - `setSessions: (sessions: ConversationSession[]) => void` — replaces entire list
 - `upsertSession: (session: ConversationSession) => void` — prepends / replaces by id
@@ -222,9 +204,6 @@ Exact signatures, grouped by slice.
 **Stream slice** (`streamStore.ts`):
 - `setIsStreaming: (streaming: boolean, sessionId?: string) => void`
 
-**Provider health slice** (`providerHealthStore.ts`):
-- `setProviderHealth: (health: Record<string, ProviderHealthStatus>) => void`
-
 **Sync queue slice** (`syncQueueStore.ts`):
 - `addToPendingQueue: (sessionId: string, message: ConversationMessage) => void`
 - `removeFromPendingQueue: (messageId: string) => void`
@@ -238,8 +217,8 @@ Exact signatures, grouped by slice.
 
 - `useCognitiveHubStore` — the store hook, `create<CognitiveHubState>()(devtools(persist(...)))`. No standalone selector functions; consumers use inline selectors: `useCognitiveHubStore((state) => state.activeAgent)`, and `useCognitiveHubStore.getState()` for imperative access.
 - `export default useCognitiveHubStore` — default export alias.
-- Type re-exports: `PersistenceScope`, `ProviderHealthStatus`, `PendingMessage` from `./types` (backward-compat re-exports).
-- Slice creators (`createAgentSlice`, `createStreamSlice`, `createProviderHealthSlice`, `createSyncQueueSlice`) are imported from sibling files; the combined store spreads them.
+- Type re-exports: `PersistenceScope`, `PendingMessage` from `./types` (backward-compat re-exports).
+- Slice creators (`createAgentSlice`, `createStreamSlice`, `createSyncQueueSlice`) are imported from sibling files; the combined store spreads them.
 
 ## Dependencies
 
@@ -249,9 +228,8 @@ Exact signatures, grouped by slice.
 | `zustand/middleware` (`devtools`, `persist`, `PersistStorage`) | npm | Redux-DevTools integration + state persistence |
 | `./agentStore` (`createAgentSlice`, `AgentSlice`) | local slice | Agents, active agent, sessions, session lifecycle |
 | `./streamStore` (`createStreamSlice`, `StreamSlice`) | local slice | Streaming status flags |
-| `./providerHealthStore` (`createProviderHealthSlice`, `ProviderHealthSlice`) | local slice | Provider health map + active provider |
 | `./syncQueueStore` (`createSyncQueueSlice`, `SyncQueueSlice`) | local slice | Offline sync queue |
-| `./types` (`PersistenceScope`, `ProviderHealthStatus`, `PendingMessage`) | local types | Shared store types |
+| `./types` (`PersistenceScope`, `PendingMessage`) | local types | Shared store types |
 
 ## Usage Example
 
@@ -284,7 +262,7 @@ function AgentSwitcher() {
 
 ## Data Flow / Notes
 
-- **Singleton**: module-level store, not mounted in the React tree — survives navigation. `CognitiveHubProvider` mounts once at app root (a plain component, NOT a context provider; "the Zustand store is the source of truth") to run boot hydration, provider-health polling, and the offline retry processor.
+- **Singleton**: module-level store, not mounted in the React tree — survives navigation. `CognitiveHubProvider` mounts once at app root (a plain component, NOT a context provider; "the Zustand store is the source of truth") to run boot hydration and the offline retry processor.
 - **Persistence**: wrapped in `persist` middleware under storage key `cogitate-hub-storage`. `partialize` persists `agents`, `activeAgentId` (`activeAgent?.id ?? null` — only the ID, not the full object, to avoid stale data), `activeSessionId`, `activeSession`, `persistenceScope`, and `sessions`.
 - **Scoped storage**: custom `createScopedStorage()` routes get/set/remove to `localStorage`, `sessionStorage`, or nowhere based on `persistenceScope` (`'local' | 'session' | 'none'`). `onRehydrateStorage` re-applies the persisted scope and logs a rehydration summary (agent/session counts, active agent name).
 - **Restore flow** — there is no single `restore` action in the store; restore is distributed:
@@ -309,7 +287,7 @@ Consumers (18 files in `frontend/src` import `useCognitiveHubStore`):
 
 ## Deprecation / Obsolete Notes
 
-- No `@deprecated`, `legacy`, "no longer used", or `unused` markers in `cognitiveHubStore.ts` or any of the four slice files (grep-verified).
+- No `@deprecated`, `legacy`, "no longer used", or `unused` markers in `cognitiveHubStore.ts` or any of the three slice files (grep-verified).
 - `hydrateFromPersistedIds()` is an intentional no-op placeholder (docstring: "This will be implemented in Phase 3 with CognitiveHubProvider") — not deprecated, but non-functional; real restore is handled by the persist middleware plus provider/hook logic documented above.
 - The header doc comment's reference to `docs/hub/PHASED-IMPLEMENTATION-PLAN.md` is stale (plan now lives under `_archive/docs/2026-04-11-hub-consolidation/`).
 - The store is actively consumed by 18 files in `frontend/src` — in active use, not obsolete.
