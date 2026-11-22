@@ -131,8 +131,8 @@ describe('CuratedModelsManager', () => {
       expect(screen.getByText('NVIDIA: Nemotron 3 Super')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByText('+ Add Model'))
-    expect(screen.getByText('Add Curated Model')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('+ Recommend a Model'))
+    expect(screen.getByText('Recommend a Model')).toBeInTheDocument()
 
     fireEvent.change(screen.getByPlaceholderText('e.g. nvidia/nemotron-3-super-120b-a12b:free'), {
       target: { value: 'ollama/llama3.3' },
@@ -140,7 +140,7 @@ describe('CuratedModelsManager', () => {
     fireEvent.change(screen.getByPlaceholderText('e.g. NVIDIA: Nemotron 3 Super'), {
       target: { value: 'Llama 3.3' },
     })
-    fireEvent.click(screen.getByText('Add Model'))
+    fireEvent.click(screen.getByText('Add Recommendation'))
 
     await waitFor(() => {
       expect(addCuratedModel).toHaveBeenCalledWith(
@@ -160,7 +160,7 @@ describe('CuratedModelsManager', () => {
 
     // CREATE: the category select opens on "not described" — a form that PRE-SELECTED a value
     // was the defect this replaced, so nothing is sent and the row stores nothing.
-    fireEvent.click(screen.getByText('+ Add Model'))
+    fireEvent.click(screen.getByText('+ Recommend a Model'))
     expect((screen.getByLabelText('Category') as HTMLSelectElement).value).toBe('')
     fireEvent.change(screen.getByPlaceholderText('e.g. nvidia/nemotron-3-super-120b-a12b:free'), {
       target: { value: 'ollama/llama3.3' },
@@ -168,7 +168,7 @@ describe('CuratedModelsManager', () => {
     fireEvent.change(screen.getByPlaceholderText('e.g. NVIDIA: Nemotron 3 Super'), {
       target: { value: 'Llama 3.3' },
     })
-    fireEvent.click(screen.getByText('Add Model'))
+    fireEvent.click(screen.getByText('Add Recommendation'))
     await waitFor(() => {
       const sent = vi.mocked(addCuratedModel).mock.calls[0][0] as Record<string, unknown>
       expect(sent.category).toBeUndefined()
@@ -249,7 +249,7 @@ describe('CuratedModelsManager', () => {
       expect(screen.getByText('NVIDIA: Nemotron 3 Super')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByText('+ Add Model'))
+    fireEvent.click(screen.getByText('+ Recommend a Model'))
 
     const thinking = screen.getByLabelText('Thinking') as HTMLSelectElement
     expect([...thinking.options].map(o => o.value)).toEqual([
@@ -270,7 +270,7 @@ describe('CuratedModelsManager', () => {
     })
     fireEvent.change(thinking, { target: { value: 'mandatory' } })
     fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'local' } })
-    fireEvent.click(screen.getByText('Add Model'))
+    fireEvent.click(screen.getByText('Add Recommendation'))
 
     await waitFor(() => {
       expect(addCuratedModel).toHaveBeenCalledWith(
@@ -291,14 +291,14 @@ describe('CuratedModelsManager', () => {
       expect(screen.getByText('NVIDIA: Nemotron 3 Super')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByText('+ Add Model'))
+    fireEvent.click(screen.getByText('+ Recommend a Model'))
     fireEvent.change(screen.getByPlaceholderText('e.g. nvidia/nemotron-3-super-120b-a12b:free'), {
       target: { value: 'ollama/llama3.3' },
     })
     fireEvent.change(screen.getByPlaceholderText('e.g. NVIDIA: Nemotron 3 Super'), {
       target: { value: 'Llama 3.3' },
     })
-    fireEvent.click(screen.getByText('Add Model'))
+    fireEvent.click(screen.getByText('Add Recommendation'))
 
     await waitFor(() => expect(addCuratedModel).toHaveBeenCalled())
     const payload = vi.mocked(addCuratedModel).mock.calls[0][0] as unknown as Record<string, unknown>
@@ -556,7 +556,7 @@ describe('CuratedModelsManager', () => {
 
   it('refuses to invent a provider on an install that has none', async () => {
     // Measured on a from-zero install (2026-11-21): this list fabricated four providers with
-    // `openrouter` first and pre-filled it in the form, so the first "Add Model" posted a curated
+    // `openrouter` first and pre-filled it in the form, so the first "Add" posted a curated
     // model for a provider that did not exist — `400 Provider not found: openrouter`.
     vi.mocked(fetchCuratedModels).mockResolvedValue([] as never)
     render(<CuratedModelsManager providers={[]} loading={false} />)
@@ -564,6 +564,6 @@ describe('CuratedModelsManager', () => {
     await waitFor(() => {
       expect(screen.getByText(/No provider on this install yet/)).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: /Add Model/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Recommend a Model/ })).toBeDisabled()
   })
 })

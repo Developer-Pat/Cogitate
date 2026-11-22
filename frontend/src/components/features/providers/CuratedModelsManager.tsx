@@ -359,20 +359,20 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
         <div>
           <h3 className="text-lg font-semibold text-base-content">Curated Models</h3>
           <p className="text-sm text-readout mt-0.5">
-            Human-owned recommendations shown in agent setup. The DB is the source of truth
-            (config seed is fallback only).
+            Suggestions shown in agent setup — not this install's chat model. The chat model is
+            chosen on Setup → Default Model; a row here only recommends a provider's model.
           </p>
         </div>
         <span className="tooltip tooltip-left" data-tip={providersList.length === 0
           ? 'A curated model is a recommendation about a provider — add a provider first'
-          : 'Add a model to the human-owned recommendation list'}>
+          : "Add a model to the recommendation list — it suggests, it does not set the app's chat model"}>
           <button
             type="button"
             onClick={() => openAdd()}
             disabled={providersList.length === 0}
             className="btn btn-primary btn-sm rounded-[var(--button-radius)] px-[var(--button-padding)] transition-all duration-[var(--button-transition)]"
           >
-            + Add Model
+            + Recommend a Model
           </button>
         </span>
       </div>
@@ -580,7 +580,7 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50"
           role="dialog"
-          aria-label={editing ? `Edit ${editing.name}` : 'Add Curated Model'}
+          aria-label={editing ? `Edit ${editing.name}` : 'Recommend a Model'}
           onClick={() => { if (!saving) setShowAddModal(false) }}
         >
           <div
@@ -589,7 +589,7 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
             onClick={e => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-base-content mb-4">
-              {editing ? `Edit ${editing.name}` : 'Add Curated Model'}
+              {editing ? `Edit ${editing.name}` : 'Recommend a Model'}
             </h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -745,7 +745,7 @@ export default function CuratedModelsManager({ providers }: CuratedModelsManager
                 disabled={saving}
                 className="btn btn-primary btn-sm rounded-[var(--button-radius)] px-[var(--button-padding)]"
               >
-                {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add Model'}
+                {saving ? 'Saving...' : editing ? 'Save Changes' : 'Add Recommendation'}
               </button>
             </div>
           </div>

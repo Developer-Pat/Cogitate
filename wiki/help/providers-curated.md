@@ -11,7 +11,9 @@ tags: [domain/help]
 # Curated Models
 
 The curated model list is a **human-owned set of models** shown
-when configuring an agent (ProfileDetail). It is separate from provider
+when configuring an agent (ProfileDetail). It is **not this install's
+chat model**: that is chosen on **Setup → Default Model**, and a row here
+only recommends a provider's model. The list is separate from provider
 model discovery:
 
 - **Discovery** (`/providers/{id}/models/browse`) — machine-owned: live
@@ -22,10 +24,11 @@ model discovery:
 
 ## Managing the list (this tab)
 
-- **Add** — click "+ Add Model", pick provider (+ a category if you want
+- **Recommend** — click "+ Recommend a Model", pick provider (+ a category if you want
   one), enter the model ID exactly as the provider knows it (e.g.
   `nvidia/nemotron-3-super-120b-a12b:free`), a display name, and an
-  optional description / context length. The **cost is not asked for**: it
+  optional description / context length. This adds a suggestion; it does
+  not set the chat model. The **cost is not asked for**: it
   is read from the provider's own catalog as the row is created (see Cost).
 - **Copy** — the clipboard icon copies the model ID exactly as the provider
   spells it. The ID column clips long ids; this takes the whole one, which is
