@@ -622,14 +622,76 @@ cmd_status() {
     echo ""
 }
 
+# ── RELEASE ──────────────────────────────────────────────────────────────────
+# cmd_release — THE ARTIFACT A PERSON DOWNLOADS INSTEAD OF CLONING (2026-11-22).
+#
+# `git archive` is the right tool here, not a shortcut: it emits only TRACKED files, so `.env`,
+# `data/`, `local/`, `todo/`, `node_modules/`, `.venv/` and every test artifact are excluded BY
+# CONSTRUCTION rather than by an ignore-list that drifts out of date. The prefix makes the tarball
+# unpack into its own directory, and `./cogitate.sh install` then skips git entirely (no `.git` in
+# the tree), which is the whole point of shipping this way.
+#
+# The commit must be clean: a release that cannot be rebuilt from a commit is not a release.
+# ────────────────────────────────────────────────────────────────────────────
+cmd_release() {
+    cd "$SCRIPT_DIR" || return 1
+
+    command -v git >/dev/null 2>&1 || {
+        log_error "release builds from tracked files, so it needs git on THIS machine (users do not)."
+        return 1
+    }
+    git rev-parse --git-dir >/dev/null 2>&1 || {
+        log_error "not a git repository — there is nothing to release from here."
+        return 1
+    }
+
+    local dirty
+    dirty="$(git status --porcelain | wc -l | tr -d ' ')"
+    if [ "$dirty" != "0" ]; then
+        git status --short | head -5
+        log_error "${dirty} uncommitted file(s) — commit or stash first, so the artifact matches a commit."
+        return 1
+    fi
+
+    local version slug sha bytes entries
+    version="$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' pyproject.toml | head -1)"
+    if [ -z "$version" ]; then
+        log_error "could not read the version from pyproject.toml"
+        return 1
+    fi
+    slug="cogitate-${version}"
+    sha="$(git rev-parse --short HEAD)"
+
+    mkdir -p dist
+    rm -f "dist/${slug}.tar.gz" "dist/${slug}.tar.gz.sha256"
+
+    log_info "Archiving tracked files at ${sha}…"
+    if ! git archive --format=tar.gz --prefix="${slug}/" -o "dist/${slug}.tar.gz" HEAD; then
+        log_error "git archive failed"
+        return 1
+    fi
+    ( cd dist && sha256sum "${slug}.tar.gz" > "${slug}.tar.gz.sha256" )
+
+    bytes="$(du -h "dist/${slug}.tar.gz" | cut -f1)"
+    entries="$(tar tzf "dist/${slug}.tar.gz" | wc -l | tr -d ' ')"
+    log_success "dist/${slug}.tar.gz — ${bytes}, ${entries} entries, commit ${sha}"
+    log_info "sha256: $(cut -d' ' -f1 "dist/${slug}.tar.gz.sha256")"
+    echo ""
+    echo "  What a user does with it — no clone, no key, no git:"
+    echo "    tar xzf ${slug}.tar.gz && cd ${slug}"
+    echo "    ./cogitate.sh install"
+    echo "    ./cogitate.sh start"
+    echo ""
+    echo "  Verify the download first:"
+    echo "    sha256sum -c ${slug}.tar.gz.sha256"
+    echo ""
+    return 0
+}
+
 # ── VERIFY ───────────────────────────────────────────────────────────────────
 # The acceptance check: ONE readiness read of the RUNNING backend, quoted by the
 # install page and the agent skill. It prints `remaining` — the single number a
 # stranger is told — and exits non-zero when something is still unmet.
-#
-# It lives in a script (scripts/core/verify_readiness.py) rather than in this
-# file so the Python-side measurement, the JSON payload and the exit codes are
-# testable on their own; this is only the door.
 cmd_verify() {
     local py="$SCRIPT_DIR/.venv/bin/python"
 
@@ -753,6 +815,13 @@ install_preflight() {
 }
 
 install_git() {
+    # GIT IS A CLONE DEPENDENCY, NOT AN INSTALL DEPENDENCY (2026-11-22). A release tarball carries the
+    # source without a repository, so a box that only runs the app needs no git at all — and demanding
+    # it turned a two-minute install into an apt round-trip for nothing.
+    if [ ! -d "$SCRIPT_DIR/.git" ]; then
+        log_success "git not needed (release copy — no repository to update from)"
+        return 0
+    fi
     if install_have git; then
         log_success "git present ($(git --version | awk '{print $3}'))"
         return 0
@@ -909,9 +978,9 @@ cmd_install() {
     echo "║                📦 Installing Cogitate                    ║"
     echo "╚══════════════════════════════════════════════════════════╝"
     echo ""
-    echo "  git and Node.js ${NODE_MAJOR_MIN} install system-wide via apt (it may ask for"
-    echo "  your password). uv and Python 3.14 go to ~/.local. The project's own"
-    echo "  dependencies go into .venv and frontend/node_modules. Nothing is started."
+    echo "  Node.js ${NODE_MAJOR_MIN} installs system-wide via apt (it may ask for your password)."
+    echo "  uv and Python 3.14 go to ~/.local. The project's own dependencies go into"
+    echo "  .venv and frontend/node_modules. Nothing is started."
     echo ""
 
     # uv lives in ~/.local/bin. A fresh interactive shell has it on PATH via
@@ -973,6 +1042,7 @@ cmd_help() {
     echo "  mode      - Switch the frontend: development | production"
     echo "  status    - Show service status and health"
     echo "  verify    - Check the install can actually answer (one readiness verdict)"
+    echo "  release   - Build dist/cogitate-<version>.tar.gz — the artifact a user downloads"
     echo "  logs      - Show recent logs from all services"
     echo "  help      - Show this help message"
     echo ""
@@ -1030,6 +1100,9 @@ main() {
             ;;
         verify)
             cmd_verify "${@:2}"
+            ;;
+        release)
+            cmd_release
             ;;
         logs)
             cmd_logs
