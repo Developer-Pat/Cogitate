@@ -250,6 +250,12 @@ describe('ProviderCapabilities (the read-out)', () => {
     expect(screen.getByText(/No agent — each capability’s own chain/)).toBeTruthy()
     expect(getCapabilities).toHaveBeenCalledWith(null)
 
+    // THE OPTION MUST EXIST FIRST (2026-11-22). The picker renders with the page; its options come
+    // from the agent roster read, which settles LATER. Firing a change into a select that has no
+    // `56` option leaves its value '' — the page then reads with `null` and this test failed under
+    // full-suite load with no behavioural cause (passed 19/19 alone). Wait for the option.
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Lois' })).toBeTruthy())
+
     // picking an agent re-reads THROUGH the agent rung, with the BACKEND id
     fireEvent.change(picker, { target: { value: '56' } })
     await waitFor(() => expect(getCapabilities).toHaveBeenCalledWith(56))

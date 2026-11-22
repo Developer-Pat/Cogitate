@@ -19,7 +19,7 @@ interface UseDefaultProviderReturn {
   loading: boolean;
   error: string | null;
   refreshDefaultProvider: () => Promise<void>;
-  setDefaultProvider: (providerId: number) => Promise<boolean>;
+  setDefaultProvider: (providerId: number, model?: string) => Promise<boolean>;
   initializeDefaultProvider: () => Promise<boolean>;
 }
 
@@ -60,12 +60,13 @@ export const useDefaultProvider = (): UseDefaultProviderReturn => {
   /**
    * Set a provider as the default
    */
-  const handleSetDefaultProvider = useCallback(async (providerId: number): Promise<boolean> => {
+  const handleSetDefaultProvider = useCallback(
+    async (providerId: number, model?: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await defaultProviderService.setDefaultProvider(providerId);
+      const response = await defaultProviderService.setDefaultProvider(providerId, model);
       if (response.data) {
         setDefaultProvider(response.data);
         return true;

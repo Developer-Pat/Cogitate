@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import SetupDefaultModel from '../components/features/setup/SetupDefaultModel'
 import { AlertTriangle, CheckCircle2, CircleDashed, Hourglass, XCircle } from 'lucide-react'
 import ProviderKeyManager from '../components/features/providers/ProviderKeyManager'
 import ExpressSetup from '../components/features/setup/ExpressSetup'
@@ -213,27 +214,9 @@ export default function SetupPage() {
       {/* API Keys — reuse the Keys tab */}
       {activeTab === 'keys' && <ProviderKeyManager />}
 
-      {/* Default Model */}
-      {activeTab === 'model' && (
-        <div className="bg-base-200 rounded-lg border border-base-300 p-5 space-y-3">
-          <h3 className="font-semibold text-base-content">Default Model</h3>
-          <p className="text-sm text-readout">
-            Pick the provider and model used as the system default — chat, title, summary,
-            workflow and memory all take it from there. Manage it fully on the{' '}
-            <Link to="/provider-dashboard" className="link link-primary">
-              Provider Dashboard
-            </Link>
-            .
-          </p>
-          <Link
-            to="/provider-dashboard"
-            className="btn btn-primary btn-sm rounded-[var(--button-radius)]"
-            data-tip="Opens the Provider Dashboard, where the default provider and model are set"
-          >
-            Choose Default Model
-          </Link>
-        </div>
-      )}
+      {/* Default Model — the ACT, not a signpost (ruled 2026-11-22, option 2): this used to send the
+          reader to the cloud-providers page's Default tab, which no longer exists. */}
+      {activeTab === 'model' && <SetupDefaultModel onApplied={() => void load()} />}
 
       {/* Agent */}
       {activeTab === 'agent' && (

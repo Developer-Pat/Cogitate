@@ -72,3 +72,47 @@ describe('DefaultProviderConfig — an install with no default yet', () => {
     expect(await screen.findByText('No models available')).toBeInTheDocument()
   })
 })
+
+// THE STORED VALUE MUST SURVIVE (2026-11-22). An install's default model can be a string its
+// provider's catalogue no longer lists — measured on this box: `deepseek-v4-flash` stored, the
+// provider listing `deepseek-flash`. A select with no matching option renders BLANK, so the first
+// Save would silently replace a working model string with whatever the reader picked next.
+describe('DefaultProviderConfig — a stored model the catalogue does not list', () => {
+  const onProviderChange = vi.fn()
+  const onModelChange = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
+      if (url === '/api/v1/providers/managed') {
+        return {
+          data: {
+            providers: [
+              { id: 7, name: 'deepseek', provider_type: 'deepseek', is_active: true, is_default: true },
+            ],
+          },
+        } as never
+      }
+      if (url === '/api/v1/providers/managed/7/models') {
+        return { data: { models: [{ name: 'deepseek-flash', display_name: 'Deepseek Flash' }] } } as never
+      }
+      return { data: { models: [] } } as never
+    })
+  })
+
+  it('offers the stored model as an option, marked current', async () => {
+    render(
+      <DefaultProviderConfig
+        currentProviderId={7}
+        currentProviderName="deepseek"
+        currentModel="deepseek-v4-flash"
+        onProviderChange={onProviderChange}
+        onModelChange={onModelChange}
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /deepseek-v4-flash \(current\)/ })).toBeTruthy()
+    })
+  })
+})

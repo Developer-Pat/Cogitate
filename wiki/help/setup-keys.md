@@ -47,6 +47,7 @@ A key alone does not make the app answer: the next step is the **default model**
 
 ## Related
 
+- [Provider API Keys](/wiki/help/providers-keys) — where a key comes from, and rotate/clear
 - [Setup — Default Model](/wiki/help/setup-model) — the next step
 - [Setup — Overview](/wiki/help/setup-overview) — the verdict these steps move
 - [Provider Reference & Quirks](/wiki/help/providers-reference) — per-provider behaviour

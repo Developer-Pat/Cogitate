@@ -19,7 +19,7 @@ import type { ApiResponse } from '@/types';
  */
 export interface IDefaultProviderService {
   getDefaultProvider(): Promise<ApiResponse<DefaultProviderResponse>>;
-  setDefaultProvider(providerId: number): Promise<ApiResponse<DefaultProviderResponse>>;
+  setDefaultProvider(providerId: number, model?: string): Promise<ApiResponse<DefaultProviderResponse>>;
   initializeDefaultProvider(): Promise<ApiResponse<InitializeDefaultProviderResponse>>;
 }
 
@@ -55,10 +55,15 @@ class DefaultProviderService implements IDefaultProviderService {
   /**
    * Set a provider as the system default
    */
-  async setDefaultProvider(providerId: number): Promise<ApiResponse<DefaultProviderResponse>> {
+  async setDefaultProvider(
+    providerId: number,
+    model?: string
+  ): Promise<ApiResponse<DefaultProviderResponse>> {
     frontendLoggingService.info('DefaultProviderService', `Setting provider ${providerId} as default`);
     try {
-      const request: SetDefaultProviderRequest = { provider_id: providerId };
+      const request: SetDefaultProviderRequest = model
+        ? { provider_id: providerId, model }
+        : { provider_id: providerId };
       const response = await apiClient.put<DefaultProviderResponse>(
         `${this.basePath}/default`,
         request

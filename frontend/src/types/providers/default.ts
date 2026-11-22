@@ -21,6 +21,8 @@ export interface DefaultProviderResponse {
  */
 export interface SetDefaultProviderRequest {
   provider_id: number;
+  /** Optional: `PUT /providers/default` writes it to the row's `config.default_model`. */
+  model?: string;
 }
 
 /**

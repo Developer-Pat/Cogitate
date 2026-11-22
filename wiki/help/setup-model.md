@@ -16,9 +16,11 @@ summaries, workflows and memory all inherit it, so setting it once is the whole 
 
 ## Set it
 
-Open the **Provider Dashboard** and choose the default provider and model. The curated list (marked
-✓ verified) is the human-reviewed shortlist, and a good place to start; any provider with a working
-key shows its own catalog.
+Choose the provider and the model **on this tab**, then press **Save Default Model** — until you do, the
+readout says the selection is not saved yet. The list is that provider's own catalogue; if the install's
+stored model is not in it, it is still offered and marked *(current)*, so a save cannot silently replace a
+working model string. The curated list (marked ✓ verified) is the human-reviewed shortlist and a good place
+to start — see **Curated Models**.
 
 **Setting the default seeds the agents.** Bob and Lois arrive as soon as a chat model resolves —
 immediately, without a restart. On an install where nothing answers chat yet, they wait: the seed
@@ -38,6 +40,7 @@ model nobody chose.
 
 ## Related
 
+- [Default Provider](/wiki/help/providers-default) — what reads this value, and what ignores it
 - [Setup — API Keys](/wiki/help/setup-keys) — the step before this one
 - [Setup — Agents](/wiki/help/setup-agent) — what arrives once a model resolves
 - [Setup — Overview](/wiki/help/setup-overview) — the verdict these steps move

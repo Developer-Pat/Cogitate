@@ -184,7 +184,7 @@ export const DefaultProviderConfig: React.FC<DefaultProviderConfigProps> = ({
           </select>
         ) : models.length === 0 ? (
           <select className="select select-bordered w-full" disabled>
-            <option value="">No models available</option>
+            <option value={currentModel}>{currentModel || 'No models available'}</option>
           </select>
         ) : (
           <div className="space-y-2">
@@ -201,6 +201,14 @@ export const DefaultProviderConfig: React.FC<DefaultProviderConfigProps> = ({
               onChange={handleModelChange}
             >
               <option value="">Select a model...</option>
+              {/* THE STORED VALUE MUST BE AN OPTION. An install's default can be a model its
+                  provider's catalogue no longer lists (measured: `deepseek-v4-flash` against a list
+                  carrying `deepseek-flash`), and a select with no matching option renders BLANK — so
+                  the first Save would silently replace a working model string with whatever the
+                  reader then picked. Always offer the current value, and say it is current. */}
+              {currentModel && !models.some((m) => m.name === currentModel) && (
+                <option value={currentModel}>{currentModel} (current)</option>
+              )}
               {models
                 .filter((model) => {
                   const q = modelSearch.trim().toLowerCase()

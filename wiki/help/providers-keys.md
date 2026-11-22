@@ -5,38 +5,41 @@ subtopic: Provider Keys
 order: 1
 confidence: high
 created: 2026-08-03
+updated: 2026-11-22
 tags: [domain/help]
 ---
 
 # Provider API Keys
 
-The Keys tab shows where each provider gets its API key and lets you
-store, rotate, or clear keys — one place for all providers.
+A cloud provider needs a key before it can serve anything. Two doors write the SAME store — **Setup → API
+Keys** (`/setup?tab=keys`) for the install's first key, and a **provider row's Edit form** on Cloud Providers
+for any provider afterwards — and both write the project's `.env`, the app's single secrets store.
 
 ## Key sources
 
 | Badge | Meaning |
 |---|---|
-| **Env (.env)** | Key comes from the `.env` file (gitignored) — the default for most providers |
-| **Stored (DB)** | Key is encrypted at rest on the provider row (Fernet) and takes precedence over .env |
-| **None** | No key — local providers (Ollama) need none |
+| **Env (.env)** | The key is in `.env` — what both doors write |
+| **Stored (DB)** | Legacy: an older DB-encrypted value still exists and still answers; clear it to go fully `.env` |
+| **None** | No key. A local model server needs none. |
 
 ## Actions
 
-- **Set Key** — store a new key for a provider that currently uses
-  .env or has none. It is encrypted at rest; after storing, the source
-  badge flips to Stored (DB).
-- **Rotate** — replace an existing stored key.
-- **Clear** — remove the stored key; the provider falls back to .env
-  if one is configured there. Local providers have no clear button
-  (they need no key).
+- **Set Key** — store a key for a provider. It writes `.env` and applies immediately: no restart.
+- **Rotate** — replace an existing key.
+- **Clear** — remove the key from `.env` (a legacy DB value is what Clear removes first); the provider
+  then falls back to none. Local providers have no clear button — they need no key.
 
 ## Tips
 
-- Keys are never shown back to you — the UI only shows their source.
-  The Show/Hide toggle in the entry form lets you verify what you
-  typed.
-- Storing a key for a provider that currently uses .env makes the
-  stored key take precedence. Clear it to go back to .env.
-- The Ollama Cloud provider requires a Bearer key from
-  https://ollama.com/settings/keys.
+- Keys are never shown back to you — the UI shows their source only. The Show/Hide toggle in the entry
+  form lets you verify what you typed.
+- **groq** may return `403 Access denied` behind a VPN; turn the VPN off and retry.
+- **ollama_cloud** needs a Bearer key from https://ollama.com/settings/keys; the free tier works without
+  a top-up.
+
+## Related
+
+- [Setup — API Keys](/wiki/help/setup-keys) — the setup step that uses this store first
+- [Default Provider](/wiki/help/providers-default) — the model a key makes usable
+- [Provider Reference & Quirks](/wiki/help/providers-reference) — per-provider behaviour
