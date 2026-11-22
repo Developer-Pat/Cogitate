@@ -59,6 +59,6 @@ so you don't have to rediscover it.
 
 ## Key storage note
 Provider API keys live either in the **DB (encrypted at rest, via the
-Keys tab)** or in the **.env file (gitignored)**. The Keys tab shows
+API Keys tab on Setup)** or in the **.env file (gitignored)**. That tab shows
 which source each provider uses. A DB-stored key takes precedence over
 the .env key.

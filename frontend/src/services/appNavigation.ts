@@ -109,7 +109,7 @@ const ALIASES: Array<{ match: string[]; to: string; label: string }> = [
   // (The bare word `configuration` went with the mock page in the token-limit
   // arc's A.4 — it now REFUSES rather than pointing at a page that is gone.)
   { match: ['keys', 'api key', 'api keys', 'the keys'],
-    to: '/provider-dashboard', label: 'Provider Dashboard — the Keys tab' },
+    to: '/setup?tab=keys', label: 'Setup — the API Keys tab' },
   { match: ['models', 'the models'],
     to: '/providers/cloud', label: 'Providers — Cloud' },
   // THE OTHER SIDE OF A DUAL NAME (2026-09-18). `messages` and `message center`

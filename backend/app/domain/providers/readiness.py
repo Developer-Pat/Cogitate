@@ -193,8 +193,8 @@ async def _chat_item(db: AsyncSession) -> ReadinessItem:
         label="Chat model",
         state=UNMET,
         detail=(
-            "Nothing answers chat yet. Set a default provider and model on the Provider "
-            "Dashboard — every other LLM capability inherits it."
+            "Nothing answers chat yet. Pick a provider and model on the Setup page's Default "
+            "Model tab — every other LLM capability inherits it."
         ),
         href=HREF_MODEL,
     )

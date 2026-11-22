@@ -33,8 +33,8 @@ its model list. The dialog reports:
 
 - **Connected** — the provider answered; the message names it and the dialog
   shows the **latency** in milliseconds and how many **models** it serves.
-- **Not configured** — no API key for that provider yet. Fix it under Edit or in
-  the Keys tab.
+- **Not configured** — no API key for that provider yet. Fix it under Edit, or on
+  **Setup → API Keys**.
 - **Unreachable** / **Failed** — the request did not complete; the message says
   what came back, and it is the provider's answer, not a guess.
 

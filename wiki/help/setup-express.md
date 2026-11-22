@@ -76,7 +76,7 @@ it for what was actually done.
 
 ## Choosing your own
 
-**or choose your own model** on the same tab leads to the Provider Dashboard's Default tab, where any
+**or choose your own model** on the Setup page leads to its **Default Model** tab, where any
 provider and model on this install can be picked. A terminal has the same shortlist:
 
 ```bash

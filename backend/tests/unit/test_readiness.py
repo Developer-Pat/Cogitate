@@ -111,3 +111,22 @@ async def test_a_dialable_provider_and_a_chat_model_turn_both_items_ok(test_sess
         "the model answers and no agents exist — the message must say to restart, not wait"
     )
     assert report.remaining == 1
+
+
+async def test_a_doors_copy_names_the_surface_its_href_opens(test_session):
+    """The sentence must name the page the button opens, not a page it used to be.
+
+    Measured on the v0.1.1 release run: the chat item's href had moved to `/setup?tab=model`
+    while its copy still said "on the Provider Dashboard" — a page whose Default tab the same
+    ruling deleted. The href test stayed green; the copy sent a stranger to a door that is gone.
+    """
+    await _bare(test_session)
+    report = await readiness.measure(test_session)
+
+    for item in report.items:
+        if item.href.startswith("/setup"):
+            assert "Setup" in item.detail, (
+                f"{item.key}: the button opens {item.href}, but the copy never names the Setup "
+                "page — a detail that names a retired surface is product copy, rendered verbatim"
+            )
+    assert "Default Model" in _item(report, "chat").detail

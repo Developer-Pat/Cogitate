@@ -1,5 +1,5 @@
 /**
- * ProviderKeyManager — Keys tab for the Provider Dashboard.
+ * ProviderKeyManager — the API Keys tab of the Setup page.
  *
  * Phase 4 (mini-map item 8): single place to see/set/rotate/clear
  * provider API keys. Key source is surfaced per provider:
