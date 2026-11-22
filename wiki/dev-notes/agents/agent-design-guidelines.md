@@ -111,7 +111,7 @@ failing would be the bug.
 
 | What | Value | Where |
 |---|---|---|
-| The input budget | 16000, lowered by the window — **not** the model's window | `token_budget.DEFAULT_INPUT_BUDGET` |
+| The input budget | 100000 by default (`INPUT_TOKEN_BUDGET` in `.env` sets it), lowered by the window — **not** the model's window | `token_budget.DEFAULT_INPUT_BUDGET` |
 | The fast profile's budget | 512 | `output_budget.FAST_POLICY_BUDGET` |
 | The deep pass's minimum | 4096 | `output_budget.DEEP_MIN_BUDGET` |
 | Undeclared fallback | 4096 | `output_budget.FALLBACK_BUDGET` |

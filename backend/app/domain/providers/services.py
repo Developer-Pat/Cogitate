@@ -14,6 +14,10 @@ from cryptography.fernet import InvalidToken as FernetInvalidToken
 
 logger = logging.getLogger(__name__)
 
+#: Models whose missing price has already been reported, so the line is said ONCE per model
+#: rather than on every call (2026-11-21 — a state repeated per call reads as a fault).
+_PRICING_GAPS_REPORTED: set[str] = set()
+
 #: The key file, relative to the installation's data dir. ONE key per install,
 #: generated on first use — see `EncryptionService._load_or_create_key`.
 KEY_FILE_NAME = ".encryption_key"
@@ -226,11 +230,19 @@ class ProviderService:
             # defined in the wiki (`dev-notes/deep-dives/token-limit-policy`,
             # *Appendix — the gate's decisions*), so the comment keeps the pointer
             # and the message keeps the words.
-            logger.warning(
-                "calculate_cost: no pricing for model=%s — treating as $0; "
-                "cost limit inactive (pricing unverified)",
-                lookup_model,
-            )
+            # SAID ONCE PER MODEL (2026-11-21, the user's ruling): DeepSeek prices vary by model and
+            # by time of day, so this is a KNOWN state, not a fault — and a line repeated on every
+            # call reads as a fault. The first sight of a model without pricing says it in full;
+            # every later call drops to debug.
+            if lookup_model not in _PRICING_GAPS_REPORTED:
+                _PRICING_GAPS_REPORTED.add(lookup_model)
+                logger.warning(
+                    "calculate_cost: no pricing for model=%s — treating as $0; "
+                    "cost limit inactive (pricing unverified)",
+                    lookup_model,
+                )
+            else:
+                logger.debug("calculate_cost: still no pricing for model=%s", lookup_model)
             pricing = {"prompt": 0.0, "completion": 0.0}
         
         # Calculate cost

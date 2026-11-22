@@ -162,19 +162,32 @@ def describe_needs(pick: SetupPick) -> tuple[str, str]:
     """`(state, detail)` where state is `ready` | `needs-key` | `unavailable`.
 
     Applicability is COMPUTED, never assumed — the same discipline the readiness verdict follows.
+
+    THE DETAIL IS END-USER COPY (2026-11-21, the user's read of the first draft: "looks more like
+    developer stuff than end user material"). The env var name, the file it lands in and the
+    install it was measured on are facts for the tooltip and the log, not sentences a stranger
+    should have to read to install an app.
     """
     if pick.needs_kind == "none":
-        return "ready", "Nothing to supply."
+        return "ready", "Nothing needed."
     if pick.needs_kind == "key":
         env = _env_snapshot()
         name = pick.needs_env or ""
         if env.get(name):
-            return "ready", f"{name} is set."
-        where = f" — get one at {pick.needs_url}" if pick.needs_url else ""
-        return "needs-key", f"Paste a {name}{where}. It is stored in this install's .env."
+            return "ready", "Its key is already set."
+        where = f" — get one from {_pretty_url(pick.needs_url)}" if pick.needs_url else ""
+        return "needs-key", f"Add your {pick.provider_name} key to use this model{where}."
     # `local` picks are not shipped yet: a local model is whatever the box happens to run, and it
     # is chosen on the Providers page (the user's call, 2026-11-21).
-    return "unavailable", "Local models are chosen on the Providers page once the box is configured."
+    return "unavailable", "Local models are chosen on the Providers page once the app is set up."
+
+
+def _pretty_url(url: Optional[str]) -> str:
+    """`https://platform.deepseek.com/api_keys` → `platform.deepseek.com` — a host a person reads."""
+    if not url:
+        return ""
+    without_scheme = url.split("://", 1)[-1]
+    return without_scheme.split("/", 1)[0]
 
 
 async def list_picks(db: AsyncSession) -> list[dict[str, Any]]:

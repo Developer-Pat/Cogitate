@@ -109,19 +109,19 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
       <div className="bg-base-200 rounded-lg border border-base-300 p-5 space-y-4">
         <div>
           <label className="block text-sm font-medium text-label mb-2" htmlFor="express-pick">
-            What should answer here?
+            Model
           </label>
           <select
             id="express-pick"
             value={selected}
             onChange={(e) => { setSelected(e.target.value); setResult(null); setFailed(null); setApiKey('') }}
             disabled={applying}
-            data-tip="A model we have picked and tested — you can change it later"
+            data-tip="One model answers chat, titles, summaries, workflows and Exa — you can change it later"
             className="tooltip tooltip-bottom select select-bordered w-full"
           >
             {picks.map((p) => (
               <option key={p.key} value={p.key}>
-                {p.label} · {p.provider_name}/{p.model_id} ({p.tier})
+                {p.label}
               </option>
             ))}
           </select>
@@ -130,16 +130,17 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
         {pick && (
           <div className="space-y-2 text-sm">
             {pick.why && <p className="text-base-content">{pick.why}</p>}
-            <p className="text-readout">
-              <span className="font-medium">{pick.provider_name}</span> ·{' '}
-              <code className="font-mono text-xs bg-base-300 px-1 rounded">{pick.model_id}</code>
-            </p>
             <p className={pick.state === 'ready' ? 'text-success' : 'text-warning'}>{pick.detail}</p>
-            <p className="text-xs text-readout">
-              {pick.verified_on
-                ? `Verified ${pick.verified_on}${pick.verified_how ? ` — ${pick.verified_how}` : ''}`
-                : `Not yet driven end to end${pick.verified_how ? ` — ${pick.verified_how}` : ''}. You can still use it.`}
-            </p>
+            {/* The provenance is a tooltip, not a sentence: a person installing an app does not
+                need the install it was measured on, but the claim still has to be checkable. */}
+            <span
+              className={`tooltip tooltip-top badge badge-sm ${
+                pick.verified_on ? 'badge-success badge-outline' : 'badge-ghost'
+              }`}
+              data-tip={pick.verified_how || 'No test recorded for this model yet.'}
+            >
+              {pick.verified_on ? `Tested ${pick.verified_on}` : 'Not yet fully tested'}
+            </span>
           </div>
         )}
 
@@ -147,7 +148,7 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
           <div className="form-control">
             <label className="label py-0">
               <span className="label-text font-semibold">
-                {pick.needs_env}
+                Your {pick.provider_name} key
                 {pick.needs_url && (
                   <>
                     {' '}
@@ -157,6 +158,7 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
                       target="_blank"
                       rel="noreferrer"
                       className="link link-primary"
+                      data-tip="Opens the provider's key page in a new tab"
                     >
                       get one here
                     </a>
@@ -171,7 +173,8 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
                 onChange={(e) => setApiKey(e.target.value)}
                 disabled={applying}
                 placeholder="paste the key"
-                aria-label={`${pick.needs_env} value`}
+                aria-label={pick.needs_env ? `${pick.needs_env} value` : 'provider key'}
+                data-tip={pick.needs_env || undefined}
                 className="input input-bordered input-sm flex-1 font-mono"
               />
               <button
@@ -185,7 +188,7 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
               </button>
             </div>
             <p className="text-xs text-readout mt-1">
-              Stored in this install&apos;s .env (gitignored) — never written to the database.
+              Stored on this machine only.
             </p>
           </div>
         )}
@@ -214,8 +217,8 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
               'Use this model'
             )}
           </button>
-          <a href="/providers/cloud?tab=default" className="link link-primary text-sm">
-            or configure a provider and model yourself
+          <a href="/providers/cloud?tab=default" className="link link-primary text-sm" data-tip="Choose any provider and model yourself, without the shortlist">
+            or choose your own model
           </a>
         </div>
 

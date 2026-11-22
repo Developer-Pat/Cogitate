@@ -98,6 +98,22 @@ def schemas_tokens(tools: Optional[Sequence[Any]]) -> int:
         return 0
 
 
+def default_input_budget() -> int:
+    """The ceiling in force: `.env`'s `INPUT_TOKEN_BUDGET`, else `DEFAULT_INPUT_BUDGET`.
+
+    One number a human sets per install, never a per-model system (2026-11-21): an install running
+    a small local model puts `INPUT_TOKEN_BUDGET=16384` in `.env` and everything else is unchanged.
+    A Settings read that fails (a bare script, a test) falls back to the constant.
+    """
+    try:
+        from app.core.config import get_settings
+
+        configured = int(getattr(get_settings(), "input_token_budget", 0) or 0)
+    except Exception:
+        configured = 0
+    return configured if configured > 0 else DEFAULT_INPUT_BUDGET
+
+
 def input_budget_for(
     window: Optional[int] = None,
     reserved_output: Optional[int] = None,
@@ -121,7 +137,7 @@ def input_budget_for(
     An unknown window (``None``) leaves the constant alone — §2.4: an unknown
     window must not clamp blindly.
     """
-    ceiling = DEFAULT_INPUT_BUDGET
+    ceiling = default_input_budget()
     if window is None:
         return ceiling
     try:

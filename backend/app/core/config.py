@@ -280,6 +280,16 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # THE INPUT CEILING — one knob, not a per-model system (2026-11-21).
+    #
+    # `token_budget.DEFAULT_INPUT_BUDGET` is the policy number the prompt assembly may fill; the
+    # MODEL's own window can only LOWER it. Sizing per model was ruled out as "a per model config
+    # and a moving target at that", so the ceiling is a human's single number instead: an install
+    # running a small local model sets `INPUT_TOKEN_BUDGET=16384` in `.env` and nothing else
+    # changes. 100000 is the default because every model the express shortlist ships answers a
+    # 1M-token window, and 16K was dropping history that had room to stay.
+    input_token_budget: int = 100_000
+
     # THE STARTUP SYSTEM-SWEEP (2026-09-12) — OPT-IN, OFF BY DEFAULT.
     # The sweep itself is deterministic: no LLM, no agent call (the
     # system-audit graph's nodes are plain functions and the Exa

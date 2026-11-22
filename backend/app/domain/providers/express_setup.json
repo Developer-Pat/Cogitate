@@ -12,9 +12,9 @@
       "needs_kind": "key",
       "needs_env": "DEEPSEEK_API_KEY",
       "needs_url": "https://platform.deepseek.com/api_keys",
-      "why": "The best all-round model tested on this project so far: strong writing, fast, long context, cheap. It is what this install ships expecting.",
+      "why": "The best all-round model we have tested: strong writing, fast, long context, inexpensive. It is the one this app expects.",
       "verified_on": "2026-11-21",
-      "verified_how": "Listed by the provider's own API and accepted as the default on a fresh install (mint-cogitate-test), with Bob and Lois seeded from it. No chat turn was driven on that install yet.",
+      "verified_how": "Was listed by DeepSeek's own API and accepted as the default on a fresh install, with both reporters seeded from it. No chat turn had been driven on that install when this was written.",
       "sort_order": 10
     },
     {
@@ -27,9 +27,9 @@
       "needs_kind": "key",
       "needs_env": "OPENROUTER_API_KEY",
       "needs_url": "https://openrouter.ai/keys",
-      "why": "The same family as the DeepSeek pick, through OpenRouter — one key also opens every other model that service carries, so this is the pick for anyone who wants to try others later.",
+      "why": "The same family as the DeepSeek model, through OpenRouter — one key also opens every other model that service offers, if you want to try them later.",
       "verified_on": null,
-      "verified_how": "Listed and priced in the install's own curated list; not yet driven end to end here.",
+      "verified_how": "Appears in the app's own curated model list with its price and context length. Not yet driven end to end.",
       "sort_order": 20
     },
     {
@@ -42,9 +42,9 @@
       "needs_kind": "key",
       "needs_env": "OPENROUTER_API_KEY",
       "needs_url": "https://openrouter.ai/keys",
-      "why": "The long-context workhorse: 1M context at about $0.03/M in. A sound second choice behind a DeepSeek key.",
+      "why": "The long-context workhorse: 1M tokens of context at about three cents a million. A sound second choice.",
       "verified_on": null,
-      "verified_how": "Listed and priced in the install's own curated list; not yet driven end to end here.",
+      "verified_how": "Appears in the app's own curated model list with its price and context length. Not yet driven end to end.",
       "sort_order": 30
     },
     {
@@ -57,9 +57,9 @@
       "needs_kind": "key",
       "needs_env": "OPENROUTER_API_KEY",
       "needs_url": "https://openrouter.ai/keys",
-      "why": "OpenAI's open 120B through OpenRouter — cheap, capable, a different family to fall back on if the DeepSeek line ever lets you down.",
+      "why": "OpenAI's open 120B — inexpensive and capable, and a different family to fall back on if DeepSeek ever lets you down.",
       "verified_on": null,
-      "verified_how": "Listed and priced in the install's own curated list; not yet driven end to end here.",
+      "verified_how": "Appears in the app's own curated model list with its price and context length. Not yet driven end to end.",
       "sort_order": 40
     },
     {
@@ -72,9 +72,9 @@
       "needs_kind": "key",
       "needs_env": "OLLAMA_CLOUD_API_KEY",
       "needs_url": "https://ollama.com/settings/keys",
-      "why": "A large reasoning model on a keyed service, for anyone already using Ollama Cloud. The free usage tier is metered, so treat it as a stopgap rather than the plan.",
+      "why": "A large reasoning model on a keyed service, for anyone already using Ollama Cloud. Its free usage is metered, so treat it as a stopgap.",
       "verified_on": null,
-      "verified_how": "Listed in the install's own curated list; not yet driven end to end here.",
+      "verified_how": "Appears in the app's own curated model list. Not yet driven end to end.",
       "sort_order": 50
     }
   ]
