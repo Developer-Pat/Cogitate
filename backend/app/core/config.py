@@ -272,7 +272,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "Cogitate"
-    app_version: str = "0.1.0"
+    app_version: str = "0.1.1"
     debug: bool = True
     environment: str = "development"  # development, staging, production
 

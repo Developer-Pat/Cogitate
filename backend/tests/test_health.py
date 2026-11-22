@@ -4,8 +4,31 @@ The root, health and comprehensive endpoints answer with the expected status.
 Tests for basic and comprehensive health check endpoints.
 """
 
+import re
+
 import pytest
 from httpx import AsyncClient
+
+from app.core.config import Paths, Settings, get_settings
+
+_ROOT_PYPROJECT = Paths.root / "pyproject.toml"
+
+
+def _declared_version() -> str:
+    match = re.search(r'^version\s*=\s*"([^"]+)"', _ROOT_PYPROJECT.read_text(), re.M)
+    assert match, f"no version line in {_ROOT_PYPROJECT}"
+    return match.group(1)
+
+
+def test_declared_version_matches_settings_default() -> None:
+    """A version bump moves `pyproject.toml` and the Settings DEFAULT together.
+
+    The endpoint reports the CONFIGURED version, and `.env` holds the number its
+    install was created with — so a box that installed before a bump keeps
+    answering the old one, and a literal here would fail every such box. The
+    packaged default is the fact no `.env` can shadow.
+    """
+    assert Settings.model_fields["app_version"].default == _declared_version()
 
 
 @pytest.mark.anyio
@@ -16,7 +39,7 @@ async def test_root_endpoint(client: AsyncClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Cogitate"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == get_settings().app_version
     assert data["status"] == "running"
 
 
