@@ -21,7 +21,9 @@ deliberately leaves to you and the honest limits of a local installation.
 
 Debian, Ubuntu or Mint, with `sudo` and `curl`. That is the whole list — `./cogitate.sh install` brings
 git, Node.js 20 and `uv`, and `uv` brings its own Python 3.14 (the project pins 3.14; distro releases
-still ship 3.12).
+still ship 3.12). The one exception is the **clone** path below: a clone runs the install from the tree
+it just made, so `git` has to be there first — it is the only thing the install cannot supply for that
+route.
 
 ## 1. Install
 

@@ -42,6 +42,9 @@ Two facts that decide how you work here:
    ```
 
    Debian, Ubuntu or Mint with `curl` and `sudo` is the whole requirement. Anything else: stop and report.
+   The clone route is the one exception: a clone runs the install from the tree it just made, so `git`
+   must already be present — check `command -v git` before choosing it, because the install cannot
+   supply git to the step that needs it.
 
 2. **Get the code.** The release copy is the shipped path — no git, no key, no account once the files are
    on the box:

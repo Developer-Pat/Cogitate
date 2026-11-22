@@ -428,8 +428,9 @@ def _check_keys(home: Path) -> ActivationCheck:
     if available:
         fix = (
             f"{_operator_env_path()} already has {', '.join(sorted(available))} — carry it across "
-            f"with `scripts/core/activate_exa.py --apply --carry-operator-env`, or paste the key on "
-            f"the Exa page's Keys tab. A key entered into Hermes elsewhere does not count on its own."
+            f"with `scripts/core/activate_exa.py --apply --carry-operator-env`, or paste it on "
+            f"Setup → API Keys, which writes the project's .env that provisioning copies. A key "
+            f"entered into Hermes elsewhere does not count on its own."
         )
     return ActivationCheck(
         "keys",
@@ -472,8 +473,9 @@ def pre_turn_refusal(cfg: ExternalAgentConfig, home: Path | None = None) -> str 
     if not usable:
         return (
             f"Exa's model {model['model']} via {model['provider']} cannot be called: {why}. "
-            "Add the provider key on the Exa page's Keys tab (or run `activate_exa.py --apply`), "
-            "then send again."
+            "Add the provider key on Setup → API Keys — that is the .env provisioning copies from — "
+            "or run `activate_exa.py --apply --carry-operator-env` for a key already in your own "
+            "Hermes home, then send again."
         )
     return None
 

@@ -293,7 +293,10 @@ def test_the_guard_refuses_a_model_without_its_key(tmp_path):
     )
     assert why is not None
     assert "ANTHROPIC_API_KEY" in why
-    assert "Keys tab" in why
+    assert "Setup → API Keys" in why, (
+        "the refusal names the door that writes the .env provisioning copies from — the Exa "
+        "pages have no Keys tab, and the sentence used to send the reader to one"
+    )
 
 
 def test_the_guard_passes_a_local_model_with_no_key(tmp_path):

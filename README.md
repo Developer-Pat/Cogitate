@@ -120,8 +120,10 @@ cd cogitate-0.1.1
 #    API Docs:    http://localhost:8000/docs
 ```
 
-Working on the code instead? A clone works the same way — `git clone` then steps 2–4; `install` only
-wants git when the tree is a repository, and only to keep it updatable.
+Working on the code instead? A clone works the same way — `git clone` then steps 2–4, with one
+difference: the clone needs `git` on the machine BEFORE it, and that is the one thing the install cannot
+supply for that route. `install` only consults git when the tree is a repository, and only to keep it
+updatable.
 
 `install` is idempotent — a second run reports what is already present and does only what is missing. It
 writes `.env` from `.env.example` (never overwriting an existing one), builds `.venv` and
