@@ -52,14 +52,13 @@ Two facts that decide how you work here:
    ```bash
    # cogitate-0.1.3.tar.gz and its .sha256, from
    # https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.3
-   # (the repository is private today, so that page needs access to it)
    sha256sum -c cogitate-0.1.3.tar.gz.sha256
    tar xzf cogitate-0.1.3.tar.gz && cd cogitate-0.1.3
    ```
 
-   Working on the code instead: `git clone https://github.com/Developer-Pat/Cogitate.git && cd Cogitate`.
-   If the clone is refused for auth, the repository is not public yet — report that, and never substitute
-   a mirror.
+   Working on the code instead: `git clone https://github.com/Developer-Pat/Cogitate.git && cd Cogitate`
+   — remember that this route needs `git` on the box before it. If the clone fails, report the error; never
+   substitute a mirror.
 
 3. **Install.** `./cogitate.sh install`. It installs git if absent, uv, Node 20, creates `.env` from
    `.env.example` (never overwriting one), runs `uv sync` and `npm ci`, then proves the result (interpreter
