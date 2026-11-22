@@ -99,9 +99,11 @@ travels with the build tool rather than with your package manager.
 ## Quick Start
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/Developer-Pat/Cogitate.git
-cd Cogitate
+# 1. Get the code — the release artifact needs no git, no key, no account
+#    (the file is published with a .sha256; check it first)
+sha256sum -c cogitate-0.1.0.tar.gz.sha256
+tar xzf cogitate-0.1.0.tar.gz
+cd cogitate-0.1.0
 
 # 2. Install the toolchain and the project's dependencies
 ./cogitate.sh install
@@ -114,6 +116,9 @@ cd Cogitate
 #    Backend API: http://localhost:8000/api/v1
 #    API Docs:    http://localhost:8000/docs
 ```
+
+Working on the code instead? A clone works the same way — `git clone` then steps 2–4; `install` only
+wants git when the tree is a repository, and only to keep it updatable.
 
 `install` is idempotent — a second run reports what is already present and does only what is missing. It
 writes `.env` from `.env.example` (never overwriting an existing one), builds `.venv` and

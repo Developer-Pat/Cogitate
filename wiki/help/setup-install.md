@@ -26,16 +26,22 @@ still ship 3.12).
 ## 1. Install
 
 ```bash
-git clone https://github.com/Developer-Pat/Cogitate.git
-cd Cogitate
+# A release copy: no git, no key, no account. Check the download, then unpack it.
+sha256sum -c cogitate-0.1.0.tar.gz.sha256
+tar xzf cogitate-0.1.0.tar.gz && cd cogitate-0.1.0
+
 ./cogitate.sh install
 ```
+
+A **clone** works identically — `git clone <repo> && cd Cogitate` — and is the path for working on the
+code rather than running it. `install` treats git as a clone dependency: it is checked and installed
+only when the directory is a repository, and skipped with `git not needed (release copy)` otherwise.
 
 What it touches, in the order it does it:
 
 | Step | What happens |
 |---|---|
-| git | `apt`, only when missing |
+| git | `apt`, only when the tree is a clone and git is missing — never for a release copy |
 | uv | astral's installer, into `~/.local/bin` |
 | Node 20 | NodeSource's apt repo — the distro's nodejs is 18, and Node is a **runtime** dependency: both frontend modes run through `npx vite` |
 | `.env` | copied from `.env.example`, never overwriting an existing one. No keys are set |
