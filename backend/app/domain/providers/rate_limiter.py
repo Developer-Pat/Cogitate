@@ -378,6 +378,17 @@ class ProviderHealthMonitor:
             self._unhealthy_providers.add(provider)
             logger.warning(f"⚠️ Provider {provider} marked unhealthy")
 
+    def observed(self) -> list[str]:
+        """The providers an OUTCOME has been recorded for — the only ones this monitor can speak about.
+
+        A name never seen here is `unknown`, and reporting it as healthy is the default-green lie: the
+        API used to iterate the STATIC supported-provider registry, so a fresh install listed openai
+        and anthropic as `healthy` with no row, no key and no call ever made. Keep the circuit breaker's
+        own semantics (`is_healthy` answers True for an unseen name, because that means "allow the
+        attempt") separate from what can be REPORTED.
+        """
+        return sorted(set(self._failure_counts) | set(self._last_failure_time) | self._unhealthy_providers)
+
     def is_healthy(self, provider: str) -> bool:
         """
         Check if provider is healthy.

@@ -16,11 +16,6 @@ import type { ConversationMessage } from '../types/agentInteraction'
 export type PersistenceScope = 'local' | 'session' | 'none'
 
 /**
- * Provider health status
- */
-export type ProviderHealthStatus = 'up' | 'degraded' | 'down'
-
-/**
  * Pending message for offline sync queue
  */
 export interface PendingMessage {

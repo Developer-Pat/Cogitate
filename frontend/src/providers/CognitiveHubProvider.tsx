@@ -18,7 +18,6 @@ import { IdService } from '../services/domain/IdService'
 
 import { frontendLoggingService } from '../services/frontendLoggingService'
 import type { Agent, ConversationSession } from '../types/agentInteraction'
-import type { ProviderHealthStatus } from '../stores/types'
 import type { components } from '../types/api.generated'
 
 interface CognitiveHubProviderProps {
@@ -221,39 +220,6 @@ export function CognitiveHubProvider({ children }: CognitiveHubProviderProps) {
     }
 
     hydrate()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  /**
-   * Poll provider health on mount and every 30 seconds
-   */
-  useEffect(() => {
-    const pollProviderHealth = async () => {
-      try {
-        // Try to get provider health from backend
-        // This endpoint may not exist yet, so we'll handle errors gracefully
-        const response = await apiClient.get('/api/v1/providers/health')
-
-        if (response.data) {
-          hubStore.setProviderHealth(response.data as Record<string, ProviderHealthStatus>)
-        }
-      } catch {
-        // Endpoint doesn't exist yet, set default health
-        hubStore.setProviderHealth({
-          ollama: 'up',
-          openai: 'up',
-          anthropic: 'up',
-        })
-      }
-    }
-
-    // Poll immediately
-    pollProviderHealth()
-
-    // Then poll every 30 seconds
-    const interval = setInterval(pollProviderHealth, 30000)
-
-    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

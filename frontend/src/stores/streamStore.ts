@@ -9,7 +9,6 @@
 
 import { type StateCreator } from 'zustand'
 import type { AgentSlice } from './agentStore'
-import type { ProviderHealthSlice } from './providerHealthStore'
 import type { SyncQueueSlice } from './syncQueueStore'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,7 +29,7 @@ export interface StreamSlice {
 /**
  * Combined store type used for cross-slice access.
  */
-type CombinedState = AgentSlice & StreamSlice & ProviderHealthSlice & SyncQueueSlice
+type CombinedState = AgentSlice & StreamSlice & SyncQueueSlice
 
 /**
  * Creates the stream slice of the Cognitive Hub store.

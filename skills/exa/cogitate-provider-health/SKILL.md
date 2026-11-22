@@ -15,11 +15,17 @@ details that orientation said to discover and document.
 
 ## The core discipline: tracked state ≠ liveness (verified 2026-09-08)
 
-- `GET /api/v1/providers/health` is a TRACKED registry. It defaults
-  to `healthy:true` (even for UNCONFIGURED providers) and NEVER
-  records failures — verified twice: a failed live test AND a failed
-  real agent run both left the provider at `healthy:true,
-  failure_count:0`. Never cite it as liveness evidence.
+- `GET /api/v1/providers/health` is a TRACKED registry of CALL
+  OUTCOMES, and it now says only what it measured (2026-11-22): a
+  provider appears ONLY after `POST /providers/complete` records an
+  outcome for it, so on a normal install — where the app never calls
+  that endpoint — the payload is `{"providers": {}, ...}`. An entry
+  with `healthy:false` means `failure_threshold` consecutive failures
+  were recorded in THIS backend process; the state is in memory and
+  resets with the backend. **An absent provider is `unknown`, never
+  `up`** — and never cite the payload as liveness evidence. Measured
+  before the change: a failed live test AND a failed real agent run
+  both left the provider at `healthy:true, failure_count:0`.
 - Agent-level health (each row of `GET /api/v1/agents`:
   `health{status, consecutive_failures, last_error, ...}`) has the
   SAME default-green pattern — a real failed agent run left the agent
@@ -172,7 +178,8 @@ noise), `down` (silent and ownerless). `running` = the serving
 daemons; `loaded_models` = what occupies VRAM now. This is the
 authoritative local-state surface (the occupancy UI + the swap
 flow both read it); the tracked `/providers/health` registry is
-NOT — same default-green caveat as ever.
+NOT — it is empty until `POST /providers/complete` records an
+outcome, which the app never does.
 
 **The probe-URL pitfall (verified 2026-09-09, live):** the service
 probes `base_url + path` with a /v1 dedupe, because managed local
@@ -209,7 +216,9 @@ logs an error, the reply is simply blank.
 
 ## Pitfalls
 
-- Reading `/providers/health` (or agent `health`) as liveness.
+- Reading `/providers/health` (or agent `health`) as liveness — and
+  the newer shape of the same mistake: reading its EMPTY payload as
+  "no providers configured". Empty means nothing was measured.
 - Trusting the catalog for what providers exist.
 - Restarting ollama to "fix" it (deliberately down).
 - Trusting an occupancy/health "down" without curling the exact

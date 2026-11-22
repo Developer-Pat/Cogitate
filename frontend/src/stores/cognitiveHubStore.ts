@@ -25,7 +25,6 @@ import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 
 import { createAgentSlice, type AgentSlice } from './agentStore'
 import { createStreamSlice, type StreamSlice } from './streamStore'
-import { createProviderHealthSlice, type ProviderHealthSlice } from './providerHealthStore'
 import { createSyncQueueSlice, type SyncQueueSlice } from './syncQueueStore'
 import type { PersistenceScope } from './types'
 
@@ -36,7 +35,6 @@ import type { PersistenceScope } from './types'
 interface CognitiveHubState
   extends AgentSlice,
     StreamSlice,
-    ProviderHealthSlice,
     SyncQueueSlice {
   // ─────────────────────────────────────────────────────────────
   // User Preferences (kept here — tightly coupled to persist config)
@@ -136,7 +134,6 @@ export const useCognitiveHubStore = create<CognitiveHubState>()(
         // Compose sub-store slices
         ...createAgentSlice(set, get, store),
         ...createStreamSlice(set, get, store),
-        ...createProviderHealthSlice(set, get, store),
         ...createSyncQueueSlice(set, get, store),
 
         // ─────────────────────────────────────────────────────────────
@@ -228,7 +225,7 @@ export const useCognitiveHubStore = create<CognitiveHubState>()(
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Re-export types used by consumers
-export type { PersistenceScope, ProviderHealthStatus, PendingMessage } from './types'
+export type { PersistenceScope, PendingMessage } from './types'
 
 // Default export for convenience
 export default useCognitiveHubStore

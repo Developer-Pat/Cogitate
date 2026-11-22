@@ -575,13 +575,13 @@ export function useAgentInteraction(): UseAgentInteractionReturn {
     // traceService.trace('ChatFlow', 'handleSendMessage', { contentLength: content.length })
 
 
-    const state = useCognitiveHubStore.getState()
-    const providerStatus = state.activeProvider ? state.providerHealth[state.activeProvider] : 'up'
-
-    if (providerStatus === 'down') {
-      throw new Error(`Provider ${state.activeProvider} is currently unavailable`)
-    }
-
+    // The pre-turn refusal is the SERVER's (`domain.providers.refusal.refusal_statement`, read in
+    // chat/router.py before the pipeline starts) because it reads the availability memo the app
+    // already keeps and knows whether a fallback can run. The browser used to re-decide it from a
+    // health map that was never a map — the poll stored `{providers, timestamp}` under a flat cast,
+    // so every lookup was `undefined`, and a failed poll replaced it with a fabricated all-'up'
+    // default. This gate could therefore never fire, and would have refused on a different fact
+    // than the backend if it had. (2026-11-22)
     const freshState = useCognitiveHubStore.getState()
     const freshSession = freshState.activeSession
 

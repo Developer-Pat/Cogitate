@@ -58,12 +58,15 @@ the raw httpx clients `openrouter_client` / `deepseek_client` /
 ## Health: tracked registry vs LIVE probe (the headline finding)
 
 - `GET /api/v1/providers/health` → per-name tracked registry
-  `{healthy, failure_count, last_failure, rate_limit}` — includes
-  entries for UNCONFIGURED providers (openai + anthropic show
-  `healthy:true` with no config/key). VERIFIED TWICE: it does NOT
-  record failures — a failed `POST /{id}/test` (ollama unreachable)
-  AND a failed real agent run both left ollama at
-  `healthy:true, failure_count:0`. **Not a liveness source.**
+  `{healthy, failure_count, last_failure, rate_limit}`, listing ONLY
+  the providers `POST /providers/complete` has recorded an outcome
+  for (changed 2026-11-22; it used to iterate the static
+  supported-provider registry and report openai/anthropic
+  `healthy:true` with no config or key). Nothing calling
+  `/providers/complete` ⇒ `{"providers": {}}` — an absent name is
+  UNKNOWN, not up. A failed `POST /{id}/test` and a failed real agent
+  run both leave it untouched (they never pass through that
+  endpoint), so it is **not a liveness source** either way.
 - `POST /api/v1/providers/config/{int_id}/test` (NO body) → the LIVE
   probe: `{status: connected|unreachable|not_configured|error, message,
   latency_ms, models_available, state, checked_at}`. **The trustworthy

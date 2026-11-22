@@ -10,7 +10,6 @@
 import { type StateCreator } from 'zustand'
 import type { AgentSlice } from './agentStore'
 import type { StreamSlice } from './streamStore'
-import type { ProviderHealthSlice } from './providerHealthStore'
 import type { PendingMessage } from './types'
 import type { ConversationMessage } from '../types/agentInteraction'
 
@@ -41,7 +40,7 @@ export interface SyncQueueSlice {
 /**
  * Combined store type used for cross-slice access.
  */
-type CombinedState = AgentSlice & StreamSlice & ProviderHealthSlice & SyncQueueSlice
+type CombinedState = AgentSlice & StreamSlice & SyncQueueSlice
 
 /**
  * Creates the sync queue slice of the Cognitive Hub store.

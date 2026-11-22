@@ -10,7 +10,6 @@
 import { type StateCreator } from 'zustand'
 import type { Agent, ConversationSession, ConversationMessage } from '../types/agentInteraction'
 import { frontendLoggingService } from '../services/frontendLoggingService'
-import type { ProviderHealthSlice } from './providerHealthStore'
 import type { StreamSlice } from './streamStore'
 import type { SyncQueueSlice } from './syncQueueStore'
 
@@ -108,7 +107,7 @@ export interface AgentSlice {
  * Combined store type used for cross-slice access.
  * All slice types combined so that `get()` and `set()` can access the full store.
  */
-type CombinedState = AgentSlice & StreamSlice & ProviderHealthSlice & SyncQueueSlice
+type CombinedState = AgentSlice & StreamSlice & SyncQueueSlice
 
 /**
  * Creates the agent slice of the Cognitive Hub store.
@@ -154,7 +153,6 @@ export const createAgentSlice: StateCreator<
 
     set({
       activeAgent: agent,
-      activeProvider: agent?.provider || null,
     })
   },
 

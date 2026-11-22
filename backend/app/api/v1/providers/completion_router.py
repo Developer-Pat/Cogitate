@@ -173,23 +173,29 @@ async def complete(
 
 @router.get("/health")
 async def get_provider_health():
-    """
-    Get health status for all providers.
+    """Call outcomes for the providers `POST /providers/complete` has actually seen.
 
-    Returns health metrics for each configured provider.
-    """
-    providers = list(provider_factory.SUPPORTED_PROVIDERS.keys())
+    This is a TRACKED record, not a liveness probe, and the distinction is the whole contract:
 
+    - a provider appears only after a completion recorded an outcome, so `healthy: false` means
+      `failure_threshold` consecutive failures were recorded by THIS process (the state is in memory
+      and resets with the backend);
+    - a provider with NO entry has not been checked. That is `unknown` and is deliberately absent
+      rather than reported `healthy`.
+
+    For a live check ask `POST /providers/config/{id}/test`; for the app's own "can this install
+    answer" verdict read `GET /setup/readiness`. **2026-11-22:** this endpoint used to iterate the
+    STATIC `SUPPORTED_PROVIDERS` registry, so a fresh install reported openai and anthropic `healthy`
+    with no row, no key and no call ever made — the default-green row a reader takes as a check.
+    """
     health_status = {}
-    for provider in providers:
-        status = health_monitor.get_status(provider)
-        rate_limit_status = {
-            "can_proceed": rate_limiter.can_proceed(provider),
-            "wait_time": rate_limiter.get_wait_time(provider),
-        }
+    for provider in health_monitor.observed():
         health_status[provider] = {
-            **status,
-            "rate_limit": rate_limit_status,
+            **health_monitor.get_status(provider),
+            "rate_limit": {
+                "can_proceed": rate_limiter.can_proceed(provider),
+                "wait_time": rate_limiter.get_wait_time(provider),
+            },
         }
 
     return {
