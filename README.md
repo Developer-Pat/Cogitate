@@ -12,12 +12,14 @@
   <img src="https://img.shields.io/badge/python-3.14-blue" alt="Python 3.14"/>
   <img src="https://img.shields.io/badge/node-20+-green" alt="Node 20+"/>
   <img src="https://img.shields.io/badge/license-GPLv2-blue" alt="License GPLv2"/>
-  <img src="https://img.shields.io/badge/status-active%20development-brightgreen" alt="Status Active Development"/>
+  <img src="https://img.shields.io/badge/status-extreme%20alpha-red" alt="Status: extreme alpha"/>
 </p>
 
-> 🚀 **Project Status: Active Development**
-> Cogitate is published mid-build. Issues and pull requests are welcome; there is no release schedule and no
-> support promise.
+> ⚠️ **EXTREME ALPHA WARE — experimental, use at your own risk.** Cogitate is published mid-build: it contains
+> known bugs, it can lose work, and it spends real money on model calls. Read
+> [DISCLAIMER.md](DISCLAIMER.md) before you install it.
+>
+> Issues and pull requests are welcome; there is no release schedule and no support promise.
 >
 > * **Want to contribute?** Open an issue — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
