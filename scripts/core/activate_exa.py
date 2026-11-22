@@ -78,6 +78,7 @@ async def _run(args) -> int:
                 base_url=args.base_url,
                 reasoning_effort=args.reasoning,
                 from_default=args.from_default,
+                carry_operator_env=args.carry_operator_env,
             )
         else:
             report = await activation.probe(db, home=home)
@@ -112,6 +113,15 @@ def main() -> int:
         "--reasoning",
         choices=["none", "low", "medium", "high", "max"],
         help="optional reasoning effort for --model",
+    )
+    p.add_argument(
+        "--carry-operator-env",
+        dest="carry_operator_env",
+        action="store_true",
+        help=(
+            "also copy the provider keys (~/.hermes/.env) the operator already configured, "
+            "with the same narrow NAME filter — names are logged, values never are"
+        ),
     )
     p.add_argument("--home", help="inspect/provision this home instead of <project>/.hermes")
     p.add_argument("--json", action="store_true", help="machine-readable output")

@@ -109,6 +109,33 @@ def _home(home: Path | None) -> Path:
     return Path(home) if home is not None else Paths.exa_home
 
 
+def _operator_env_path() -> Path:
+    """The operator's OWN Hermes home `.env` — where `hermes setup` puts a provider key.
+
+    A user who configures Hermes the normal way ends with `DEEPSEEK_API_KEY` in `~/.hermes/.env`,
+    and activation never read it: the copy source is the PROJECT's `.env`, whose every key NAME
+    already exists with an EMPTY value (install writes it from `.env.example`), so the ladder said
+    `keys ✗` and the same key had to be entered a second time (measured on a fresh install,
+    2026-11-22). This is the path — carrying it across stays a decision.
+    """
+    return Path.home() / ".hermes" / ".env"
+
+
+def operator_key_names(home: Path | None = None) -> list[str]:
+    """Provider key NAMES the operator's Hermes home carries — names only, never a value.
+
+    Empty when that home IS the isolated home (a project placed directly under `~`), so the offer
+    can never point a user at the file it is about to write.
+    """
+    path = _operator_env_path()
+    try:
+        if path.parent.resolve() == _home(home).resolve():
+            return []
+    except OSError:  # an unreadable path is not an offer
+        return []
+    return _present_key_names(path.parent)
+
+
 def _env_keys(dst: Path, src: Path) -> list[str]:
     """Copy ONLY the provider-key lines from src into dst; return the NAMES.
 
@@ -156,6 +183,7 @@ def provision_home(
     home: Path | None = None,
     seed_dir: Path | None = None,
     project_env: Path | None = None,
+    carry_operator_env: bool = False,
 ) -> list[str]:
     """Create Exa's isolated home. Idempotent; existing files are preserved.
 
@@ -210,6 +238,19 @@ def provision_home(
         log.append("provider keys written: " + ", ".join(sorted(names)))
     else:
         log.append("no provider keys in .env — add one in Settings, or set them by hand")
+
+    # THE SECOND SOURCE, for a key the user already configured elsewhere: the same narrow filter,
+    # the same NAME-only reporting, and only when the caller asked (never a silent inheritance).
+    if carry_operator_env:
+        carried = _env_keys(target / ".env", _operator_env_path())
+        if carried:
+            log.append(
+                "provider keys carried from the Hermes home: " + ", ".join(sorted(carried))
+            )
+        else:
+            log.append(
+                f"nothing to carry from {_operator_env_path()} — no provider key there either"
+            )
 
     return log
 
@@ -380,12 +421,61 @@ def _check_keys(home: Path) -> ActivationCheck:
     names = _present_key_names(home)
     if names:
         return ActivationCheck("keys", True, "present: " + ", ".join(sorted(names)))
+    # A key the operator already configured in their OWN Hermes home is one command away, and
+    # saying so is the difference between "type it again" and "you already have this" (2026-11-22).
+    available = operator_key_names(home)
+    fix = "Add the provider key to the project's .env and run with --apply."
+    if available:
+        fix = (
+            f"{_operator_env_path()} already has {', '.join(sorted(available))} — carry it across "
+            f"with `scripts/core/activate_exa.py --apply --carry-operator-env`, or paste the key on "
+            f"the Exa page's Keys tab. A key entered into Hermes elsewhere does not count on its own."
+        )
     return ActivationCheck(
         "keys",
         False,
         "no provider key in the isolated home's .env",
-        fix="Add the provider key to the project's .env and run with --apply.",
+        fix=fix,
     )
+
+
+def pre_turn_refusal(cfg: ExternalAgentConfig, home: Path | None = None) -> str | None:
+    """None when a turn can be ATTEMPTED, else the sentence saying why it cannot.
+
+    Three facts make a turn impossible before it starts, and all three are LOCAL reads (the binary
+    on PATH; config.yaml; the isolated home's .env):
+
+    - the runtime is not on PATH;
+    - the home has no model section;
+    - the configured model's provider has no credential **and is not a loopback endpoint**.
+
+    It exists because the alternative is silence: on a fresh install a turn sat in its streaming
+    state for six minutes while the runtime did a first-run install and then had no key to call,
+    with the 900-second turn timer as the only thing that would ever have said so (measured
+    2026-11-22). A refusal is one frame, names the fix, and costs nothing to compute.
+
+    Deliberately NOT a verdict about whether the provider will answer — a present key can still be
+    wrong. This refuses only what cannot possibly work.
+    """
+    blocked = probe_runnable(cfg)
+    if blocked:
+        return f"Exa cannot answer: {blocked}"
+
+    resolved_home = _home(home)
+    model = read_model_config(resolved_home)
+    if not (model.get("model") and model.get("provider")):
+        return (
+            "Exa has no model configured, so this turn cannot run. Take this install's chat model "
+            "on the Exa page (or run `activate_exa.py --from-default --apply`), then send again."
+        )
+    usable, why = _model_usable(resolved_home, model["provider"], model.get("base_url"))
+    if not usable:
+        return (
+            f"Exa's model {model['model']} via {model['provider']} cannot be called: {why}. "
+            "Add the provider key on the Exa page's Keys tab (or run `activate_exa.py --apply`), "
+            "then send again."
+        )
+    return None
 
 
 def _check_decision(cfg: ExternalAgentConfig) -> ActivationCheck:
@@ -459,6 +549,7 @@ async def apply(
     base_url: str | None = None,
     reasoning_effort: str | None = None,
     from_default: bool = False,
+    carry_operator_env: bool = False,
 ) -> tuple[ActivationReport, list[str]]:
     """Provision the home, optionally set the brain, and take the decision.
 
@@ -470,7 +561,12 @@ async def apply(
     Returns the post-apply report and the provisioning log. The DECISION is
     taken last, so a half-provisioned home is never left switched on.
     """
-    log = provision_home(home=home, seed_dir=seed_dir, project_env=project_env)
+    log = provision_home(
+        home=home,
+        seed_dir=seed_dir,
+        project_env=project_env,
+        carry_operator_env=carry_operator_env,
+    )
     if from_default and not (model and provider):
         offer = await chat_offer(db)
         if offer is None:

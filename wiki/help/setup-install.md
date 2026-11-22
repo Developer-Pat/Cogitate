@@ -125,13 +125,22 @@ it:
 uv run python scripts/core/activate_exa.py                    # report: runtime, home, model, keys, decision
 uv run python scripts/core/activate_exa.py --apply             # provision the home and activate
 uv run python scripts/core/activate_exa.py --apply --from-default  # ...and take this install's chat model
+uv run python scripts/core/activate_exa.py --apply --carry-operator-env  # ...and copy the key you already have
 ```
 
-The runtime is the one thing the CLI will not install for you: Exa runs on the Hermes agent runtime, and if
-`hermes` is not on `PATH` the report hands you the installer command. Provisioning creates Exa's own home
-and its skills, and carries the provider keys across — it never chooses a **model**: that is a decision,
-taken by `--from-default`/`--model` here or by one press on the Exa page, which offers this install's chat
-model. A home that already has a model keeps it.
+The report reads five things — the runtime on `PATH`, the home, the model (**and whether that model can
+answer**: a model whose provider has no key reads `usable: no`), the keys, and the decision. The runtime is
+the one thing the CLI will not install for you: Exa runs on the Hermes agent runtime, and if `hermes` is not
+on `PATH` the report names the `PATH` it searched and the installer command.
+
+Provisioning creates Exa's own home and its skills, and carries the provider keys across — it never chooses
+a **model**: that is a decision, taken by `--from-default`/`--model` here or by one press on the Exa page,
+which offers this install's chat model. A home that already has a model keeps it.
+
+Keys come from the project's `.env`. A key you configured the usual way — in your own `~/.hermes/.env` —
+is not read silently: the report names it, and `--carry-operator-env` copies it with the same narrow filter
+(names only ever logged). A turn sent before any of this is refused at once with the reason, instead of
+waiting for the turn timer.
 
 ## 5. What ships: the news desk
 

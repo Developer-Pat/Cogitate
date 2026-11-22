@@ -3,7 +3,7 @@ title: Script Catalog
 type: atlas-docs
 path: wiki/docs/script-catalog.md
 confidence: medium
-updated: 2026-11-21
+updated: 2026-11-22
 tags: [type/docs, domain/docs]
 ---
 

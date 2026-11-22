@@ -62,6 +62,15 @@ def _patch(monkeypatch, client: AcpClient):
 
     monkeypatch.setattr("app.api.v1.external_agent_router._db", _fake_db)
 
+    # THE CREDENTIAL GUARD (2026-11-22): the handler refuses a turn whose runtime has no usable
+    # model BEFORE the stream starts, reading the REAL isolated home. These tests are about the
+    # stream's mechanics, and their fixture home has no model, so the guard is neutralised here —
+    # its own facts are pinned in test_exa_activation.py, and one WS-level test below proves the
+    # error frame it emits.
+    monkeypatch.setattr(
+        "app.domain.external_agent.activation.pre_turn_refusal", lambda *a, **k: None
+    )
+
 
 def _wait_for(fn, timeout=5.0, interval=0.05):
     deadline = time.monotonic() + timeout
@@ -193,3 +202,23 @@ def test_ws_prompt_after_cancel_respawns(monkeypatch, runaway_script, tmp_path):
             ev = ws.receive_json()
             assert ev["type"] in ("message", "thought", "tool_call")
             assert _wait_for(lambda: client.connected is True)
+
+
+def test_ws_a_refused_turn_ends_with_an_error_frame_and_no_stream(monkeypatch, runaway_script, tmp_path):
+    """The credential guard is the difference between a named refusal and a silent 900s hang."""
+    client = AcpClient(command=runaway_script, cwd=str(tmp_path))
+    _patch(monkeypatch, client)
+    monkeypatch.setattr(
+        "app.domain.external_agent.activation.pre_turn_refusal",
+        lambda *a, **k: "Exa's model cannot be called: ANTHROPIC_API_KEY is empty (test)",
+    )
+
+    with TestClient(app) as tc:
+        with tc.websocket_connect("/external-agent/ws") as ws:
+            assert _next_status(ws) == "connecting"
+            assert _next_status(ws) == "ready"
+            ws.send_json({"type": "prompt", "text": "go"})
+            frame = ws.receive_json()
+            assert frame["type"] == "status"
+            assert frame["status"] == "error"
+            assert "ANTHROPIC_API_KEY" in frame["message"]

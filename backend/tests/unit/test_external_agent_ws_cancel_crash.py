@@ -87,6 +87,14 @@ def _patch(monkeypatch, client):
     monkeypatch.setattr(rtr, "get_config", _fake_get_config)
     monkeypatch.setattr(rtr, "_db", _fake_db)
 
+    # THE CREDENTIAL GUARD (2026-11-22): the handler refuses a turn whose runtime has no usable
+    # model BEFORE the stream starts, reading the REAL isolated home. These tests are about the
+    # stream's mechanics, so the guard is neutralised here — its facts are pinned in
+    # test_exa_activation.py and one WS-level test proves the error frame it emits.
+    monkeypatch.setattr(
+        "app.domain.external_agent.activation.pre_turn_refusal", lambda *a, **k: None
+    )
+
 
 def _next_status(ws, timeout=12.0):
     """Read WS events until a status arrives."""

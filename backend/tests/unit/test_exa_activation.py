@@ -270,3 +270,101 @@ def test_the_missing_runtime_message_names_the_path_it_searched(monkeypatch):
     assert why is not None
     assert "/nowhere/bin" in why and "/second/bin" in why
     assert "cogitate.sh start" in why
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE PRE-TURN GUARD — a turn that cannot answer says so BEFORE it starts
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_the_guard_refuses_a_home_with_no_model(tmp_path):
+    """Six silent minutes were the alternative (measured on a fresh install, 2026-11-22)."""
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    why = activation.pre_turn_refusal(
+        ExternalAgentConfig(command="python3 acp"), home=home
+    )
+    assert why is not None
+    assert "no model configured" in why
+
+
+def test_the_guard_refuses_a_model_without_its_key(tmp_path):
+    home = _home_with_model(tmp_path, env_lines="ANTHROPIC_API_KEY=\n")
+    why = activation.pre_turn_refusal(
+        ExternalAgentConfig(command="python3 acp"), home=home
+    )
+    assert why is not None
+    assert "ANTHROPIC_API_KEY" in why
+    assert "Keys tab" in why
+
+
+def test_the_guard_passes_a_local_model_with_no_key(tmp_path):
+    """A loopback model needs no credential, so the guard must not block it."""
+    home = _home_with_model(
+        tmp_path, model="qwen", provider="llama", base_url="http://127.0.0.1:8080/v1"
+    )
+    assert activation.pre_turn_refusal(
+        ExternalAgentConfig(command="python3 acp"), home=home
+    ) is None
+
+
+def test_the_guard_names_a_missing_runtime_first(monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", "/nowhere/bin")
+    why = activation.pre_turn_refusal(
+        ExternalAgentConfig(command="hermes acp"), home=tmp_path
+    )
+    assert why is not None and "/nowhere/bin" in why
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THE KEY THE USER ALREADY HAS — offered, never silently inherited (2026-11-22)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _fake_operator_home(monkeypatch, tmp_path, lines="DEEPSEEK_API_KEY=sk-operator\n"):
+    op = tmp_path / "operator"
+    op.mkdir()
+    (op / ".env").write_text(lines, encoding="utf-8")
+    monkeypatch.setattr(activation, "_operator_env_path", lambda: op / ".env")
+    return op
+
+
+def test_the_operator_home_is_reported_by_name_only(monkeypatch, tmp_path):
+    _fake_operator_home(monkeypatch, tmp_path)
+    home = tmp_path / "isolated" / ".hermes"
+    assert activation.operator_key_names(home) == ["DEEPSEEK_API_KEY"]
+
+
+def test_a_carried_key_is_not_offered_when_the_homes_are_the_same(monkeypatch, tmp_path):
+    """A project placed directly under ~ must not be offered its own file."""
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    (home / ".env").write_text("DEEPSEEK_API_KEY=sk\n", encoding="utf-8")
+    monkeypatch.setattr(activation, "_operator_env_path", lambda: home / ".env")
+    assert activation.operator_key_names(home) == []
+
+
+def test_carrying_is_a_flag_never_a_default(monkeypatch, tmp_path):
+    _fake_operator_home(monkeypatch, tmp_path)
+    home = tmp_path / ".hermes"
+
+    activation.provision_home(home=home, seed_dir=tmp_path / "none", project_env=tmp_path / "none.env")
+    assert "DEEPSEEK_API_KEY" not in (home / ".env").read_text(encoding="utf-8")
+
+    log = activation.provision_home(
+        home=home, seed_dir=tmp_path / "none", project_env=tmp_path / "none.env",
+        carry_operator_env=True,
+    )
+    assert "DEEPSEEK_API_KEY=sk-operator" in (home / ".env").read_text(encoding="utf-8")
+    # NAMES are logged; the value never is
+    assert any("carried from the Hermes home: DEEPSEEK_API_KEY" in line for line in log)
+    assert not any("sk-operator" in line for line in log)
+
+
+def test_the_keys_step_says_where_the_key_already_is(monkeypatch, tmp_path):
+    _fake_operator_home(monkeypatch, tmp_path)
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    (home / ".env").write_text("", encoding="utf-8")
+
+    check = activation._check_keys(home)
+    assert check.ok is False
+    assert "DEEPSEEK_API_KEY" in check.fix
+    assert "--carry-operator-env" in check.fix

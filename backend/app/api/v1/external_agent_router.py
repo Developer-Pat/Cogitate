@@ -926,6 +926,19 @@ async def external_agent_ws(websocket: WebSocket) -> None:
                         "user decides granularly — that granularity is the "
                         "feature.]"
                     )
+                # THE CREDENTIAL GUARD (2026-11-22): a turn whose runtime has no usable model
+                # cannot answer, and the turn timer is a 900-second way of saying so. Refuse
+                # BEFORE the stream starts, with the one fact that unblocks it — the frontend
+                # already ends its streaming state on a `status: error` frame (ExaChat.tsx:662).
+                from app.domain.external_agent.activation import pre_turn_refusal
+
+                refusal = pre_turn_refusal(cfg)
+                if refusal:
+                    await websocket.send_json(
+                        {"type": "status", "status": "error", "message": refusal}
+                    )
+                    continue
+
                 cancel_event.clear()
                 streaming = True
                 stream_ended.clear()
