@@ -1,4 +1,5 @@
 import NavigationCard from './NavigationCard'
+import SetupNavCard from './SetupNavCard'
 
 const navigationCards = [
   {
@@ -47,7 +48,9 @@ export default function NavigationCards() {
   return (
     <section className="mb-8">
       <h2 className="text-xl font-bold mb-5 text-base-content">Quick Navigation</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[var(--card-gap)]">
+      {/* FIVE cards since the Setup door landed: three across on a desktop reads at ~310px each,
+          where five across measured 179px and stacked every card's text into a narrow column. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[var(--card-gap)]">
         {navigationCards.map((card) => (
           <NavigationCard
             key={card.to}
@@ -57,6 +60,9 @@ export default function NavigationCards() {
             to={card.to}
           />
         ))}
+        {/* THE SETUP DOOR (ruled 2026-11-22): setup lives on /setup, and this tile carries the one
+            measured state plus the way there, rather than a fifth place to configure anything. */}
+        <SetupNavCard />
       </div>
     </section>
   )

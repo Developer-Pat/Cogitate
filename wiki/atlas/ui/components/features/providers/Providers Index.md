@@ -23,4 +23,5 @@ The providers components — model selection, provider badges, and the provider 
 - [[atlas/ui/components/features/providers/UsageDashboard|UsageDashboard]]
 - [[atlas/ui/components/features/providers/CuratedModelsManager|CuratedModelsManager]] (added 2026-08-03)
 - [[atlas/ui/components/features/providers/ProviderKeyManager|ProviderKeyManager]] (added 2026-08-03)
+- [[atlas/ui/components/features/providers/SetupTiles|SetupTiles]] — the setup cards above the tabs
 - **ModelBrowser/** — directory

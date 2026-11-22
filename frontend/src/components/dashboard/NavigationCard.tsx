@@ -5,9 +5,11 @@ interface NavigationCardProps {
   title: string
   description: string
   to: string
+  /** Optional state on the card itself — the tile that reports something carries its own badge. */
+  badge?: React.ReactNode
 }
 
-export default function NavigationCard({ icon, title, description, to }: NavigationCardProps) {
+export default function NavigationCard({ icon, title, description, to, badge }: NavigationCardProps) {
   return (
     <Link
       to={to}
@@ -17,7 +19,10 @@ export default function NavigationCard({ icon, title, description, to }: Navigat
         <div className="w-14 h-14 rounded-full flex items-center justify-center bg-primary/10 text-primary mb-3 group-hover:bg-primary/20 transition-colors duration-[var(--button-transition)]">
           {icon}
         </div>
-        <h3 className="card-title text-lg">{title}</h3>
+        <h3 className="card-title text-lg">
+          {title}
+          {badge}
+        </h3>
         <p className="text-sm text-readout leading-relaxed">{description}</p>
         <div className="card-actions justify-end mt-2">
           <span className="btn btn-ghost btn-sm rounded-[var(--button-radius)] gap-1 text-primary group-hover:gap-2 transition-all duration-[var(--button-transition)]">

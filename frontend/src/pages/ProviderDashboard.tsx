@@ -18,14 +18,11 @@ import ProviderModal from '../components/features/providers/ProviderModal';
 import UsageDashboard from '../components/features/providers/UsageDashboard';
 import ModelSyncScheduler from '../components/features/providers/ModelSyncScheduler';
 import CuratedModelsManager from '../components/features/providers/CuratedModelsManager';
-import ProviderKeyManager from '../components/features/providers/ProviderKeyManager';
-import { DefaultProviderConfig } from '../components/features/providers/DefaultProviderConfig';
+import SetupTiles from '../components/features/providers/SetupTiles';
 import { HelpButton } from '../components/help/HelpButton';
 import { useProviderConfig } from '../hooks/useProviderConfig';
-import { useDefaultProvider } from '../hooks/useDefaultProvider';
 import { useUsage } from '../hooks/useUsage';
 import { useSyncSchedule } from '../hooks/useSyncSchedule';
-import { useNotificationStore } from '../stores/notificationStore';
 import { frontendLoggingService } from '../services/frontendLoggingService';
 import { modelBrowserService, type ModelInfo } from '../services/domains/providers/modelBrowserService';
 import { providerLocationOf } from '../utils/providerLocation';
@@ -39,8 +36,15 @@ import type {
 } from '../types/providers';
 import type { ModelBrowserFilters } from '../services/domains/providers/modelBrowserService';
 
-/** The page's tabs, in the order they render. Curated is FIRST and is the DEFAULT. */
-const TAB_KEYS = ['curated', 'overview', 'default', 'usage', 'keys'] as const;
+/**
+ * The page's tabs, in the order they render. Curated is FIRST and is the DEFAULT.
+ *
+ * The two SETUP acts — the provider keys and the default chat model — are NOT tabs here any more
+ * (ruled 2026-11-22, option 2): setup lives on the Setup page, one implementation each, and this
+ * page hands the reader the door instead (the tiles at the top, whose hrefs are the readiness
+ * items' own). The tiles, usage and the curated layer are what this page is for.
+ */
+const TAB_KEYS = ['curated', 'overview', 'usage'] as const;
 type ProviderTab = (typeof TAB_KEYS)[number];
 
 /**
@@ -51,9 +55,7 @@ type ProviderTab = (typeof TAB_KEYS)[number];
 const HELP_CONTEXT: Record<ProviderTab, string> = {
   curated: 'providers-curated',
   overview: 'providers-overview',
-  default: 'providers-default',
   usage: 'providers-usage',
-  keys: 'providers-keys',
 };
 
 /**
@@ -89,13 +91,6 @@ const ProviderDashboard: React.FC = () => {
   // (location absent) via the providerLocationOf fallback.
   const visibleProviders = providers.filter((p) => providerLocationOf(p) === 'cloud')
 
-  // Default provider hook
-  const {
-    defaultProvider,
-    loading: defaultLoading,
-    refreshDefaultProvider,
-    initializeDefaultProvider,
-  } = useDefaultProvider();
 
   // Usage hook
   const {
@@ -144,16 +139,6 @@ const ProviderDashboard: React.FC = () => {
     },
     [setSearchParams],
   );
-
-  // Default provider pending changes state
-  const [pendingProvider, setPendingProvider] = useState<{
-    providerId: number;
-    providerName: string;
-    providerType: string;
-    model: string;
-  } | null>(null);
-  const [savingDefault, setSavingDefault] = useState(false);
-  const [defaultError, setDefaultError] = useState<string | null>(null);
 
   // The provider whose Health modal is open. The check runs inside the modal (on open and on
   // demand), so the page holds the SELECTION only — not the result.
@@ -227,123 +212,6 @@ const ProviderDashboard: React.FC = () => {
   const handlePeriodChange = (_period: UsagePeriod) => {
     // Usage hook will automatically refresh when period changes
     refreshUsage();
-  };
-
-  // ─── Default Provider Handlers ───────────────────────────────────────
-
-  /**
-   * Handle default provider change (stores pending changes)
-   */
-  const handleDefaultProviderChange = (providerId: number, providerName: string, providerType: string) => {
-    setPendingProvider({
-      providerId,
-      providerName,
-      providerType,
-      model: defaultProvider?.model_name || '',
-    });
-    setDefaultError(null);
-  };
-
-  /**
-   * Handle default model change (stores pending changes)
-   */
-  const handleDefaultModelChange = (model: string) => {
-    setPendingProvider(prev => {
-      if (prev) {
-        return { ...prev, model };
-      }
-      if (defaultProvider) {
-        return {
-          providerId: defaultProvider.provider_id,
-          providerName: defaultProvider.provider_name,
-          providerType: defaultProvider.provider_type,
-          model,
-        };
-      }
-      return null;
-    });
-    setDefaultError(null);
-  };
-
-  /**
-   * Save pending default provider configuration
-   */
-  const handleSaveDefaultConfiguration = async () => {
-    if (!pendingProvider) {
-      setDefaultError('No changes to save');
-      return;
-    }
-
-    if (!pendingProvider.providerId) {
-      setDefaultError('No provider selected. Please select a provider from the dropdown.');
-      return;
-    }
-
-    if (!pendingProvider.model) {
-      setDefaultError('No model selected. Please select a model from the dropdown.');
-      return;
-    }
-
-    setSavingDefault(true);
-    setDefaultError(null);
-
-    try {
-      frontendLoggingService.info(
-        'ProviderDashboard',
-        'Saving default provider configuration',
-        { pendingProvider, defaultProvider }
-      );
-
-      const requestBody = {
-        provider_id: pendingProvider.providerId,
-        model: pendingProvider.model,
-      };
-
-      const response = await fetch('/api/v1/providers/default', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-        throw new Error(errorData.detail || 'Failed to save configuration');
-      }
-
-      await response.json();
-
-      // Refresh to get updated state
-      await refreshDefaultProvider();
-
-      const { addSuccess } = useNotificationStore.getState();
-      addSuccess('Default Provider Updated', `${pendingProvider.providerName} / ${pendingProvider.model} is now the default`);
-
-      setPendingProvider(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save configuration';
-      setDefaultError(errorMessage);
-
-      frontendLoggingService.error(
-        'ProviderDashboard',
-        `Failed to save default provider configuration: ${errorMessage}`,
-        err instanceof Error ? err : undefined
-      );
-
-      const { addError } = useNotificationStore.getState();
-      addError('Failed to Save', errorMessage);
-    } finally {
-      setSavingDefault(false);
-    }
-  };
-
-  /**
-   * Handle initialize default provider
-   */
-  const handleInitializeDefaultProvider = async () => {
-    const success = await initializeDefaultProvider();
-    if (success) {
-      _refreshProviders();
-    }
   };
 
   // ─── Model Browser Handlers ──────────────────────────────────────────
@@ -499,6 +367,11 @@ const ProviderDashboard: React.FC = () => {
         </PageBanner>
       )}
 
+      {/* THE SETUP TILES (ruled 2026-11-22, option 2): where the install stands, and the door to the
+          one page that changes it. They ARE the readiness items — the same payload the Dashboard's
+          verdict card renders — so this is not a second grade assembled in the browser. */}
+      <SetupTiles />
+
       {/* Tabs */}
       <div className="mb-6 border-b border-base-content/20">
         <nav className="-mb-px flex gap-4">
@@ -526,18 +399,6 @@ const ProviderDashboard: React.FC = () => {
               Overview
             </button>
           </Tooltip>
-          <Tooltip content="Set the provider and model used where nothing else chooses one" position="bottom">
-            <button
-              onClick={() => setActiveTab('default')}
-              className={`pb-3 px-1 font-medium text-sm transition-colors ${
-                activeTab === 'default'
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-base-content/60 hover:text-base-content'
-              }`}
-            >
-              Default
-            </button>
-          </Tooltip>
           <Tooltip content="View usage statistics, token consumption, and cost breakdown" position="bottom">
             <button
               onClick={() => setActiveTab('usage')}
@@ -550,188 +411,8 @@ const ProviderDashboard: React.FC = () => {
               Usage
             </button>
           </Tooltip>
-          <Tooltip content="See and manage provider API keys (set, rotate, clear)" position="bottom">
-            <button
-              onClick={() => setActiveTab('keys')}
-              className={`pb-3 px-1 font-medium text-sm transition-colors ${
-                activeTab === 'keys'
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-base-content/60 hover:text-base-content'
-              }`}
-            >
-              Keys
-            </button>
-          </Tooltip>
         </nav>
       </div>
-
-      {/* Default Provider Tab */}
-      {activeTab === 'default' && (
-        <div className="space-y-6">
-          {/* ── Default Provider Configuration ─────────────────────────── */}
-          <div className="bg-base-200 rounded-lg shadow p-4 border border-base-content/20">
-            {defaultLoading ? (
-              <div className="flex items-center gap-2 text-sm text-readout">
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Loading default provider...
-              </div>
-            ) : defaultProvider ? (
-              <>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <svg className="h-6 w-6 text-success" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <div>
-                      <h3 className="text-lg font-semibold text-base-content">Default Provider</h3>
-                    </div>
-                  </div>
-                  <div className="badge badge-success badge-outline badge-sm">Active</div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-base-content/10">
-                  <DefaultProviderConfig
-                    currentProviderId={defaultProvider.provider_id}
-                    currentProviderName={defaultProvider.provider_name}
-                    currentProviderType={defaultProvider.provider_type}
-                    currentModel={defaultProvider.model_name}
-                    onProviderChange={handleDefaultProviderChange}
-                    onModelChange={handleDefaultModelChange}
-                  />
-                </div>
-
-                {/* Save Button */}
-                <div className="mt-4 flex items-center justify-between">
-                  {pendingProvider ? (
-                    <div className="flex items-center gap-2 text-sm text-info">
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2V3a1 1 0 00-1-1H8a1 1 0 00-1 1v8a1 1 0 102 0z" clipRule="evenodd" />
-                      </svg>
-                      <span>
-                        Changes pending: <strong>{pendingProvider.providerName}</strong> / <strong>{pendingProvider.model || 'Select a model'}</strong>
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-readout">
-                      ✓ Configuration is up to date
-                    </div>
-                  )}
-
-                  <div className="tooltip tooltip-left" data-tip={pendingProvider ? "Save your provider and model selection as the new default" : "No changes to save"}>
-                    <button
-                      onClick={handleSaveDefaultConfiguration}
-                      disabled={savingDefault || !pendingProvider || !pendingProvider.model}
-                      className={`btn btn-sm ${pendingProvider && pendingProvider.model ? 'btn-primary' : 'btn-disabled'}`}
-                    >
-                      {savingDefault ? (
-                        <>
-                          <span className="loading loading-spinner loading-sm"></span>
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          Save Configuration
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {defaultError && (
-                  <div className="mt-3 p-2 bg-error/10 border border-error/20 rounded text-xs text-error">
-                    ⚠️ {defaultError}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="space-y-4">
-                <div className="alert alert-warning">
-                  <svg className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <div>
-                    <h3 className="font-semibold">No Default Provider Configured</h3>
-                    <p className="text-sm">
-                      Pick the provider and model that answer chat. Title, summary, workflow and
-                      memory all inherit it.
-                    </p>
-                  </div>
-                </div>
-
-                {providers.length === 0 ? (
-                  // THE EMPTY DOOR (2026-11-21): a default needs a provider to point at, and a fresh
-                  // install has none — so the page asks for the thing it is missing instead of
-                  // offering a choice among zero options.
-                  <div className="bg-base-200 rounded-lg border border-base-300 p-4 space-y-3">
-                    <p className="text-sm text-readout">
-                      No provider on this install yet, and a default provider is a choice among
-                      providers. Add one first — it carries its own key.
-                    </p>
-                    <button
-                      onClick={handleAddProvider}
-                      className="btn btn-primary btn-sm rounded-[var(--button-radius)]"
-                      data-tip="Open the add-provider form; the key rides the same form"
-                    >
-                      Add your first provider
-                    </button>
-                  </div>
-                ) : (
-                  <div className="bg-base-200 rounded-lg border border-base-300 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <DefaultProviderConfig
-                        onProviderChange={handleDefaultProviderChange}
-                        onModelChange={handleDefaultModelChange}
-                      />
-                    </div>
-                    <div className="mt-4 flex items-center justify-between">
-                      {pendingProvider ? (
-                        <div className="text-sm text-info">
-                          Pending: <strong>{pendingProvider.providerName}</strong> /{' '}
-                          <strong>{pendingProvider.model || 'Select a model'}</strong>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-readout">Choose a provider and a model, then save.</div>
-                      )}
-                      <div className="tooltip tooltip-left" data-tip={pendingProvider?.model ? 'Make this the default provider and model' : 'Choose a model first'}>
-                        <button
-                          onClick={handleSaveDefaultConfiguration}
-                          disabled={savingDefault || !pendingProvider?.model}
-                          className={`btn btn-sm ${pendingProvider?.model ? 'btn-primary' : 'btn-disabled'}`}
-                        >
-                          {savingDefault ? 'Saving...' : 'Set as Default'}
-                        </button>
-                      </div>
-                    </div>
-                    {defaultError && (
-                      <div className="mt-3 p-2 bg-error/10 border border-error/20 rounded text-xs text-error">
-                        ⚠️ {defaultError}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* The one-click path stays, but only where it can WORK: it points the install at a
-                    local Ollama, which is meaningless on a box that has no ollama row. */}
-                {providers.some((p) => p.provider_type === 'ollama') && (
-                  <div className="text-xs text-readout">
-                    Or{' '}
-                    <button onClick={handleInitializeDefaultProvider} className="link link-primary">
-                      initialize the default from the local Ollama server
-                    </button>
-                    .
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
@@ -877,11 +558,6 @@ const ProviderDashboard: React.FC = () => {
           providers={visibleProviders}
           loading={providersLoading}
         />
-      )}
-
-      {/* Keys Tab — provider API key management (Phase 4) */}
-      {activeTab === 'keys' && (
-        <ProviderKeyManager location="cloud" />
       )}
 
       {/* Config Modal */}

@@ -127,7 +127,9 @@ def test_a_fix_it_link_names_the_TAB_that_fixes_it():
     """
     from app.domain.providers import readiness
 
-    assert readiness.HREF_PROVIDER.endswith("?tab=keys")
-    assert readiness.HREF_MODEL.endswith("?tab=default")
+    # The acts live on the SETUP page (ruled 2026-11-22, option 2): the cloud-providers page keeps
+    # the tiles and the curated layer, and no longer hosts a second Keys or Default-model tab.
+    assert readiness.HREF_PROVIDER == "/setup?tab=keys"
+    assert readiness.HREF_MODEL == "/setup?tab=model"
     # the bare page is never the answer: its landing tab is Curated
     assert "/provider-dashboard" not in (readiness.HREF_PROVIDER, readiness.HREF_MODEL)

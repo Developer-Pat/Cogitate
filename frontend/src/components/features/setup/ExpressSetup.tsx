@@ -217,7 +217,7 @@ export default function ExpressSetup({ onApplied }: ExpressSetupProps) {
               'Use this model'
             )}
           </button>
-          <a href="/providers/cloud?tab=default" className="link link-primary text-sm" data-tip="Choose any provider and model yourself, without the shortlist">
+          <a href="/setup?tab=model" className="link link-primary text-sm" data-tip="Choose any provider and model yourself, without the shortlist">
             or choose your own model
           </a>
         </div>

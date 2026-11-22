@@ -15,5 +15,6 @@ The dashboard components — navigation cards, quick stats, and recent activity 
 ## Inventory
 
 - [[atlas/ui/components/dashboard/NavigationCard|NavigationCard]]
+- [[atlas/ui/components/dashboard/SetupNavCard|SetupNavCard]] — the Setup door in Quick Navigation
 - [[atlas/ui/components/dashboard/NavigationCards|NavigationCards]]
 - [[atlas/ui/components/dashboard/QuickStats|QuickStats]]

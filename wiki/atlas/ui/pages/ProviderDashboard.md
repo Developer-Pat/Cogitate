@@ -32,9 +32,13 @@ case is a **type error**, where a chained ternary used to fall through to its la
 |---|---|---|
 | Curated | `CuratedModelsManager` | `providers-curated` |
 | Overview | the provider cards and their actions | `providers-overview` |
-| Default | `DefaultProviderConfig` + the pending-changes readout and Save | `providers-default` |
 | Usage | `UsageDashboard` | `providers-usage` |
-| Keys | `ProviderKeyManager` | `providers-keys` |
+
+**Above the tabs sit the setup TILES** — [[atlas/ui/components/features/providers/SetupTiles|SetupTiles]]
+renders the readiness items (provider + key, chat model, agents, and the optional runtime) as cards
+whose `href` is the item's own. The two setup ACTS are not tabs on this page: the provider keys and
+the default chat model live on the Setup page (`/setup?tab=keys`, `/setup?tab=model`), one
+implementation each, and the readiness verdict's doors point there.
 
 The header's `HelpButton` opens the active tab's context from `wiki/help/`. The header also carries the
 cross-link into the capability surface — a line under the subtitle reading *"Which service each

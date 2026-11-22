@@ -9,12 +9,12 @@ tags: [type/component, domain/atlas-ui]
 
 # ProviderKeyManager
 
-Keys tab on the Provider Dashboard (Phase 4, mini-map item 8) — the
-single place to see/set/rotate/clear provider API keys.
+The single place to see/set/rotate/clear provider API keys (Phase 4, mini-map item 8), hosted by
+the Setup page's **API Keys** tab — setup acts live on `/setup`, not on the cloud-providers page.
 
 ## Location & integration
 
-- Rendered as the **Keys tab** (5th) on ProviderDashboard
+- Rendered by the Setup page's **API Keys** tab (`/setup?tab=keys`)
 - Backed by the key-management endpoints in
   `management_router.py`:
   - `GET /api/v1/providers/managed/keys` — all providers' key status
@@ -46,7 +46,7 @@ single place to see/set/rotate/clear provider API keys.
 
 - Route ordering matters: `/managed/keys` must be registered before
   `/managed/{provider_id}` or FastAPI shadows it (int-parsing error).
-- Help: wiki/help/providers-keys.md; HelpButton context
-  `providers-keys` (dashboard header).
+- Hosted by the Setup page's API Keys tab (`/setup?tab=keys`); that page's header carries the
+  help context (`setup-keys`).
 - Tested: `__tests__/ProviderKeyManager.test.tsx` (render, set, clear)
   — 3 tests; backend `test_provider_key_management.py` — 3 tests.

@@ -46,8 +46,12 @@ OPTIONAL = "optional"
 # `/provider-dashboard` landed a stranger one tab away from the thing it named. Each href names the
 # tab that fixes the item, and both tabs can now do their job from nothing: the Keys tab creates the
 # first provider (key and row in one form), the Default tab offers the provider+model picker.
-HREF_PROVIDER = "/providers/cloud?tab=keys"
-HREF_MODEL = "/providers/cloud?tab=default"
+# THE DOORS POINT AT THE SETUP PAGE (ruled 2026-11-22, option 2): a setup ACT lives in one place,
+# and that place is /setup. The cloud-providers page keeps the tiles, the usage and the curated
+# layer; it no longer carries a second Keys tab or a second Default-model tab, so a checklist item
+# that sent a stranger there would be sending them to a door that no longer exists.
+HREF_PROVIDER = "/setup?tab=keys"
+HREF_MODEL = "/setup?tab=model"
 HREF_AGENTS = "/agent-profiles"
 HREF_RUNTIME = "/exa"
 
@@ -129,9 +133,9 @@ async def _provider_item(db: AsyncSession) -> ReadinessItem:
             label="Provider + key",
             state=UNMET,
             detail=(
-                "No provider yet. Add one on the Provider Dashboard (deepseek and openrouter "
-                "are the two this build offers) and paste its key — or point Cogitate at a "
-                "local model server."
+                "No provider yet. Add one on the Setup page's API Keys tab (deepseek and "
+                "openrouter are the two this build offers) and paste its key — or point Cogitate "
+                "at a local model server."
             ),
             href=HREF_PROVIDER,
         )
