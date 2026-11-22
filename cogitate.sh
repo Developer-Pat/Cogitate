@@ -795,6 +795,14 @@ install_node() {
     install_as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
     if ! install_node_ok; then
         log_error "Node.js >= ${NODE_MAJOR_MIN} is still missing (found: $(node --version 2>/dev/null || echo none))."
+        # SAY THE CAUSE, because the line above is a symptom and the two `sudo:` lines most people
+        # meet here are the cause (measured 2026-11-21 on a user with no sudo: EXIT 1, "stopped at:
+        # node", and nothing saying that root was the missing thing).
+        if [ "$(id -u)" -ne 0 ]; then
+            log_error "Node installs system-wide, so this step needs root. Run this install from a"
+            log_error "terminal where sudo can prompt for your password — or install Node.js ${NODE_MAJOR_MIN}+"
+            log_error "yourself and re-run; every other step works as your own user."
+        fi
         return 1
     fi
     log_success "Node installed ($(node --version), npm $(npm --version))"
