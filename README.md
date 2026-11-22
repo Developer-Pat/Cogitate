@@ -101,13 +101,13 @@ travels with the build tool rather than with your package manager.
 ## Quick Start
 
 ```bash
-# 1. Get the code — download cogitate-0.1.3.tar.gz and its .sha256 from
-#    https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.3
+# 1. Get the code — download cogitate-0.1.4.tar.gz and its .sha256 from
+#    https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.4
 #    The artifact needs no git, no key and no GitHub account;
 #    the .sha256 beside it is the check on the download.
-sha256sum -c cogitate-0.1.3.tar.gz.sha256
-tar xzf cogitate-0.1.3.tar.gz
-cd cogitate-0.1.3
+sha256sum -c cogitate-0.1.4.tar.gz.sha256
+tar xzf cogitate-0.1.4.tar.gz
+cd cogitate-0.1.4
 
 # 2. Install the toolchain and the project's dependencies
 ./cogitate.sh install

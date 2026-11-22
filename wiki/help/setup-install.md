@@ -29,10 +29,10 @@ route.
 
 ```bash
 # A release copy: no git, no key, no account. Get the tarball and its .sha256
-# from https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.3, check the
+# from https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.4, check the
 # download, then unpack it.
-sha256sum -c cogitate-0.1.3.tar.gz.sha256
-tar xzf cogitate-0.1.3.tar.gz && cd cogitate-0.1.3
+sha256sum -c cogitate-0.1.4.tar.gz.sha256
+tar xzf cogitate-0.1.4.tar.gz && cd cogitate-0.1.4
 
 ./cogitate.sh install
 ```
