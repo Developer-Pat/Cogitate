@@ -212,7 +212,12 @@ def _entry(name: str, field, note: str = "") -> list[str]:
     elif _is_derived(literal):
         lines.append(f"# {type_name} · derived from the project root{suffix}")
         lines.append(f"# {env_name}=")
-    elif env_name.endswith(SECRET_HINTS) or any(h in env_name for h in SECRET_HINTS):
+    elif isinstance(field.default, str) and (
+        env_name.endswith(SECRET_HINTS) or any(h in env_name for h in SECRET_HINTS)
+    ):
+        # A NON-STRING FIELD CANNOT BE A SECRET (2026-11-22). The name heuristic matched `_TOKEN` in
+        # `INPUT_TOKEN_BUDGET` — a number — and shipped it as an empty placeholder, which made a fresh
+        # `.env` fail to parse at import. Secrets are strings; anything else keeps its default.
         lines.append(f"# {type_name} · secret: `.env` only, never committed{suffix}")
         lines.append(f"{env_name}=")
     else:

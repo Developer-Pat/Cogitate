@@ -290,6 +290,23 @@ class Settings(BaseSettings):
     # 1M-token window, and 16K was dropping history that had room to stay.
     input_token_budget: int = 100_000
 
+    @field_validator("input_token_budget", mode="before")
+    @classmethod
+    def _empty_budget_is_the_default(cls, value: object) -> object:
+        """`INPUT_TOKEN_BUDGET=` in `.env` means "unset", not "a number that failed to parse".
+
+        Measured 2026-11-22 on a release install: a fresh `.env` is copied from `.env.example`, and that
+        file carries the key with NO value (the generator had classed it as a secret). pydantic then tried
+        `int("")` at import time and the whole backend failed to load — the install stopped at its own
+        verification step, on the default it ships. An empty numeric setting is "leave it alone" for every
+        person who will ever edit this file by hand, so it is normalised here rather than there.
+        """
+        if value is None:
+            return 100_000
+        if isinstance(value, str) and not value.strip():
+            return 100_000
+        return value
+
     # THE STARTUP SYSTEM-SWEEP (2026-09-12) — OPT-IN, OFF BY DEFAULT.
     # The sweep itself is deterministic: no LLM, no agent call (the
     # system-audit graph's nodes are plain functions and the Exa
