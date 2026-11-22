@@ -300,6 +300,14 @@ page load fires a keyed request at deepseek, openrouter, groq and ollama_cloud. 
 pestering the providers"* also rules out **adding a second, periodic layer** to a footprint that is
 already broader than it should be. The bridge adds nothing to this table.
 
+**The page-load row is now retired, which is the ruling applied to itself.** A cloud row is probed only on
+purpose — `force` (the providers page's Test and Refresh) or `verify_key` — and every other read answers from
+the memo and reports `unknown` when it is cold: *"not checked — a page read does not call a cloud provider;
+press Test to check it now"*, with an empty `checked_at`. Local rows still probe (they are this machine, and
+the idle poll below keeps their memo warm), and a keyless cloud row still reads `unconfigured`, because that
+is a configuration fact that costs no packet. The footprint is then the one this table wanted: the weekly
+catalogue sync, a turn, and the loopback poll.
+
 **Ranked by what an operator would have to explain:**
 
 | rank | the check | what a network admin sees |

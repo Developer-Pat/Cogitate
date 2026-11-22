@@ -145,6 +145,7 @@ async def test_a_cloud_row_without_a_key_is_unconfigured_not_unreachable(monkeyp
 
 @pytest.mark.anyio
 async def test_a_cloud_row_that_answers_reads_available_with_its_catalogue(monkeypatch) -> None:
+    """A DELIBERATE read (`force`) is the only kind that dials a cloud row (ruled 2026-11-22)."""
     monkeypatch.setattr(
         av, "probe_json",
         _probe_from({("https://api.deepseek.com", "/v1/models"): {"data": [{"id": "deepseek-v4-flash"}]}}),
@@ -153,7 +154,7 @@ async def test_a_cloud_row_that_answers_reads_available_with_its_catalogue(monke
     async def key(provider):
         return "zz-key"
 
-    result = await av.read_availability([CLOUD_DEEPSEEK], key_for=key)
+    result = await av.read_availability([CLOUD_DEEPSEEK], key_for=key, force=True)
 
     assert result["deepseek"].state == "available"
     assert result["deepseek"].models_served == ("deepseek-v4-flash",)
@@ -673,7 +674,9 @@ async def test_a_cloud_row_under_a_dead_connection_is_NOT_the_providers_news(mon
         {"id": 4, "name": "groq", "provider_type": "groq", "base_url": "https://api.groq.com/openai/v1"},
     ]
 
-    await av.read_availability(rows, key_for=key)
+    # A DELIBERATE read: page loads stopped dialling cloud rows (ruled 2026-11-22), and this test
+    # is about what a FAILING cloud read publishes, not about who triggers it.
+    await av.read_availability(rows, key_for=key, force=True)
 
     assert [t[0] for t in toasts] == ["The connection looks down"]
     assert "could not be reached" in toasts[0][1], "the verdict's own reason, not a second vocabulary"
@@ -853,3 +856,61 @@ def test_an_unreadable_call_failure_stays_unknown() -> None:
     """Never accuse a side on evidence that does not name one — a turn's error copy and this class
     ride the same exception, so they must not disagree."""
     assert av.classify_call_error(RuntimeError("something else entirely")) == av.FAILURE_UNKNOWN
+
+
+# ── a PAGE READ never dials a cloud row (ruled 2026-11-22) ───────────────────────────────────────
+
+@pytest.mark.anyio
+async def test_a_page_read_does_not_dial_a_cloud_row(monkeypatch) -> None:
+    """The ruling: no packets of the app's own on somebody's network because a page was opened."""
+    calls: list = []
+    monkeypatch.setattr(av, "probe_json", _probe_from({}, calls))
+
+    async def key(_provider):
+        return "zz-key"
+
+    result = await av.read_availability([CLOUD_DEEPSEEK], key_for=key)
+
+    assert calls == [], "a page read must not call a cloud provider"
+    row = result["deepseek"]
+    assert row.state == "unknown", "no evidence means unknown — never `available`"
+    assert row.available is None, "unknown is not False (which reads as broken)"
+    assert row.checked_at == "", "nothing was checked, so no time may be claimed"
+    assert "press Test" in row.reason
+
+
+@pytest.mark.anyio
+async def test_a_page_read_serves_the_memo_a_deliberate_read_warmed(monkeypatch) -> None:
+    """A Test that just ran IS evidence a page may show — and it costs no second packet."""
+    calls: list = []
+    monkeypatch.setattr(
+        av,
+        "probe_json",
+        _probe_from({("https://api.deepseek.com", "/v1/models"): {"data": [{"id": "deepseek-v4-flash"}]}}, calls),
+    )
+
+    async def key(_provider):
+        return "zz-key"
+
+    await av.read_availability([CLOUD_DEEPSEEK], key_for=key, force=True)
+    after_test = len(calls)
+    page = await av.read_availability([CLOUD_DEEPSEEK], key_for=key)
+
+    assert len(calls) == after_test, "the page read added no probe of its own"
+    assert page["deepseek"].state == "available"
+
+
+@pytest.mark.anyio
+async def test_a_keyless_cloud_row_still_reads_unconfigured_on_a_page(monkeypatch) -> None:
+    """Configuration costs no packet, so it survives the ruling that stopped the probing."""
+    calls: list = []
+    monkeypatch.setattr(av, "probe_json", _probe_from({}, calls))
+    monkeypatch.setattr(av, "env_key", lambda provider_type: None)
+
+    async def no_key(_provider):
+        return None
+
+    result = await av.read_availability([CLOUD_DEEPSEEK], key_for=no_key)
+
+    assert calls == []
+    assert result["deepseek"].state == "unconfigured"

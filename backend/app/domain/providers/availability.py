@@ -921,6 +921,49 @@ def _cloud_failure_reason(failure: Optional[str]) -> str:
     return "the provider did not answer"
 
 
+async def _unprobed_cloud(
+    provider: Mapping[str, Any],
+    key_for: Optional[Callable[[Mapping[str, Any]], Awaitable[Optional[str]]]],
+) -> Availability:
+    """A cloud row a PAGE read will not dial: `unconfigured` without a key, else `unknown`.
+
+    Two honest answers, neither of which touches the network. `unconfigured` is read from the key
+    store and is the same sentence `_probe_cloud` gives it; `unknown` says nobody looked, which is
+    the truth — a badge that claimed `available` on no evidence is the default-green defect this
+    ruling removes. `checked_at` is EMPTY for `unknown`, and every surface already treats a falsy
+    `checked_at` as "never checked".
+    """
+    name = str(provider.get("name") or "")
+    provider_id = provider.get("id")
+
+    key: Optional[str] = None
+    if key_for is not None:
+        try:
+            key = await key_for(provider)
+        except Exception as exc:  # noqa: BLE001 — a key lookup failure is not a connectivity one
+            logger.warning("availability: key lookup failed for %s: %s", name, exc)
+    if not key:
+        key = env_key(str(provider.get("provider_type") or ""))
+    if not key:
+        return Availability(
+            provider_id=provider_id,
+            name=name,
+            state=STATE_UNCONFIGURED,
+            reason="no API key is configured",
+            checked_at=_now_iso(),
+        )
+    return Availability(
+        provider_id=provider_id,
+        name=name,
+        state=STATE_UNKNOWN,
+        reason=(
+            "not checked — a page read does not call a cloud provider; "
+            "press Test to check it now"
+        ),
+        checked_at="",
+    )
+
+
 async def _probe_cloud(
     provider: Mapping[str, Any],
     key_for: Optional[Callable[[Mapping[str, Any]], Awaitable[Optional[str]]]],
@@ -1081,6 +1124,12 @@ async def read_availability(
     `verify_key` additionally asks whether each cloud row's key is ACCEPTED — see
     `probe_key_accepted` for why a listing cannot answer that. Off by default: it is a real inference
     request, so only an explicit test should ask for it.
+
+    **CLOUD ROWS ARE PROBED ONLY ON PURPOSE** (ruled 2026-11-22): a `force` read (the providers
+    page's Test and Refresh) or a `verify_key` read dials them; any other read — every page load —
+    answers from the memo and reports `unknown` when it is cold, because the ruling refuses to put
+    the app's own packets on somebody else's network on a cadence set by page visits. LOCAL rows
+    still probe: they are this machine, and the idle poll keeps their memo warm anyway.
     """
     now = time.monotonic()
     out: Dict[str, Availability] = {}
@@ -1128,11 +1177,27 @@ async def read_availability(
             )
 
     if cloud_batch:
-        fresh.extend(
-            await asyncio.gather(
-                *[_probe_cloud(p, key_for, verify_key=verify_key) for p in cloud_batch]
+        if force or verify_key:
+            fresh.extend(
+                await asyncio.gather(
+                    *[_probe_cloud(p, key_for, verify_key=verify_key) for p in cloud_batch]
+                )
             )
-        )
+        else:
+            # A PAGE READ DOES NOT DIAL A VENDOR (ruled 2026-11-22). A keyed `GET /v1/models` at
+            # every cloud row a chain names, on a cadence set by how often a page is opened, is
+            # exactly the traffic the availability ruling refuses to add — so a page read answers
+            # from the memo and, with no memo, says NOT CHECKED. The rows still report the one
+            # cloud fact that costs no packet: a row with no key cannot be attempted at all.
+            memo_until = time.monotonic() + DEFAULT_TTL_SECONDS
+            for provider in cloud_batch:
+                availability = await _unprobed_cloud(provider, key_for)
+                out[availability.name] = availability
+                # A CONFIGURATION answer is a measurement and is memoized like one (two reads a
+                # second apart must agree, timestamp included). `unknown` is NOT: nobody looked,
+                # so there is nothing to remember, and caching it would only hide a later Test.
+                if availability.state != STATE_UNKNOWN and availability.provider_id is not None:
+                    _CACHE[availability.provider_id] = (memo_until, availability)
 
     expires_at = time.monotonic() + DEFAULT_TTL_SECONDS
     # THE BRIDGE'S OBSERVATION POINT (seam 3): the memo's write is where every probe's answer lands,
