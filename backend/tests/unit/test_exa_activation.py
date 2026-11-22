@@ -214,3 +214,59 @@ async def test_probe_calls_out_a_missing_runtime(test_session):
     assert runtime.ok is False
     assert "definitely-not-installed" in runtime.detail
     assert activation.HERMES_INSTALL_COMMAND in runtime.fix
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TWO FACTS, NOT ONE: "a model is set" vs "that model can answer" (2026-11-22)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _home_with_model(tmp_path, model="anthropic/claude-opus-4.6", provider="anthropic",
+                     base_url=None, env_lines=""):
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    yaml = f"model:\n  default: {model}\n  provider: {provider}\n"
+    if base_url:
+        yaml += f"  base_url: {base_url}\n"
+    (home / "config.yaml").write_text(yaml, encoding="utf-8")
+    (home / ".env").write_text(env_lines, encoding="utf-8")
+    return home
+
+
+def test_a_model_without_its_key_is_reported_unusable(tmp_path):
+    """The measured ladder: `model ✓` beside `keys ✗` — a stranger reads the tick as working.
+
+    The step still passes (the SECTION exists, and Exa may deliberately run on another model);
+    the credential fact rides the detail, which is where a reader can act on it.
+    """
+    home = _home_with_model(tmp_path, env_lines="ANTHROPIC_API_KEY=\n")
+    check = activation._check_model(home)
+    assert check.ok is True
+    assert "usable: no" in check.detail
+    assert "ANTHROPIC_API_KEY" in check.detail
+
+
+def test_a_model_with_its_key_is_reported_usable(tmp_path):
+    home = _home_with_model(tmp_path, env_lines="ANTHROPIC_API_KEY=sk-test\n")
+    check = activation._check_model(home)
+    assert check.ok is True
+    assert "usable: yes" in check.detail
+
+
+def test_a_local_endpoint_needs_no_key_to_be_usable(tmp_path):
+    """A loopback model is usable without any credential — do not report it as blocked."""
+    home = _home_with_model(
+        tmp_path, model="qwen", provider="llama", base_url="http://127.0.0.1:8080/v1"
+    )
+    check = activation._check_model(home)
+    assert "usable: yes" in check.detail
+
+
+def test_the_missing_runtime_message_names_the_path_it_searched(monkeypatch):
+    """"not on PATH" is true and unactionable; the backend's PATH is not the user's shell."""
+    from app.domain.external_agent.services import probe_runnable
+
+    monkeypatch.setenv("PATH", "/nowhere/bin:/second/bin")
+    why = probe_runnable(ExternalAgentConfig(command="hermes acp"))
+    assert why is not None
+    assert "/nowhere/bin" in why and "/second/bin" in why
+    assert "cogitate.sh start" in why

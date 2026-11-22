@@ -309,24 +309,64 @@ def _check_home(home: Path) -> ActivationCheck:
     return ActivationCheck("home", True, f"{home} is provisioned")
 
 
-def _check_model(home: Path, offer: ChatOffer | None = None) -> ActivationCheck:
-    """The model step, with this install's chat answer named when it differs.
+def _present_key_names(home: Path) -> list[str]:
+    """The provider key NAMES the isolated home carries with a non-empty value."""
+    env_path = home / ".env"
+    names: list[str] = []
+    if not env_path.exists():
+        return names
+    for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        if value.strip() and any(w in key.upper() for w in _KEY_MARKERS):
+            names.append(key.strip())
+    return names
 
-    A configured model is still `ok` — Exa may deliberately run on something else. What the
-    detail adds is the OFFER, because on a fresh install the user has already chosen a chat
-    model and should not have to choose twice.
+
+def _is_loopback(url: str) -> bool:
+    from urllib.parse import urlsplit
+
+    return (urlsplit(url).hostname or "") in {"127.0.0.1", "localhost", "::1"}
+
+
+def _model_usable(home: Path, provider: str, base_url: str | None) -> tuple[bool, str]:
+    """Can the configured model actually be CALLED from this home? `(usable, why not)`.
+
+    Two facts, not one: a model being SET says nothing about a credential existing, and this
+    ladder reported only the first — a home carrying the operator's `anthropic/claude-opus-4.6`
+    (copied config) read `model ✓` beside `keys ✗`, i.e. a runtime that could not make one call
+    (measured on a fresh install, 2026-11-22). A LOCAL endpoint needs no key, so it is usable.
+    """
+    if base_url and _is_loopback(base_url):
+        return True, ""
+    from app.domain.providers.env_key_store import env_key_store
+
+    name = env_key_store.env_var_for(provider) or env_key_store.env_var_for(provider.lower())
+    if name is None:
+        return False, f"no provider key name is known for '{provider}'"
+    if name in _present_key_names(home):
+        return True, ""
+    return False, f"{name} is empty or absent in the isolated home"
+
+
+def _check_model(home: Path, offer: ChatOffer | None = None) -> ActivationCheck:
+    """The model step: what is configured, whether it can ANSWER, and the offer.
+
+    `ok` stays about the section existing — Exa may deliberately run on something other than
+    this install's model. USABILITY rides the detail, so the ladder reads
+    `model ✓ (usable: no — ANTHROPIC_API_KEY is empty ...)` rather than a ✓ that a stranger
+    reads as a working model.
     """
     m = read_model_config(home)
     have = (m.get("model"), m.get("provider"))
     if have[0] and have[1]:
+        usable, why = _model_usable(home, have[1], m.get("base_url"))
+        detail = f"{have[0]} via {have[1]} (usable: {'yes' if usable else 'no — ' + why})"
         if offer is not None and have != (offer.model, offer.provider):
-            return ActivationCheck(
-                "model",
-                True,
-                f"{have[0]} via {have[1]} (this install's chat model is "
-                f"{offer.model} via {offer.provider})",
-            )
-        return ActivationCheck("model", True, f"{have[0]} via {have[1]}")
+            detail += f"; this install's chat model is {offer.model} via {offer.provider}"
+        return ActivationCheck("model", True, detail)
     fix = (
         f"Take this install's chat model — {offer.model} via {offer.provider} (--from-default, "
         "or the Exa page). Nothing is set for you."
@@ -337,16 +377,7 @@ def _check_model(home: Path, offer: ChatOffer | None = None) -> ActivationCheck:
 
 
 def _check_keys(home: Path) -> ActivationCheck:
-    env_path = home / ".env"
-    names: list[str] = []
-    if env_path.exists():
-        for raw in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            if value.strip() and any(w in key.upper() for w in _KEY_MARKERS):
-                names.append(key.strip())
+    names = _present_key_names(home)
     if names:
         return ActivationCheck("keys", True, "present: " + ", ".join(sorted(names)))
     return ActivationCheck(

@@ -858,9 +858,16 @@ def probe_runnable(cfg: ExternalAgentConfig) -> str | None:
     if not parts:
         return "the configured command is empty"
     if shutil.which(parts[0]) is None:
+        # NAME THE PATH THAT WAS SEARCHED. "not on PATH" is true and unactionable: the backend's
+        # PATH is the launcher's, not the user's shell, so the directories below are the whole
+        # answer to "but it works in my terminal" (measured on a fresh install, 2026-11-22).
+        searched = [entry for entry in os.environ.get("PATH", "").split(os.pathsep) if entry]
         return (
             f"'{parts[0]}' is not on PATH — Exa runs on an external agent runtime "
-            f"(the command is '{cfg.command}'), and nothing answers to it here"
+            f"(the command is '{cfg.command}'), and nothing answers to it here. "
+            f"Searched: {os.pathsep.join(searched) if searched else '(PATH is empty)'}. "
+            f"`cogitate.sh start` puts ~/.local/bin first, so a runtime installed after the "
+            f"backend started is invisible until a restart."
         )
     return None
 
