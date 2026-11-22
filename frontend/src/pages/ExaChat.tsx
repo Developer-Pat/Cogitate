@@ -9,7 +9,8 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { useTracePanel } from '../hooks/useTracePanel'
 import { useMessageStore, selectUnreadCount } from '../stores/messageStore'
 import { useNotificationStore } from '../stores/notificationStore'
-import { getExternalAgentConfig, getExternalAgentStatus, activateExa } from '../services/externalAgentService'
+import { getExternalAgentConfig, getExternalAgentStatus, activateExa, updateExaModel, modelAskFrom } from '../services/externalAgentService'
+import ExaModelAskDialog, { type ExaModelOffer } from '../components/features/exa/ExaModelAskDialog'
 import { SessionService } from '../services/domain/SessionService'
 import { SessionSource } from '../services/sessionSyncService'
 import { navigateTo } from '../services/crossTab/navigationService'
@@ -54,6 +55,13 @@ export default function ExaChat() {
   const [exaActive, setExaActive] = useState<boolean | null>(null)
   const [exaBlockedReason, setExaBlockedReason] = useState<string | null>(null)
   const [activating, setActivating] = useState(false)
+  // THE MODEL ASK (2026-11-22, measured on the release run): activation provisions Exa's home, and a
+  // home with NO model does not answer at all — the first turn came back as an opaque
+  // `RequestError: Internal error` while the toast said "say something to wake it up". The
+  // integrations page asked this question; this page did not, and this page is the door the
+  // readiness verdict links to. One dialog component, both doors.
+  const [modelAsk, setModelAsk] = useState<ExaModelOffer | null>(null)
+  const [savingModel, setSavingModel] = useState(false)
   useEffect(() => {
     getExternalAgentConfig()
       .then(cfg => setExaImage(cfg.image || ''))
@@ -831,19 +839,66 @@ export default function ExaChat() {
       setExaActive(res.enabled)
       setExaBlockedReason(res.blocked_reason ?? null)
       if (res.enabled) reconnectNow()
-      useNotificationStore.getState().addNotification({
-        type: res.runnable ? 'success' : 'warning',
-        title: res.runnable ? 'Exa activated' : 'Exa activated — but it cannot run here yet',
-        message: res.runnable
-          ? 'Say something to wake it up.'
-          : (res.blocked_reason ?? 'The runtime it needs is missing from this machine.'),
-      })
+      // THE ANSWER'S SECOND FACT (2026-11-22): "activated" and "able to answer" are different, and
+      // on a home with no model the difference is total. Ask the one question activation cannot
+      // decide, with this install's model already named.
+      const { needsModel, offer } = modelAskFrom(res)
+      if (needsModel) {
+        if (offer) {
+          setModelAsk(offer)
+          useNotificationStore.getState().addNotification({
+            type: 'warning',
+            title: 'Exa activated — it needs a model',
+            message: 'One press on the card and it can answer.',
+          })
+        } else {
+          useNotificationStore.getState().addNotification({
+            type: 'warning',
+            title: 'Exa activated — but it has no model',
+            message: 'Nothing on this install answers chat yet. Set a provider and model first.',
+          })
+        }
+      } else {
+        useNotificationStore.getState().addNotification({
+          type: res.runnable ? 'success' : 'warning',
+          title: res.runnable ? 'Exa activated' : 'Exa activated — but it cannot run here yet',
+          message: res.runnable
+            ? 'Say something to wake it up.'
+            : (res.blocked_reason ?? 'The runtime it needs is missing from this machine.'),
+        })
+      }
     } catch (err) {
       useNotificationStore.getState().addNotification({ type: 'error', title: 'Exa', message: String(err) })
     } finally {
       setActivating(false)
     }
   }, [reconnectNow])
+
+  // THE ASK'S ACCEPT: the same write the integrations page's Model card makes, so the two doors can
+  // never disagree about what "use this model" means.
+  const acceptOfferedModel = useCallback(async () => {
+    if (!modelAsk) return
+    const chosen = modelAsk
+    setSavingModel(true)
+    try {
+      const updated = await updateExaModel({
+        model: chosen.model,
+        provider: chosen.provider,
+        base_url: chosen.base_url ?? '',
+      })
+      setModelAsk(null)
+      useNotificationStore.getState().addNotification({
+        type: 'success',
+        title: 'Exa Agent',
+        message: `Model set to ${updated.model} (${updated.provider})`,
+      })
+      reconnectNow()
+    } catch (err) {
+      useNotificationStore.getState().addNotification({ type: 'error', title: 'Exa Agent', message: String(err) })
+    } finally {
+      setSavingModel(false)
+    }
+  }, [modelAsk, reconnectNow])
 
   return (
     <ErrorBoundary>
@@ -1131,6 +1186,15 @@ export default function ExaChat() {
         <CognitiveTraceDebugOverlay
           cognitiveState={busCognitiveState}
           getCognitiveState={() => busStateRef.current}
+        />
+
+        {/* THE ACTIVATION ASK: asked here as well as on the integrations page, because this page
+            hosts the Activate button the readiness verdict links to. */}
+        <ExaModelAskDialog
+          offer={modelAsk}
+          saving={savingModel}
+          onAccept={acceptOfferedModel}
+          onDismiss={() => setModelAsk(null)}
         />
       </div>
     </ErrorBoundary>

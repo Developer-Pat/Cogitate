@@ -79,6 +79,13 @@ export async function restartExternalAgent(): Promise<{ status: string }> {
   return data!;
 }
 
+/** This install's chat model as the activation answer offers it — the one press that fills the gap. */
+export interface ExaModelOffer {
+  provider: string;
+  model: string;
+  base_url?: string | null;
+}
+
 /** The activation decision's shape — what the box can actually do about it. */
 export interface ExaActivation {
   enabled: boolean;
@@ -92,7 +99,7 @@ export interface ExaActivation {
   /** True when Exa has no model of its own: it cannot answer until one is chosen. */
   needs_model?: boolean;
   /** This install's chat model, offered as the one press that fills that gap. */
-  offer?: { provider: string; model: string; base_url?: string | null } | null;
+  offer?: ExaModelOffer | null;
 }
 
 /** How many files activation seeded into Exa's home (0 = it was already provisioned). */
@@ -106,6 +113,20 @@ export function seededFileCount(log?: string[]): number {
 export async function activateExa(): Promise<ExaActivation> {
   const { data } = await apiClient.post<ExaActivation>('/api/v1/external-agent/activate');
   return data!;
+}
+
+/**
+ * WHAT THE ANSWER MEANS FOR THE MODEL — one reading, both doors.
+ *
+ * "Activated" and "able to answer" are different facts, and on a home with no model the difference
+ * is total: the runtime's session comes back as an opaque `RequestError: Internal error` (measured
+ * on the 2026-11-22 release run). The integrations page consulted `needs_model`; the Exa CHAT page —
+ * the door the readiness verdict links to — did not, and told the user to just say something.
+ * Reading it once is what keeps the next page from forgetting.
+ */
+export function modelAskFrom(res: ExaActivation): { needsModel: boolean; offer: ExaModelOffer | null } {
+  const needsModel = Boolean(res.enabled && res.needs_model);
+  return { needsModel, offer: needsModel ? res.offer ?? null : null };
 }
 
 /** Switch Exa off; any live session is ended by the backend. */

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { PageBanner } from '../components/ui/PageBanner';
 import { PageContainer } from '../components/ui/PageContainer';
 import { HelpButton } from '../components/help';
+import ExaModelAskDialog from '../components/features/exa/ExaModelAskDialog';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useNotificationStore } from '../stores/notificationStore';
 import {
@@ -18,7 +19,7 @@ import {
   deactivateExa,
   getExternalAgentConfig,
   getExternalAgentStatus,
-  restartExternalAgent, getExaModel, updateExaModel, seededFileCount,
+  restartExternalAgent, getExaModel, updateExaModel, seededFileCount, modelAskFrom,
   updateExternalAgentConfig,
   type ExternalAgentConfig,
   type ExternalAgentStatus,
@@ -172,10 +173,13 @@ export default function AgentIntegration() {
         const seeded = seededFileCount(res.provisioned);
         // THE ASK (2026-11-20): a model-less Exa answers as plain Hermes. When the
         // answer says so, the page offers THIS install's chat model — one press, and
-        // it is the accept; nothing was inherited on the user's behalf.
-        if (res.needs_model) {
-          if (res.offer) {
-            setModelAsk(res.offer);
+        // it is the accept; nothing was inherited on the user's behalf. The reading is
+        // `modelAskFrom`, shared with the Exa chat page: this question was once asked
+        // on one of the two doors only.
+        const { needsModel, offer } = modelAskFrom(res);
+        if (needsModel) {
+          if (offer) {
+            setModelAsk(offer);
             addNotification({
               type: 'warning',
               title: 'Exa activated — it needs a model',
@@ -657,36 +661,15 @@ export default function AgentIntegration() {
         </div>
       </div>
 
-      {/* THE ACTIVATION ASK (2026-11-20) — DaisyUI v5 needs the <dialog> wrapper.
-          Activation provisions Exa's home; a home with no model answers as plain
-          Hermes. So the one thing the switch cannot decide is asked here, with this
-          install's chat model already named: one press and Exa can answer. */}
-      <dialog className="modal" open={!!modelAsk}>
-        <div className="modal-box">
-          <h3 className="font-bold text-lg">Exa is on — it has no model yet</h3>
-          <p className="py-3 text-sm">
-            Without one it answers as a plain agent with none of its own character. This
-            install answers chat with{' '}
-            <span className="font-mono">{modelAsk?.model}</span> via{' '}
-            <span className="font-mono">{modelAsk?.provider}</span>.
-          </p>
-          <div className="modal-action">
-            <div className="tooltip tooltip-top" data-tip="Pick any provider and model on the Model card instead">
-              <button className="btn btn-ghost btn-sm" onClick={() => setModelAsk(null)}>
-                Choose on the card
-              </button>
-            </div>
-            <div className="tooltip tooltip-top" data-tip="Write this install's chat model into Exa — one model, one key, one place">
-              <button className="btn btn-primary btn-sm" onClick={acceptOfferedModel} disabled={savingModel}>
-                {savingModel ? 'Saving…' : 'Use this model'}
-              </button>
-            </div>
-          </div>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button onClick={() => setModelAsk(null)}>close</button>
-        </form>
-      </dialog>
+      {/* THE ACTIVATION ASK (2026-11-20): one component, because the Exa CHAT page asks the same
+          question on the same event — and it did not, which is how a model-less runtime was told to
+          "say something to wake it up". */}
+      <ExaModelAskDialog
+        offer={modelAsk}
+        saving={savingModel}
+        onAccept={acceptOfferedModel}
+        onDismiss={() => setModelAsk(null)}
+      />
     </PageContainer>
   );
 }
