@@ -1,6 +1,6 @@
 [project]
 name = "cogitate"
-version = "0.1.1"
+version = "0.1.2"
 description = "A cognitive architecture exploration platform — multi-agent orchestration, LLM provider management, and workflow composition."
 authors = [{ name = "The Cogitate Authors" }]
 requires-python = ">=3.14"

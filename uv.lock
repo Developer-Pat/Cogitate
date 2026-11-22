@@ -247,7 +247,7 @@ wheels = [
 
 [[package]]
 name = "backend"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "backend" }
 dependencies = [
     { name = "aiosqlite" },
@@ -585,7 +585,7 @@ wheels = [
 
 [[package]]
 name = "cogitate"
-version = "0.1.1"
+version = "0.1.2"
 source = { virtual = "." }
 dependencies = [
     { name = "backend" },

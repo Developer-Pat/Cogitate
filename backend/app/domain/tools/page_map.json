@@ -316,14 +316,14 @@
     },
     {
       "kind": "alias",
-      "label": "Provider Dashboard — the Keys tab",
+      "label": "Setup — the API Keys tab",
       "match": [
         "keys",
         "api key",
         "api keys",
         "the keys"
       ],
-      "to": "/provider-dashboard"
+      "to": "/setup?tab=keys"
     },
     {
       "kind": "alias",

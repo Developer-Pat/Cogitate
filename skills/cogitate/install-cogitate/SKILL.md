@@ -50,11 +50,11 @@ Two facts that decide how you work here:
    on the box:
 
    ```bash
-   # cogitate-0.1.1.tar.gz and its .sha256, from
-   # https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.1
+   # cogitate-0.1.2.tar.gz and its .sha256, from
+   # https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.2
    # (the repository is private today, so that page needs access to it)
-   sha256sum -c cogitate-0.1.1.tar.gz.sha256
-   tar xzf cogitate-0.1.1.tar.gz && cd cogitate-0.1.1
+   sha256sum -c cogitate-0.1.2.tar.gz.sha256
+   tar xzf cogitate-0.1.2.tar.gz && cd cogitate-0.1.2
    ```
 
    Working on the code instead: `git clone https://github.com/Developer-Pat/Cogitate.git && cd Cogitate`.

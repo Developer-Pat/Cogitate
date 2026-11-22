@@ -553,7 +553,8 @@ describe('ExaPromptFlyout — config, help and back', () => {
     openFlyout();
     type('config keys');
     send();
-    await waitFor(() => expect(landedAt()).toBe('/provider-dashboard'));
+    // The keys act lives on Setup since the 2026-11-22 ruling; the dashboard's Keys tab is gone.
+    await waitFor(() => expect(landedAt()).toBe('/setup?tab=keys'));
   });
 
   it('help lists EVERY canonical verb — generated from the set, so it cannot drift', async () => {
