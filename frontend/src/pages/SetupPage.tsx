@@ -35,7 +35,7 @@ const TABS: { id: SetupTab; label: string; tip: string }[] = [
 ]
 
 const HELP_CONTEXT: Record<SetupTab, string> = {
-  express: 'setup-overview',
+  express: 'setup-express',
   overview: 'setup-overview',
   local: 'setup-local',
   keys: 'setup-keys',

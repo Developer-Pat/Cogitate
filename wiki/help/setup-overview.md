@@ -5,7 +5,7 @@ subtopic: Setup
 order: 1
 confidence: high
 created: 2026-08-04
-updated: 2026-11-20
+updated: 2026-11-21
 tags: [domain/help]
 ---
 
@@ -14,6 +14,12 @@ tags: [domain/help]
 The Overview tab is the install's **readiness verdict**: the facts that decide whether anything can
 answer, measured once in the backend. `./cogitate.sh verify` prints the same verdict from a terminal —
 one check, the same number.
+
+## The three steps, or one press
+
+A fresh install has no provider row, and the steps below each assume one. **Express** is the exception:
+pick a model from the shortlist, paste its key, press once, and the provider, the model, all five llm
+chains and the two reporters are written for you. The tabs below remain for choosing differently.
 
 ## The order
 
@@ -41,6 +47,7 @@ managed in full on the **Provider Dashboard**.
 ## Related
 
 - [Installing Cogitate](/wiki/help/setup-install) — the whole path, and the two decisions it leaves to you
+- [Setup — Express](/wiki/help/setup-express) — one model, one key, one press: the short path these steps shorten
 - [Setup — API Keys](/wiki/help/setup-keys) · [Setup — Default Model](/wiki/help/setup-model) ·
   [Setup — Agents](/wiki/help/setup-agent) — the three steps, in order
 - [Providers](/wiki/help/providers-overview) — the Provider Dashboard's own help

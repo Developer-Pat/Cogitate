@@ -2,10 +2,10 @@
 title: Setup — Agents
 category: setup-agent
 subtopic: Setup
-order: 5
+order: 6
 confidence: high
 created: 2026-08-04
-updated: 2026-11-20
+updated: 2026-11-21
 tags: [domain/help]
 ---
 

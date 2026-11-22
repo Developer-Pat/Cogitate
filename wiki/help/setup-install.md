@@ -86,7 +86,10 @@ model server) is what makes `verify` say ready, because it is what makes an agen
 
 ## 4. The two decisions the install leaves to you
 
-### A model — `scripts/core/setup_models.py`
+### A model — the Setup page's Express tab, or `scripts/core/setup_models.py`
+
+The shortest path is in the app: **Setup → Express**, one model from a shortlist, one key, one press
+([Setup — Express](/wiki/help/setup-express)). From a terminal, the same choice is a script:
 
 Structure ships with the install (the capability rows, the provider shells, the tables); a **value** — which
 model answers — is offered rather than decided. The step reports every capability, proposes only what this

@@ -2,10 +2,10 @@
 title: Setup — Local LLM
 category: setup-local
 subtopic: Setup
-order: 2
+order: 3
 confidence: high
 created: 2026-08-04
-updated: 2026-11-20
+updated: 2026-11-21
 tags: [domain/help]
 ---
 
