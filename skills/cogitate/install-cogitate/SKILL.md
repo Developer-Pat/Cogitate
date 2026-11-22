@@ -1,7 +1,7 @@
 ---
 name: cogitate-install-cogitate
-description: "Install Cogitate on a Linux box and leave it running: clone, one bootstrap command, one readiness check, then decide about Exa. Use when asked to install, set up, or run Cogitate for the first time."
-version: 2.0.0
+description: "Install Cogitate on a Linux box and leave it running: download the release copy (or clone), one bootstrap command, one readiness check, then decide about Exa. Use when asked to install, set up, or run Cogitate for the first time."
+version: 2.1.0
 author: Cogitate Team
 license: MIT
 metadata:
@@ -14,7 +14,7 @@ metadata:
 
 ## Overview
 
-A fresh clone plus ONE command is a working install: `./cogitate.sh install`. It is idempotent, it
+A release copy (or a fresh clone) plus ONE command is a working install: `./cogitate.sh install`. It is idempotent, it
 verifies its own steps, and it is the only thing that defines what "installed" means — every other
 delivery path (a package, this skill) wraps it, so do not reimplement any part of it by hand.
 
@@ -43,8 +43,20 @@ Two facts that decide how you work here:
 
    Debian, Ubuntu or Mint with `curl` and `sudo` is the whole requirement. Anything else: stop and report.
 
-2. **Clone.** `git clone https://github.com/Developer-Pat/Cogitate.git && cd Cogitate`. If the clone is
-   refused for auth, the repository is not public yet — report that, and never substitute a mirror.
+2. **Get the code.** The release copy is the shipped path — no git, no key, no account once the files are
+   on the box:
+
+   ```bash
+   # cogitate-0.1.0.tar.gz and its .sha256, from
+   # https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.0
+   # (the repository is private today, so that page needs access to it)
+   sha256sum -c cogitate-0.1.0.tar.gz.sha256
+   tar xzf cogitate-0.1.0.tar.gz && cd cogitate-0.1.0
+   ```
+
+   Working on the code instead: `git clone https://github.com/Developer-Pat/Cogitate.git && cd Cogitate`.
+   If the clone is refused for auth, the repository is not public yet — report that, and never substitute
+   a mirror.
 
 3. **Install.** `./cogitate.sh install`. It installs git if absent, uv, Node 20, creates `.env` from
    `.env.example` (never overwriting one), runs `uv sync` and `npm ci`, then proves the result (interpreter

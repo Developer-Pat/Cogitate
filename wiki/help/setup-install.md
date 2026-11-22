@@ -26,7 +26,10 @@ still ship 3.12).
 ## 1. Install
 
 ```bash
-# A release copy: no git, no key, no account. Check the download, then unpack it.
+# A release copy: no git, no key, no account once downloaded. Get the tarball and
+# its .sha256 from https://github.com/Developer-Pat/Cogitate/releases/tag/v0.1.0
+# (the repository is private today, so that page needs access to it); check the
+# download, then unpack it.
 sha256sum -c cogitate-0.1.0.tar.gz.sha256
 tar xzf cogitate-0.1.0.tar.gz && cd cogitate-0.1.0
 
