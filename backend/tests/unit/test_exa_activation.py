@@ -233,16 +233,18 @@ def _home_with_model(tmp_path, model="anthropic/claude-opus-4.6", provider="anth
 
 
 def test_a_model_without_its_key_is_reported_unusable(tmp_path):
-    """The measured ladder: `model ✓` beside `keys ✗` — a stranger reads the tick as working.
+    """A model with no credential is not a satisfied step.
 
-    The step still passes (the SECTION exists, and Exa may deliberately run on another model);
-    the credential fact rides the detail, which is where a reader can act on it.
+    It used to pass (`ok` was about the SECTION existing, and Exa may deliberately run on another
+    model); measured on the 0.1.2 walk, that let a home with a model and no key read every step
+    green while the runtime could not make one call.
     """
     home = _home_with_model(tmp_path, env_lines="ANTHROPIC_API_KEY=\n")
     check = activation._check_model(home)
-    assert check.ok is True
+    assert check.ok is False
     assert "usable: no" in check.detail
     assert "ANTHROPIC_API_KEY" in check.detail
+    assert "Setup → API Keys" in check.fix
 
 
 def test_a_model_with_its_key_is_reported_usable(tmp_path):
@@ -371,3 +373,58 @@ def test_the_keys_step_says_where_the_key_already_is(monkeypatch, tmp_path):
     assert check.ok is False
     assert "DEEPSEEK_API_KEY" in check.fix
     assert "--carry-operator-env" in check.fix
+
+
+def test_a_budget_is_not_a_provider_key(tmp_path):
+    """MEASURED on the 0.1.2 walk: `INPUT_TOKEN_BUDGET=100000` counted as a provider key.
+
+    The ladder printed `keys ✓ present: INPUT_TOKEN_BUDGET` on a home whose model had no
+    credential — and, with the model step passing on its section alone, ended
+    "READY — Exa can answer" over a runtime that could not make one call.
+    """
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    (home / ".env").write_text("INPUT_TOKEN_BUDGET=100000\n", encoding="utf-8")
+
+    assert activation._present_key_names(home) == []
+    check = activation._check_keys(home)
+    assert check.ok is False
+    assert "--apply" in check.fix, "the fix names the door that copies a key this install already has"
+
+
+def test_a_numeric_token_setting_is_not_a_credential():
+    """A number is a setting; `_TOKEN` in the name does not make it a secret.
+
+    The same trap shipped a numeric setting as an empty SECRET through the env-example
+    generator (`SECRET_HINTS` contains `_TOKEN`) and stopped a fresh backend at import.
+    """
+    assert activation._is_credential("INPUT_TOKEN_BUDGET", "100000") is False
+    assert activation._is_credential("SOME_TOKEN", "60") is False
+    assert activation._is_credential("SOME_TOKEN", "abc123") is True
+    assert activation._is_credential("DEEPSEEK_API_KEY", "sk-1") is True
+    assert activation._is_credential("COGITATE_ENCRYPTION_KEY", "app-secret") is False
+
+
+def test_provisioning_does_not_carry_the_input_budget(tmp_path):
+    """The copy filter and the presence check are one rule now — neither carries a number."""
+    home = tmp_path / ".hermes"
+    env = tmp_path / "project.env"
+    env.write_text("INPUT_TOKEN_BUDGET=100000\nDEEPSEEK_API_KEY=sk-test\n", encoding="utf-8")
+
+    log = activation.provision_home(home=home, seed_dir=tmp_path / "none", project_env=env)
+    written = (home / ".env").read_text(encoding="utf-8")
+
+    assert "INPUT_TOKEN_BUDGET" not in written
+    assert "DEEPSEEK_API_KEY=sk-test" in written
+    assert not any("INPUT_TOKEN_BUDGET" in line for line in log)
+
+
+def test_a_model_nobody_can_call_is_not_a_satisfied_step(tmp_path):
+    """The verdict itself: two green rows over no credential made `ready` True."""
+    home = _home_with_model(tmp_path, env_lines="INPUT_TOKEN_BUDGET=100000\n")
+    report = activation.ActivationReport(
+        checks=[activation._check_model(home), activation._check_keys(home)]
+    )
+
+    assert [c.ok for c in report.checks] == [False, False]
+    assert report.ready is False, "a model nobody can call is not a satisfied sequence"

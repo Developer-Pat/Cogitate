@@ -45,8 +45,32 @@ HERMES_INSTALL_COMMAND = "curl -fsSL https://hermes-agent.nousresearch.com/insta
 # and the test only asserted the PUBLIC half of the pair. A provider key is an
 # API_KEY or a TOKEN; a SECRET is an application credential. Unknown names still
 # do not carry a bare `*_KEY`, which is what keeps COGITATE_ENCRYPTION_KEY out.
-_CARRIED_ENV_MARKERS = ("API_KEY", "BASE_URL", "TOKEN")
-_KEY_MARKERS = ("API_KEY", "TOKEN")
+# A CREDENTIAL IS A SHAPE, NOT A SUBSTRING (2026-11-22, measured on the 0.1.2 walk).
+# `_KEY_MARKERS = ("API_KEY", "TOKEN")` matched NAMES, so `INPUT_TOKEN_BUDGET` — a number —
+# counted as a provider key and was also copied into Exa's home: the ladder printed
+# `keys ✓ present: INPUT_TOKEN_BUDGET` beside `model … (usable: no …)` and still ended
+# "READY — Exa can answer". The same trap had already shipped a numeric setting as an empty
+# SECRET through the env-example generator, whose `SECRET_HINTS` contains `_TOKEN`.
+# So a NAME SUFFIX says what the line is, and a purely numeric value is never a credential.
+_CREDENTIAL_SUFFIXES = ("_API_KEY", "_TOKEN")
+# Carried because the agent needs them, but not credentials: a provider's endpoint.
+_CARRIED_ONLY_SUFFIXES = ("_BASE_URL",)
+
+
+def _is_credential(name: str, value: str) -> bool:
+    """Is this `.env` line a provider CREDENTIAL? Shape, never a bare substring."""
+    if not name.strip().upper().endswith(_CREDENTIAL_SUFFIXES):
+        return False
+    v = value.strip()
+    # A budget, a window, a limit: numbers are settings, never secrets.
+    return bool(v) and not v.isdigit()
+
+
+def _is_carried(name: str, value: str) -> bool:
+    """Lines provisioning copies into Exa's home: credentials, plus provider base URLs."""
+    if _is_credential(name, value):
+        return True
+    return bool(value.strip()) and name.strip().upper().endswith(_CARRIED_ONLY_SUFFIXES)
 
 
 @dataclass
@@ -155,10 +179,10 @@ def _env_keys(dst: Path, src: Path) -> list[str]:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key = line.split("=", 1)[0].strip()
-            # THE ORIGINAL FILTER, deliberately NOT widened: a `*_KEY` suffix
-            # would also carry COGITATE_ENCRYPTION_KEY into the agent's home, and
-            # an app secret crossing that boundary is a leak, not a convenience.
-            if any(w in key.upper() for w in _CARRIED_ENV_MARKERS):
+            # NEVER widened to a bare `*_KEY`: that suffix would also carry
+            # COGITATE_ENCRYPTION_KEY into the agent's home, and an app secret
+            # crossing that boundary is a leak, not a convenience.
+            if _is_carried(key, line.split("=", 1)[1]):
                 carried[key] = line
 
     existing = dst.read_text(encoding="utf-8").splitlines() if dst.exists() else []
@@ -361,7 +385,7 @@ def _present_key_names(home: Path) -> list[str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
-        if value.strip() and any(w in key.upper() for w in _KEY_MARKERS):
+        if _is_credential(key, value):
             names.append(key.strip())
     return names
 
@@ -395,10 +419,14 @@ def _model_usable(home: Path, provider: str, base_url: str | None) -> tuple[bool
 def _check_model(home: Path, offer: ChatOffer | None = None) -> ActivationCheck:
     """The model step: what is configured, whether it can ANSWER, and the offer.
 
-    `ok` stays about the section existing — Exa may deliberately run on something other than
-    this install's model. USABILITY rides the detail, so the ladder reads
-    `model ✓ (usable: no — ANTHROPIC_API_KEY is empty ...)` rather than a ✓ that a stranger
-    reads as a working model.
+    `ok` means the step is SATISFIED — a model that is configured AND callable (any provider with
+    a key in this home, or a loopback endpoint that needs none). Deliberate choice is about WHICH
+    model, never about calling one with no credential.
+
+    It used to be `ok` about the SECTION existing, with usability riding the detail only; measured
+    on the 0.1.2 walk, that let a home with a model and no key report every step green while the
+    runtime could not make one call, and the ladder ended "READY — Exa can answer" under its own
+    `usable: no`.
     """
     m = read_model_config(home)
     have = (m.get("model"), m.get("provider"))
@@ -407,6 +435,14 @@ def _check_model(home: Path, offer: ChatOffer | None = None) -> ActivationCheck:
         detail = f"{have[0]} via {have[1]} (usable: {'yes' if usable else 'no — ' + why})"
         if offer is not None and have != (offer.model, offer.provider):
             detail += f"; this install's chat model is {offer.model} via {offer.provider}"
+        if not usable:
+            fix = (
+                "Add the provider key on Setup → API Keys — that is the .env provisioning copies "
+                "from — then run with --apply."
+            )
+            if offer is not None:
+                fix += f" Or take this install's chat model ({offer.model} via {offer.provider})."
+            return ActivationCheck("model", False, detail, fix=fix)
         return ActivationCheck("model", True, detail)
     fix = (
         f"Take this install's chat model — {offer.model} via {offer.provider} (--from-default, "
@@ -424,7 +460,11 @@ def _check_keys(home: Path) -> ActivationCheck:
     # A key the operator already configured in their OWN Hermes home is one command away, and
     # saying so is the difference between "type it again" and "you already have this" (2026-11-22).
     available = operator_key_names(home)
-    fix = "Add the provider key to the project's .env and run with --apply."
+    fix = (
+        "Add the provider key on Setup → API Keys (that is the project's .env provisioning copies "
+        "from) — or, if this install already has the key, run with --apply to copy it into Exa's "
+        "home; nothing needs typing again."
+    )
     if available:
         fix = (
             f"{_operator_env_path()} already has {', '.join(sorted(available))} — carry it across "
