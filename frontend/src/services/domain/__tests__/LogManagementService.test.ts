@@ -40,13 +40,14 @@ vi.mock('@/services/domain/TraceService', () => ({
   }
 }))
 
-// Mock EventSource
-vi.stubGlobal('EventSource', vi.fn(() => ({
+// Mock EventSource — a `function` impl, not an arrow: vitest 4 refuses `new` on an
+// arrow-implemented mock, and the service constructs it with `new`.
+vi.stubGlobal('EventSource', vi.fn(function () { return {
   onmessage: null,
   onerror: null,
   close: vi.fn(),
   readyState: 1
-})))
+} }))
 
 describe('LogManagementService', () => {
   let service: LogManagementService
