@@ -41,6 +41,11 @@ export const useSettingsStore = create<SettingsState>()(
           enableAutoTitle: true,
           titleModelPreference: 'backend_default',
           titleCustomModel: '',
+          // Both required by GeneralSettings; the store shipped without them, so a page that read
+          // them before the backend load got `undefined`. zustand 5.1's stricter inference is what
+          // surfaced it.
+          showMacroIds: false,
+          showPipelineIndicators: false,
         },
         appearance: {
           theme: 'auto',
