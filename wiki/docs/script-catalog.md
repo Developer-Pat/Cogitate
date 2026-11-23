@@ -16,7 +16,7 @@ is its documented `Usage:` line or the project default for that file type.
 Regenerate with `python3 scripts/dev/generate_script_catalog.py`; `--check`
 fails when the page is stale.
 
-**108 scripts** in 10 directories.
+**109 scripts** in 10 directories.
 
 ---
 
@@ -28,7 +28,7 @@ fails when the page is stale.
 | `scripts/` | Top-level verification helpers. | 2 |
 | `scripts/bench/` | THE BENCH: the fixed job set and its driver. | 1 |
 | `scripts/core/` | Seeding, RAG ingestion, backup, export, sweep, docs. | 33 |
-| `scripts/dev/` | Developer tools: metrics, codemods, API limit probes. | 7 |
+| `scripts/dev/` | Developer tools: metrics, codemods, API limit probes. | 8 |
 | `scripts/diagnostics/` | Health checks, model probes, conflict detection. | 4 |
 | `scripts/maintenance/` | Migrations, cleanup, database recovery. | 9 |
 | `scripts/spikes/` | Throwaway experiments kept for the record. | 1 |
@@ -125,6 +125,7 @@ Developer tools: metrics, codemods, API limit probes.
 
 | Script | Purpose | Invocation |
 |--------|---------|------------|
+| [`capture_screenshots.py`](scripts/dev/capture_screenshots.py) | Capture screenshots of the running app, with every tooltip forced open if asked. | `uv run python scripts/dev/capture_screenshots.py` |
 | [`check-openrouter-limits.js`](scripts/dev/check-openrouter-limits.js) | (no module docstring) | `node scripts/dev/check-openrouter-limits.js` |
 | [`check_mermaid_fences.mjs`](scripts/dev/check_mermaid_fences.mjs) | (no module docstring) | `node scripts/dev/check_mermaid_fences.mjs` |
 | [`fix_ts6133.py`](scripts/dev/fix_ts6133.py) | Bulk-fix TS6133 (unused declarations) errors across the frontend. — Reads `npx tsc -b` output from stdin and applies mechanical fixes. | `uv run python scripts/dev/fix_ts6133.py` |
