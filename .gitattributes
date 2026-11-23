@@ -33,5 +33,4 @@
 
 # Generated lockfiles: one line in diffs, out of the language statistics.
 uv.lock                    linguist-generated=true -diff
-backend/uv.lock            linguist-generated=true -diff
 frontend/package-lock.json linguist-generated=true -diff

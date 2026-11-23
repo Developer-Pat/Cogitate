@@ -1,6 +1,11 @@
 # Dependabot — dependency updates for the two package universes this repo has.
 # The Python side uses uv (pyproject.toml + uv.lock), so the ecosystem is `uv`, not `pip`;
 # a `pip` entry would ignore the lockfile this project actually installs from.
+#
+# `directory: "/"` is the ONLY Python entry, and has to be: the root pyproject.toml declares a
+# uv workspace whose member is `backend`, and a uv workspace has exactly one lockfile — the root
+# one. A `/backend` entry made Dependabot open 305 alerts against a `backend/uv.lock` that `uv`
+# never reads (and that had drifted to packages the project no longer has).
 version: 2
 
 updates:
@@ -13,18 +18,6 @@ updates:
       prefix: "chore(deps)"
     groups:
       root-python:
-        patterns: ["*"]
-        update-types: ["minor", "patch"]
-
-  - package-ecosystem: "uv"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-    groups:
-      backend-python:
         patterns: ["*"]
         update-types: ["minor", "patch"]
 
