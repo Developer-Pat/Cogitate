@@ -3,11 +3,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import fs from 'fs'
+import { fileURLToPath } from 'node:url'
 import { aliases } from './aliases'
 
-// Read version from package.json
+// Read version from the ROOT pyproject.toml — the same file `./cogitate.sh release` treats as the
+// version's home and the same one the backend reports. frontend/package.json says 0.0.0 and is never
+// bumped, so reading it here put "v0.0.0" in the header of a 0.1.x build.
 const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf-8'))
-const appVersion = packageJson.version || '0.0.0-dev'
+const rootPyproject = fs.readFileSync(fileURLToPath(new URL('../pyproject.toml', import.meta.url)), 'utf-8')
+const appVersion = rootPyproject.match(/^version\s*=\s*"([^"]+)"/m)?.[1] ?? packageJson.version ?? '0.0.0-dev'
 
 // https://vite.dev/config/
 // PORTS (2026-09-15). The launcher EXPORTS these, so the dev server and its API
