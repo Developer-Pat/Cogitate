@@ -3,7 +3,7 @@ title: Script Catalog
 type: atlas-docs
 path: wiki/docs/script-catalog.md
 confidence: medium
-updated: 2026-11-22
+updated: 2026-11-23
 tags: [type/docs, domain/docs]
 ---
 
@@ -16,7 +16,7 @@ is its documented `Usage:` line or the project default for that file type.
 Regenerate with `python3 scripts/dev/generate_script_catalog.py`; `--check`
 fails when the page is stale.
 
-**107 scripts** in 10 directories.
+**108 scripts** in 10 directories.
 
 ---
 
@@ -29,7 +29,7 @@ fails when the page is stale.
 | `scripts/bench/` | THE BENCH: the fixed job set and its driver. | 1 |
 | `scripts/core/` | Seeding, RAG ingestion, backup, export, sweep, docs. | 33 |
 | `scripts/dev/` | Developer tools: metrics, codemods, API limit probes. | 7 |
-| `scripts/diagnostics/` | Health checks, model probes, conflict detection. | 3 |
+| `scripts/diagnostics/` | Health checks, model probes, conflict detection. | 4 |
 | `scripts/maintenance/` | Migrations, cleanup, database recovery. | 9 |
 | `scripts/spikes/` | Throwaway experiments kept for the record. | 1 |
 | `scripts/testing/` | Test execution, suites, gates, provider probes. | 18 |
@@ -141,6 +141,7 @@ Health checks, model probes, conflict detection.
 
 | Script | Purpose | Invocation |
 |--------|---------|------------|
+| [`audit_dependencies.py`](scripts/diagnostics/audit_dependencies.py) | Measure the dependency backlog the way an auditor would, not the way a badge does. | `uv run python scripts/diagnostics/audit_dependencies.py` |
 | [`example_triggers.py`](scripts/diagnostics/example_triggers.py) | Example triggers for testing and demonstration. — This script creates example triggers to demonstrate the event-driven trigger system: | `uv run python scripts/diagnostics/example_triggers.py` |
 | [`langfuse_sink.py`](scripts/diagnostics/langfuse_sink.py) | Langfuse rung 1 — the local sink: does the payload our code builds cross the wire? | `uv run python scripts/diagnostics/langfuse_sink.py` |
 | [`verify_tool_slug_conflicts.py`](scripts/diagnostics/verify_tool_slug_conflicts.py) | Verify that no built-in tool has slug/config argument conflicts with — ToolRegistry.execute_tool(tool_slug, tool_config, arguments). | `uv run python scripts/diagnostics/verify_tool_slug_conflicts.py` |
