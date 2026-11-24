@@ -1,0 +1,14 @@
+{
+  "topic": "Agents",
+  "name": "The pool",
+  "description": "Agent state, kits, tool permissions and stuck sessions",
+  "sort_order": 2,
+  "is_active": true,
+  "macros": {
+    "f1": "List the agents and their state.",
+    "f2": "Which agents are running, stalled or idle?",
+    "f3": "Check the agent kits and tool permissions.",
+    "f4": "What did the last agent run cost?",
+    "f5": "Is anything stuck in a session?"
+  }
+}

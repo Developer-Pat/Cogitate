@@ -1,0 +1,16 @@
+{
+  "name": "About Cogitate",
+  "namespace": "agent",
+  "description": "The tour — logging, the wiki, agent profiles, the knowledge base and workflows",
+  "surface": "exa",
+  "role": "default",
+  "is_active": true,
+  "sort_order": 20,
+  "macro_sets": [
+    "logging.json",
+    "wiki.json",
+    "agent-profiles.json",
+    "knowledge.json",
+    "workflows.json"
+  ]
+}

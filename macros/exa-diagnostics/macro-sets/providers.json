@@ -1,0 +1,14 @@
+{
+  "topic": "Providers",
+  "name": "Models",
+  "description": "Provider health, keys, routing and call failures",
+  "sort_order": 1,
+  "is_active": true,
+  "macros": {
+    "f1": "Check the provider health.",
+    "f2": "Which providers are configured, and which are missing keys?",
+    "f3": "What is calling which model right now?",
+    "f4": "Are any provider calls failing or slow?",
+    "f5": "Walk the provider configuration end to end."
+  }
+}

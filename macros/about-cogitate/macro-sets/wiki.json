@@ -1,0 +1,14 @@
+{
+  "topic": "The Wiki",
+  "name": "Knowledge base",
+  "description": "The tracked wiki — structure, schema, and how to search it",
+  "sort_order": 1,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the wiki.",
+    "f2": "How is the wiki organised?",
+    "f3": "How do I find something in the wiki?",
+    "f4": "What is the difference between help pages and dev notes?",
+    "f5": "How does the wiki stay current?"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "A-Key Macros",
+  "namespace": "agent",
+  "description": "The action keys — response, conversation, self-check and modes",
+  "surface": "agent",
+  "role": "action",
+  "is_active": true,
+  "sort_order": 15,
+  "macro_sets": [
+    "response-macros.json",
+    "greetings.json",
+    "conversation.json",
+    "diagnostics.json",
+    "modes.json"
+  ]
+}

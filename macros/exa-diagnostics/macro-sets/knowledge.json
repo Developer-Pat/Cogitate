@@ -1,0 +1,14 @@
+{
+  "topic": "Knowledge",
+  "name": "Docs and memory",
+  "description": "RAG freshness, ingest results and the memory stores",
+  "sort_order": 3,
+  "is_active": true,
+  "macros": {
+    "f1": "Is the RAG index current?",
+    "f2": "Run the ingest and report what changed.",
+    "f3": "Which documents are indexed, and which failed?",
+    "f4": "Check the cognitive memory stores.",
+    "f5": "What can the agents answer from these docs?"
+  }
+}

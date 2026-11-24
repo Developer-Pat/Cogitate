@@ -1,0 +1,16 @@
+{
+  "name": "Bob",
+  "namespace": "agent",
+  "description": "News Hound — local desk, world headlines, tabloid and the native-language press",
+  "surface": "agent",
+  "role": "default",
+  "is_active": true,
+  "sort_order": 5,
+  "macro_sets": [
+    "local-desk.json",
+    "world-headlines.json",
+    "tabloid-fortean.json",
+    "native-language-press.json",
+    "tech-and-science.json"
+  ]
+}

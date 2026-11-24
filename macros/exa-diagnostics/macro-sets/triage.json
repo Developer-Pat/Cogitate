@@ -1,0 +1,14 @@
+{
+  "topic": "Triage",
+  "name": "First look",
+  "description": "The read-only first pass when something looks wrong",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Check the logs for errors and warnings.",
+    "f2": "Give me a system status report.",
+    "f3": "Diagnose the current state — read only, change nothing.",
+    "f4": "Why did that fail?",
+    "f5": "Let's fix it."
+  }
+}

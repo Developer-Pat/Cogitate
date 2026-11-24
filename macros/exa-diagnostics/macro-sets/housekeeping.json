@@ -1,0 +1,14 @@
+{
+  "topic": "Housekeeping",
+  "name": "Tidying",
+  "description": "Disk, databases, locks, trash and log growth",
+  "sort_order": 4,
+  "is_active": true,
+  "macros": {
+    "f1": "Check the disk and the database sizes.",
+    "f2": "Are there stale locks, PIDs or zombie processes?",
+    "f3": "What is in the trash, and what can be cleared?",
+    "f4": "Check the log growth and rotation.",
+    "f5": "What needs attention before the next run?"
+  }
+}

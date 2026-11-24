@@ -1,0 +1,14 @@
+{
+  "topic": "Greetings & Check-ins",
+  "name": "Conversational openers",
+  "description": "Opening moves and the are-you-there checks",
+  "sort_order": 1,
+  "is_active": true,
+  "macros": {
+    "f1": "Hello",
+    "f2": "Are you OK?",
+    "f3": "Good morning. What is on our agenda?",
+    "f4": "What is our status?",
+    "f5": "Let's wrap up and roll."
+  }
+}

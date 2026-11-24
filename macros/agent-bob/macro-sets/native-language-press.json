@@ -1,0 +1,14 @@
+{
+  "topic": "Native-Language Press",
+  "name": "Vox Populi",
+  "description": "The region's own press, in its own language — what the local reader sees",
+  "sort_order": 3,
+  "is_active": true,
+  "macros": {
+    "f1": "Please sweep the native-language press — the Vox Populi scan.",
+    "f2": "What is the local-language press leading with today?",
+    "f3": "Any story the international press is not carrying?",
+    "f4": "Translate the front page of the leading local outlet.",
+    "f5": "Which region should I point you at? Ask me, then sweep."
+  }
+}
