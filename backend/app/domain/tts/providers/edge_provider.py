@@ -73,7 +73,14 @@ class EdgeProvider:
             )
             _, err = await proc.communicate()
             if proc.returncode != 0:
-                raise RuntimeError(f"edge-tts failed ({proc.returncode}): {err.decode('utf-8', 'replace')[:200]}")
+                # THE USEFUL LINE IS THE LAST ONE. A Python traceback opens with the
+                # frame list and ends with the reason; slicing the HEAD left
+                # "edge-tts failed (1): Traceback (most recent call last): …" in the
+                # log with the actual cause (a 403 from Microsoft's endpoint, a
+                # missing voice) cut off past the 200th character.
+                detail = err.decode("utf-8", "replace").strip().splitlines()
+                reason = " | ".join(line.strip() for line in detail[-3:]) if detail else "no output"
+                raise RuntimeError(f"edge-tts failed ({proc.returncode}): {reason[:400]}")
             data = out_path.read_bytes()
             if not data:
                 raise RuntimeError("edge-tts produced no audio")
