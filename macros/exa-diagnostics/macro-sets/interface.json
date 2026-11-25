@@ -1,0 +1,14 @@
+{
+  "topic": "Interface",
+  "name": "Speech, themes, macros",
+  "description": "The parts of the app you look at and talk to",
+  "sort_order": 3,
+  "is_active": true,
+  "macros": {
+    "f1": "The TTS is not working. Is it configured correctly?",
+    "f2": "The voices are not loading. Why?",
+    "f3": "The theme is not applying. Why?",
+    "f4": "The macros are not loading. Why?",
+    "f5": "Are the speech settings configured correctly?"
+  }
+}

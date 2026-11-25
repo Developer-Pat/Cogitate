@@ -92,8 +92,22 @@ export const ttsService = {
     const controller = new AbortController()
     pendingAbort = controller
     fetch(url, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`tts api ${res.status}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          // THE SERVER'S REASON WINS when it gave one: a 409 says speech is switched
+          // off, and telling the user to "check the backend" sends them hunting in the
+          // wrong place for a setting that is one press away.
+          let detail = ''
+          try {
+            const body = await res.json()
+            if (body && body.detail) detail = String(body.detail)
+          } catch {
+            // not JSON (a proxy page, an empty body) — fall through to the generic text
+          }
+          const error = new Error(detail || `tts api ${res.status}`) as Error & { fromServer?: boolean }
+          error.fromServer = Boolean(detail)
+          throw error
+        }
         return res.blob()
       })
       .then((blob) => {
@@ -123,9 +137,12 @@ export const ttsService = {
         const now = Date.now()
         if (now - lastFailureNotice > 10_000) {
           lastFailureNotice = now
+          const fromServer = (err as { fromServer?: boolean } | null)?.fromServer
           useNotificationStore.getState().addError(
             'Voice unavailable',
-            'The speech service did not respond — check the backend.',
+            fromServer && err instanceof Error
+              ? err.message
+              : 'The speech service did not respond — check the backend.',
             3000
           )
         }

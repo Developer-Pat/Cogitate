@@ -1,0 +1,14 @@
+{
+  "topic": "Weird News",
+  "name": "Eastern & Latin",
+  "description": "UFOs, cryptids and folk entities — Eastern lens, then Latin Lens",
+  "sort_order": 4,
+  "is_active": true,
+  "macros": {
+    "f1": "Please sweep the weird-news beat — Eastern lens.",
+    "f2": "Check the latest UFO and UAP stories.",
+    "f3": "Please sweep the weird-news beat — Latin Lens.",
+    "f4": "Any cryptid or folk-entity story from Latin America?",
+    "f5": "What is the strangest story you have today?"
+  }
+}

@@ -4,11 +4,13 @@ The TTS PREFERENCES live in the UserSettings JSON blob under the
 "tts" key (the notifications-config pattern). Shape:
 
     {"voice": "en_US-lessac-medium", "rate": 1.0,
-     "enabled": true, "source": "piper", "sticky_mode": "siren"}
+     "enabled": false, "source": "piper", "sticky_mode": "siren"}
 
 - voice: the engine's voice name (the piper model's filename stem).
 - rate: the speaking speed (1.0 = normal).
-- enabled: the global TTS on/off (the P2 toggle).
+- enabled: the global TTS on/off (the P2 toggle). **OFF out of the box** —
+  shipping it on made a fresh install read every reply aloud and, where TTS is
+  unconfigured, raise a failure notice nobody asked for.
 - source: the voice SOURCE — "piper" (the app's TTS API) vs
   "browser" (the system's speechSynthesis — the OS voice, no API).
   The user's switch ask (2026-08-30). This is a PATH preference, not
@@ -42,7 +44,12 @@ RETIRED_KEYS: tuple[str, ...] = ("provider",)
 DEFAULT_CONFIG: dict = {
     "voice": "en_US-lessac-medium",
     "rate": 1.0,
-    "enabled": True,
+    # THE SHIPPED STATE IS OFF (2026-11-25, the user's ruling). Speech is an OUTBOUND
+    # call to a third party — the keyless edge-tts path talks to Microsoft, and the
+    # piper path has to be installed per machine — so a fresh install must not start
+    # speaking on its own: no auto-read, no failure notice nobody asked for, no traffic
+    # to a service nobody chose. Turning it on is one deliberate press on /speech.
+    "enabled": False,
     "source": "piper",
     "sticky_mode": "siren",
 }

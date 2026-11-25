@@ -264,8 +264,7 @@ every key — each with its default — and a check keeps it that way. Every key
 - **Semantic Search** — Vector-based semantic search requires SQLite-vec support. Full-text search is available via SQLite FTS5, but embedding-based similarity search is not yet optimized for large document collections.
 - **pgvector** — PostgreSQL with pgvector is not currently supported. The project uses SQLite as its primary database. Migration to PostgreSQL/pgvector is a future roadmap item. If your use case requires production-grade vector search, consider forking and adding pgvector support.
 - **Frontend TypeScript** — Strict mode `tsc -b` may produce pre-existing TS6133 errors (unused imports). The Vite build (`vite build`) completes successfully independently, so these do not block development.
-- **API Key Rotation** — Several API keys for external LLM providers have been leaked in git history. These must be revoked and rotated before any public GitHub push.
-- **LLM Provider Dependency** — Core functionality requires at least one configured LLM provider (default: Ollama with local models). Some features may be unavailable without a running provider.
+- **LLM Provider Dependency** — Core functionality requires at least one configured LLM provider. A fresh install offers the packaged picks (DeepSeek Flash first); without a provider, chat and the agents do not answer.
 
 ---
 
