@@ -10,6 +10,8 @@ TOOL STORM (tool_call events forever, never a usage event — the
 rabbit-hole shape) + a config with tiny caps.
 """
 
+import json
+import threading
 import time
 
 import pytest
@@ -85,6 +87,74 @@ def _patch(monkeypatch, client: AcpClient, config: ExternalAgentConfig):
 
     monkeypatch.setattr("app.api.v1.external_agent_router._db", _fake_db)
 
+    # THE MACHINE IS NOT THE SUBJECT (2026-11-25). The router asks
+    # `pre_turn_refusal` whether a turn can be attempted, and that is a set of
+    # LOCAL reads: is `hermes` on PATH, does the isolated home have a model, does
+    # its provider have a key. All three are true on a developer's box and false
+    # on every runner, which is why these two tests passed here and failed there
+    # with "Exa cannot answer: 'hermes' is not on PATH". The fake client IS the
+    # agent, so the refusal must not decide anything — the same machine-
+    # dependency `test_exa_activation` was fixed for, in a different place.
+    monkeypatch.setattr(
+        "app.domain.external_agent.activation.pre_turn_refusal",
+        lambda cfg, home=None: None,
+    )
+
+
+class Frames:
+    """The socket read in a BACKGROUND THREAD, so silence fails by name.
+
+    A SILENT SOCKET USED TO BLOCK FOREVER (2026-11-25). `ws.receive_json()`
+    waits on Starlette's portal with no timeout, so on GitHub's runners — where
+    this file's storm never reaches the socket — both tests here blocked until
+    the CI job was cancelled at 30 minutes. That is how a red build sat
+    unnamed for two days. Reading in a thread lets the test enforce a deadline
+    and, when it fails, say WHAT IT SAW.
+    """
+
+    def __init__(self, ws) -> None:
+        self._ws = ws
+        self._frames: list[dict] = []
+        self._error: Exception | None = None
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self) -> None:
+        try:
+            while True:
+                self._frames.append(self._ws.receive_json())
+        except Exception as exc:  # the socket closed — the reader's job is over
+            self._error = exc
+
+    def all(self) -> list[dict]:
+        return list(self._frames)
+
+    def statuses(self) -> list[str]:
+        return [f["status"] for f in self.all() if f.get("type") == "status"]
+
+    def wait_for(self, predicate, timeout: float, what: str) -> dict:
+        """The first frame matching `predicate`, or a message naming what was seen."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            for frame in self.all():
+                if predicate(frame):
+                    return frame
+            if self._error is not None:
+                raise AssertionError(
+                    f"{what}: the socket closed before it arrived ({self._error!r}); "
+                    f"frames seen: {_compact(self.all())}"
+                )
+            time.sleep(0.02)
+        raise AssertionError(
+            f"{what}: nothing arrived within {timeout}s. The turn produced "
+            f"{len(self.all())} frame(s): {_compact(self.all())}"
+        )
+
+
+def _compact(frames: list[dict], limit: int = 600) -> str:
+    """The frames as one line — including each status's MESSAGE, which is where
+    the app puts the reason ('status: error' alone says nothing)."""
+    return json.dumps(frames[:6], default=str)[:limit]
+
 
 def test_tool_storm_hits_the_cap_with_checkins(monkeypatch, storm_script, tmp_path):
     """The tool storm must trigger the 'working' beacons (the enforced
@@ -99,23 +169,17 @@ def test_tool_storm_hits_the_cap_with_checkins(monkeypatch, storm_script, tmp_pa
 
     with TestClient(app) as tc:
         with tc.websocket_connect("/external-agent/ws") as ws:
-            statuses = []
-            # the ready handshake first
-            while True:
-                msg = ws.receive_json()
-                if msg.get("type") == "status" and msg["status"] == "ready":
-                    break
-            ws.send_json({"type": "prompt", "text": "go"})
-            deadline = time.monotonic() + 15
-            while time.monotonic() < deadline:
-                msg = ws.receive_json()
-                if msg.get("type") == "status":
-                    statuses.append(msg["status"])
-                    if msg["status"] == "tool_call_limit":
-                        break
-            assert "tool_call_limit" in statuses, (
-                f"the tool cap never fired — statuses: {statuses}"
+            frames = Frames(ws)
+            frames.wait_for(
+                lambda f: f.get("type") == "status" and f.get("status") == "ready",
+                10.0, "the ready handshake",
             )
+            ws.send_json({"type": "prompt", "text": "go"})
+            frames.wait_for(
+                lambda f: f.get("type") == "status" and f.get("status") == "tool_call_limit",
+                20.0, "the tool_call_limit halt",
+            )
+            statuses = frames.statuses()
             assert "working" in statuses, (
                 f"the check-in beacons never fired — statuses: {statuses}"
             )
@@ -137,17 +201,16 @@ def test_tool_cap_zero_is_unlimited(monkeypatch, storm_script, tmp_path):
 
     with TestClient(app) as tc:
         with tc.websocket_connect("/external-agent/ws") as ws:
-            while True:
-                msg = ws.receive_json()
-                if msg.get("type") == "status" and msg["status"] == "ready":
-                    break
+            frames = Frames(ws)
+            frames.wait_for(
+                lambda f: f.get("type") == "status" and f.get("status") == "ready",
+                10.0, "the ready handshake",
+            )
             ws.send_json({"type": "prompt", "text": "go"})
-            # a few tool-call frames arrive (the storm is running)
-            tool_frames = 0
-            for _ in range(20):
-                msg = ws.receive_json()
-                if msg.get("type") == "tool_call":
-                    tool_frames += 1
-            assert tool_frames > 0
+            # the storm is flowing: tool-call frames must arrive
+            frames.wait_for(lambda f: f.get("type") == "tool_call", 20.0, "a tool_call frame")
             # the turn is still alive — the budget never fired
+            assert "tool_call_limit" not in frames.statuses(), (
+                f"a cap of 0 must not halt anything — statuses: {frames.statuses()}"
+            )
             ws.send_json({"type": "nuke"})
