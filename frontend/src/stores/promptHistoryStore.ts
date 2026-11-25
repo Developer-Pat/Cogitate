@@ -62,6 +62,11 @@ export interface HistoryPrompt {
   /** Which session it was sent in. Recorded, not filtered on. */
   sessionId: string | null
   createdAt: number
+  /** THE TIE-BREAK (2026-11-25). `createdAt` is milliseconds, and a burst of sends
+      — a paste-and-send, a keyboard run — lands several inside the SAME one. The cap
+      must still know which of them is oldest, so insertion order is recorded here.
+      Absent on rows persisted before this field existed; they fall back to 0. */
+  seq?: number
 }
 
 // ── the pure helpers, exported so the behaviour is testable without the store ──
@@ -87,6 +92,20 @@ export const dedupePrompts = (list: HistoryPrompt[]): HistoryPrompt[] => {
     seen.add(key)
     return true
   })
+}
+
+/**
+ * Whichever of two entries is OLDER — by time, then by insertion order.
+ *
+ * THE TIE IS THE BUG THIS EXISTS FOR (2026-11-25). `createdAt` is milliseconds and a
+ * burst of sends lands several inside one; a comparison that only reads `createdAt`
+ * treats them as equal and the cap drops an arbitrary row — measured in CI, where a
+ * 205-add loop finished inside a millisecond and the "oldest" it discarded was the one
+ * just added. The order the adds arrived in is the answer, and `seq` records it.
+ */
+export const olderOf = (a: HistoryPrompt, b: HistoryPrompt): HistoryPrompt => {
+  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? a : b
+  return (a.seq ?? 0) <= (b.seq ?? 0) ? a : b
 }
 
 interface PromptHistoryState {
@@ -119,11 +138,13 @@ export const usePromptHistoryStore = create<PromptHistoryState>()(
           if (state.prompts.some((p) => matchKey(p.text) === key)) return state
 
           const entry: HistoryPrompt = {
-            id: `${Date.now()}-${seq++}`,
+            id: `${Date.now()}-${seq}`,
             text: trimmed,
             sessionId,
             createdAt: Date.now(),
+            seq,
           }
+          seq += 1
 
           let next = [entry, ...state.prompts]
 
@@ -132,7 +153,7 @@ export const usePromptHistoryStore = create<PromptHistoryState>()(
           // instead of the oldest prompt — silently losing recent entries and
           // keeping ancient ones.
           if (next.length > MAX_HISTORY) {
-            const oldest = next.reduce((min, p) => (p.createdAt < min.createdAt ? p : min), next[0])
+            const oldest = next.reduce(olderOf)
             next = next.filter((p) => p.id !== oldest.id)
           }
 
