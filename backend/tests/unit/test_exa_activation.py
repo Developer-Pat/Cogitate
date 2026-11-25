@@ -159,7 +159,16 @@ async def test_probe_reports_every_missing_step(tmp_path, test_session):
 
 
 @pytest.mark.asyncio
-async def test_apply_provisions_and_takes_the_decision(tmp_path, test_session):
+async def test_apply_provisions_and_takes_the_decision(tmp_path, test_session, monkeypatch):
+    """Provisioning and the decision — not the box it runs on.
+
+    The runtime probe has its own subject (`test_probe_reports_every_missing_step`,
+    which uses `sh`), and the ladder's is covered by the probe tests. Left un-stubbed,
+    this test asks whether the MACHINE has `hermes` on PATH: true on a developer's box,
+    false on every CI runner, where it read as a broken build until someone downloaded
+    the runner's artifact.
+    """
+    monkeypatch.setattr(activation, "probe_runnable", lambda cfg: None)
     seed = tmp_path / "seed"
     _seed_skill(seed)
     env = tmp_path / "project.env"

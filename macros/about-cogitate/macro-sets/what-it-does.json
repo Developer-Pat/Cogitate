@@ -1,0 +1,14 @@
+{
+  "topic": "What it does",
+  "name": "Capabilities",
+  "description": "Macros, workflows, the title service, the command line",
+  "sort_order": 3,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the macro system.",
+    "f2": "Tell me about workflows.",
+    "f3": "Tell me about workflow templates.",
+    "f4": "Tell me about the title service.",
+    "f5": "Tell me about the command line."
+  }
+}

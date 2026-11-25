@@ -83,6 +83,11 @@ class Paths:
     # Deliberately NOT under `agents/`: that directory holds per-install WORKSPACES
     # (gitignored), and a seed source only exists in a clone if it is in the repo.
     agent_seed_dir: Path = BASE_DIR / "backend" / "templates" / "agents"
+    # THE SHIPPED MACRO PACKS (`macros/<pack>/{meta-topic.json, macro-sets/*.json}`).
+    # Tracked, so a clone carries them; a fresh install seeds the ones whose
+    # manifest names a surface. Deliberately NOT `data/macro-saves/` — that is
+    # gitignored and holds the user's own exports, which the Save/Load page lists.
+    macro_packs_dir: Path = BASE_DIR / "macros"
     agent_images_dir: Path = BASE_DIR / "assets" / "agent-images"
     notification_sounds_dir: Path = BASE_DIR / "data" / "notification-sounds"
     curated_sounds_dir: Path = BASE_DIR / "assets" / "notification-sounds"

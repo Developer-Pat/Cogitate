@@ -232,6 +232,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     from app.core.database import AsyncSessionLocal
     async with AsyncSessionLocal() as _seed_db:
         await seed_agent_packages(_seed_db)
+        # THE SHIPPED MACRO PACKS FIRST (the out-of-box banks): `macros/<pack>/`
+        # installed as data — Agent Bob on the agent chat's F keys, A-Key Macros on
+        # its A keys, About Cogitate and Exa Diagnostics on the Exa page. Packs run
+        # BEFORE the A-Key seed because the pack carries the complete bank (all 25
+        # slots); the seed's minimal starter content is the fallback for an install
+        # that somehow has no pack directory, and it creates nothing when the pack
+        # has already made the topic. Idempotent; never overwrites a set that exists.
+        from app.domain.macros.packs import seed_shipped_macro_packs
+
+        for _pack_outcome in await seed_shipped_macro_packs(_seed_db):
+            logger.info("shipped macro pack — %s", _pack_outcome.describe())
+
         # Seed the A-Key Macros meta-topic + starter sets (2026-09-03,
         # the akeys roadmap Phase 3 — the A1-A5 action-key bank's
         # out-of-box source; idempotent, never overwrites user edits)

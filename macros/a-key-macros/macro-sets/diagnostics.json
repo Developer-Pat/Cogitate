@@ -1,0 +1,14 @@
+{
+  "topic": "Diagnostics",
+  "name": "Diagnostic probes",
+  "description": "The self-check questions — capability, state, retry",
+  "sort_order": 3,
+  "is_active": true,
+  "macros": {
+    "f1": "What tools do you have access to?",
+    "f2": "Please try that again.",
+    "f3": "What model and provider are you configured with?",
+    "f4": "What is your context window size?",
+    "f5": "What are you working on right now?"
+  }
+}

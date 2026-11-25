@@ -12,6 +12,38 @@ import {
 
 const DEFAULT_META_TOPIC_NAME = 'System Guide';
 
+/** THE SHIPPED PACK BINDINGS (GET /macros/macro-packs): which meta-topic the
+ * install's packs put on each surface's F keys and A keys. This is the
+ * INITIALIZATION answer — a fresh browser has no saved selection, so without it
+ * the F keys fall back to a name constant and "whatever sorts first", and the A
+ * keys to a name constant. Behind the user's own saved choice, and below it. */
+export interface PackBindings {
+  agent: { f: number | null; a: number | null }
+  exa: { f: number | null; a: number | null }
+}
+
+const NO_BINDINGS: PackBindings = {
+  agent: { f: null, a: null },
+  exa: { f: null, a: null },
+}
+
+async function fetchPackBindings(): Promise<PackBindings | null> {
+  try {
+    const resp = await fetchWithTimeout('/api/v1/macros/macro-packs');
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const b = data && data.bindings;
+    if (!b || typeof b !== 'object') return null;
+    return {
+      agent: { f: b.agent?.f ?? null, a: b.agent?.a ?? null },
+      exa: { f: b.exa?.f ?? null, a: b.exa?.a ?? null },
+    };
+  } catch {
+    // An unknown binding is not an error — the older fallbacks still apply.
+    return null;
+  }
+}
+
 function loadSavedMetaTopicId(surface: MacroSurface): number | null {
   return loadScopedId(F_SELECTION_BASE_KEY, surface);
 }
@@ -72,18 +104,22 @@ function saveDefaultMetaTopicId(id: number | null): void {
   }
 }
 
-function findDefaultTopic(metaTopics: any[]): number | null { // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
+function findDefaultTopic(metaTopics: any[], shippedDefaultId: number | null = null): number | null { // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
   // 1) Prefer user's saved default
   const savedDefault = loadDefaultMetaTopicId();
   if (savedDefault !== null && metaTopics.some((mt: any) => mt.id === savedDefault)) { // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
     return savedDefault;
   }
-  // 2) Fall back to the built-in named default
+  // 2) The shipped pack's F binding for this surface (the initialization answer)
+  if (shippedDefaultId !== null && metaTopics.some((mt: any) => mt.id === shippedDefaultId)) { // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
+    return shippedDefaultId;
+  }
+  // 3) Fall back to the built-in named default
   const defaultTopic = metaTopics.find((mt: any) => mt.name === DEFAULT_META_TOPIC_NAME); // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
   if (defaultTopic) return defaultTopic.id;
-  // 3) Fall back to first available
+  // 4) Fall back to first available
   if (metaTopics.length > 0) return metaTopics[0].id;
-  // 4) No topics at all
+  // 5) No topics at all
   return null;
 }
 
@@ -104,6 +140,8 @@ interface SystemMacrosState {
   // default (cogitate_akeys_meta_topic), NEVER the F/M keys. The
   // cascade: explicit -> seeded 'A-Key Macros' -> null (deactivated).
   aKeysMetaTopicId: number | null;
+  // THE SHIPPED PACK BINDINGS — see PackBindings above.
+  packBindings: PackBindings;
   isLoading: boolean;
   isLoadingMetaTopics: boolean;
   hasNoTopics: boolean;
@@ -132,11 +170,12 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
     // surface's keys against the CURRENT metaTopics (no refetch — the
     // topic list is surface-independent; only the selection is not).
     const metaTopics = get().metaTopics;
+    const bindings = get().packBindings[surface];
     const saved = loadSavedMetaTopicId(surface);
     const selectedId = saved !== null && metaTopics.some((mt: any) => mt.id === saved) // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
       ? saved
-      : findDefaultTopic(metaTopics);
-    const aKeysSourceId = resolveAKeysSource(metaTopics, surface);
+      : findDefaultTopic(metaTopics, bindings.f);
+    const aKeysSourceId = resolveAKeysSource(metaTopics, surface, undefined, bindings.a);
     set({ surface, selectedMetaTopicId: selectedId, aKeysMetaTopicId: aKeysSourceId });
     if (metaTopics.length > 0) saveMetaTopicId(surface, selectedId);
   },
@@ -145,6 +184,7 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
   isLoadingMetaTopics: false,
   defaultMetaTopicId: loadDefaultMetaTopicId(),
   aKeysMetaTopicId: resolveAKeysSource([], 'agent'), // resolved on load; [] -> null (seed absent until topics arrive)
+   packBindings: NO_BINDINGS,
   hasNoTopics: false,
   macros: [],
   error: null,
@@ -154,13 +194,17 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
   loadMetaTopics: async () => {
     set({ isLoadingMetaTopics: true });
     try {
-      const resp = await fetchWithTimeout('/api/v1/macros/meta-topics');
+      const [resp, fetched] = await Promise.all([
+        fetchWithTimeout('/api/v1/macros/meta-topics'),
+        fetchPackBindings(),
+      ]);
       if (resp.ok) {
         const data = await resp.json();
         const metaTopics = data.meta_topics || data || [];
 
         // Determine which topic to select (surface-scoped, 2026-09-03)
         const surface = get().surface;
+        const bindings = (fetched ?? get().packBindings)[surface];
         let selectedId: number | null = null;
         const saved = loadSavedMetaTopicId(surface);
 
@@ -169,7 +213,7 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
           selectedId = saved;
         } else {
           // No saved topic, saved topic was deleted, or topic list empty
-          selectedId = findDefaultTopic(metaTopics);
+          selectedId = findDefaultTopic(metaTopics, bindings.f);
         }
 
         // Show toast if no topics available at all
@@ -191,9 +235,9 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
         // seeded 'A-Key Macros' -> null (deactivated). Independent of
         // the F-side selection above; the two never read each other.
         // Surface-scoped since Phase 5a (the split).
-        const aKeysSourceId = resolveAKeysSource(metaTopics, surface);
+        const aKeysSourceId = resolveAKeysSource(metaTopics, surface, undefined, bindings.a);
 
-        set({ metaTopics, selectedMetaTopicId: selectedId, hasNoTopics, isLoadingMetaTopics: false, aKeysMetaTopicId: aKeysSourceId });
+        set({ metaTopics, selectedMetaTopicId: selectedId, hasNoTopics, isLoadingMetaTopics: false, aKeysMetaTopicId: aKeysSourceId, packBindings: (fetched ?? get().packBindings) });
       } else {
         set({ isLoadingMetaTopics: false });
       }
@@ -253,9 +297,10 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
   reloadMacros: async () => {
     set({ isLoading: true, isLoadingMetaTopics: true });
     try {
-      const [metaResp, macroResp] = await Promise.all([
+      const [metaResp, macroResp, fetched] = await Promise.all([
         fetchWithTimeout('/api/v1/macros/meta-topics'),
         fetchWithTimeout('/api/v1/macros?all=true'),
+        fetchPackBindings(),
       ]);
       let metaTopics: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
       if (metaResp.ok) {
@@ -270,10 +315,12 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
 
       // Preserve current selection if it still exists (surface-scoped)
       const surface = get().surface;
+      const packBindings = fetched ?? get().packBindings;
+      const bindings = packBindings[surface];
       const currentId = get().selectedMetaTopicId;
       const selectedId = (currentId !== null && metaTopics.some((mt: any) => mt.id === currentId)) // eslint-disable-line @typescript-eslint/no-explicit-any -- legacy-any
         ? currentId
-        : findDefaultTopic(metaTopics);
+        : findDefaultTopic(metaTopics, bindings.f);
 
       const hasNoTopics = metaTopics.length === 0;
       if (hasNoTopics) {
@@ -284,9 +331,9 @@ export const useSystemMacrosStore = create<SystemMacrosState>((set, get) => ({
         );
       }
 
-      const aKeysSourceId = resolveAKeysSource(metaTopics, surface);
+      const aKeysSourceId = resolveAKeysSource(metaTopics, surface, undefined, bindings.a);
 
-      set({ metaTopics, macroSets, selectedMetaTopicId: selectedId, hasNoTopics, isLoading: false, isLoadingMetaTopics: false, aKeysMetaTopicId: aKeysSourceId });
+      set({ metaTopics, macroSets, selectedMetaTopicId: selectedId, hasNoTopics, isLoading: false, isLoadingMetaTopics: false, aKeysMetaTopicId: aKeysSourceId, packBindings });
     } catch (e) {
       console.error('Failed to reload macros:', e);
       notifyMacroLoadFailure(

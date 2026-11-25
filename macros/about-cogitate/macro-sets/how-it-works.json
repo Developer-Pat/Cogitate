@@ -1,0 +1,14 @@
+{
+  "topic": "How it works",
+  "name": "Architecture",
+  "description": "The pipeline, what happens to a message, memory, tracing, the stack",
+  "sort_order": 1,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about the cognitive pipeline.",
+    "f2": "What happens to a message when I send it?",
+    "f3": "Tell me about cognitive memory.",
+    "f4": "What does Langfuse show me?",
+    "f5": "What packages does Cogitate use?"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "topic": "Modes",
+  "name": "Mode switches",
+  "description": "The output-mode requests",
+  "sort_order": 4,
+  "is_active": true,
+  "macros": {
+    "f1": "Switch to concise mode.",
+    "f2": "Switch to detailed mode.",
+    "f3": "Switch to technical mode.",
+    "f4": "Switch to plain language.",
+    "f5": "Back to normal mode."
+  }
+}

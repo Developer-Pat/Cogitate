@@ -44,13 +44,17 @@ const mockWebSocket = {
   readyState: 1 // OPEN
 }
 
-vi.stubGlobal('WebSocket', vi.fn(() => mockWebSocket))
-vi.stubGlobal('EventSource', vi.fn(() => ({
+// vitest 4 refuses `new` on an arrow-implemented mock ("() => target is not a constructor").
+// The service constructs `new WebSocket(...)` inside a try/catch, so the arrow stub's TypeError
+// was swallowed and the handlers below stayed unwired. A `function` impl is constructible and
+// still returns the shared object the assertions read.
+vi.stubGlobal('WebSocket', vi.fn(function () { return mockWebSocket }))
+vi.stubGlobal('EventSource', vi.fn(function () { return {
   onmessage: null,
   onerror: null,
   close: vi.fn(),
   readyState: 1
-})))
+} }))
 
 describe('LiveMonitoringService', () => {
   let service: LiveMonitoringService
