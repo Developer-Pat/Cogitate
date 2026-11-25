@@ -882,6 +882,9 @@ async def external_agent_ws(websocket: WebSocket) -> None:
                     await websocket.send_json({"type": "status", "status": "ready", "sessionId": client.session_id})
 
                 parts: list[str] = []
+                # the LAST usage reading of the turn (context size/used) —
+                # reported on the done frame; not a turn terminator.
+                turn_usage: dict = {}
                 # SERVER-SIDE MODE DIRECTIVE (fix-mode grant, 2026-08-12):
                 # the grant lives in the persisted config; the directive is
                 # injected here so the client can't spoof it. Defense in
@@ -954,7 +957,7 @@ async def external_agent_ws(websocket: WebSocket) -> None:
                 # the user's Allow response queued behind the stream,
                 # and the adapter timed out (60s) -> denied.
                 async def _stream_run(prompt_data: dict = data) -> None:
-                    nonlocal streaming, time_limit_hit, stream_crashed
+                    nonlocal streaming, time_limit_hit, stream_crashed, turn_usage
                     tool_calls_this_turn = 0
                     last_checkin_count = 0
                     try:
@@ -1095,27 +1098,29 @@ async def external_agent_ws(websocket: WebSocket) -> None:
                                     "request": json.loads(ev.text),
                                 })
                             elif ev.kind == "usage":
-                                # THE EXA BUBBLE INSTRUMENTATION (2026-08-22):
-                                # the done event now carries the usage
-                                # payload (context size/used) + the elapsed
-                                # seconds + the model — the frontend renders
-                                # them on the bubble so model swaps and
-                                # response times are observable (the user's
-                                # ask: we're swapping LLMs + troubleshooting
-                                # response time).
-                                usage_payload = {}
+                                # A READING, NOT THE END (2026-11-25): the adapter
+                                # sends usage after EVERY model call, so the turn is
+                                # NOT over here — ending on it produced "done" with an
+                                # empty reply while the agent kept streaming.
                                 try:
                                     up = json.loads(ev.text) if ev.text else {}
-                                    usage_payload = {
+                                    turn_usage = {
                                         "size": up.get("size"),
                                         "used": up.get("used"),
                                     }
                                 except Exception:
                                     pass
+                            elif ev.kind == "done":
+                                # THE TURN'S ONE END (2026-11-25): the prompt's
+                                # response has landed, so every message chunk is in
+                                # `parts`. THE EXA BUBBLE INSTRUMENTATION
+                                # (2026-08-22) rides here: usage (context size/used),
+                                # the elapsed seconds and the model, so the frontend
+                                # can render model swaps and response times.
                                 await websocket.send_json({
                                     "type": "done",
                                     "reply": "".join(parts),
-                                    "usage": usage_payload,
+                                    "usage": turn_usage,
                                     # monotonic clock (matches turn_started's
                                     # time.monotonic() — a time.time() mix would
                                     # produce epoch-vs-monotonic garbage like
