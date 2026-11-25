@@ -10,6 +10,7 @@ TOOL STORM (tool_call events forever, never a usage event — the
 rabbit-hole shape) + a config with tiny caps.
 """
 
+import json
 import threading
 import time
 
@@ -127,14 +128,19 @@ class Frames:
             if self._error is not None:
                 raise AssertionError(
                     f"{what}: the socket closed before it arrived ({self._error!r}); "
-                    f"frames seen: {self.all()[:5]}"
+                    f"frames seen: {_compact(self.all())}"
                 )
             time.sleep(0.02)
         raise AssertionError(
             f"{what}: nothing arrived within {timeout}s. The turn produced "
-            f"{len(self.all())} frame(s) — statuses {self.statuses()}, "
-            f"types {[f.get('type') for f in self.all()][:10]}"
+            f"{len(self.all())} frame(s): {_compact(self.all())}"
         )
+
+
+def _compact(frames: list[dict], limit: int = 600) -> str:
+    """The frames as one line — including each status's MESSAGE, which is where
+    the app puts the reason ('status: error' alone says nothing)."""
+    return json.dumps(frames[:6], default=str)[:limit]
 
 
 def test_tool_storm_hits_the_cap_with_checkins(monkeypatch, storm_script, tmp_path):
