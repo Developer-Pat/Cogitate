@@ -87,6 +87,19 @@ def _patch(monkeypatch, client: AcpClient, config: ExternalAgentConfig):
 
     monkeypatch.setattr("app.api.v1.external_agent_router._db", _fake_db)
 
+    # THE MACHINE IS NOT THE SUBJECT (2026-11-25). The router asks
+    # `pre_turn_refusal` whether a turn can be attempted, and that is a set of
+    # LOCAL reads: is `hermes` on PATH, does the isolated home have a model, does
+    # its provider have a key. All three are true on a developer's box and false
+    # on every runner, which is why these two tests passed here and failed there
+    # with "Exa cannot answer: 'hermes' is not on PATH". The fake client IS the
+    # agent, so the refusal must not decide anything — the same machine-
+    # dependency `test_exa_activation` was fixed for, in a different place.
+    monkeypatch.setattr(
+        "app.domain.external_agent.activation.pre_turn_refusal",
+        lambda cfg, home=None: None,
+    )
+
 
 class Frames:
     """The socket read in a BACKGROUND THREAD, so silence fails by name.
