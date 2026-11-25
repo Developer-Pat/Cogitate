@@ -48,6 +48,9 @@ for line in sys.stdin:
             "sessionId": "meta-1",
             "update": {"size": 100000, "used": 27000, "sessionUpdate": "usage_update"},
         }})
+        # THE RESPONSE ENDS THE TURN (2026-11-25) — an ACP agent answers
+        # session/prompt after it finishes streaming.
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"stopReason": "end_turn", "usage": {}}})
 """
 
 
