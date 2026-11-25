@@ -1,14 +1,14 @@
 {
   "topic": "Local Desk",
   "name": "City desk",
-  "description": "Local news, weather, sports and civic events — asks you for the city",
+  "description": "Local news, weather, sports and civic events",
   "sort_order": 0,
   "is_active": true,
   "macros": {
     "f1": "Check the local weather, including the 10 day forecast.",
-    "f2": "Check the local headlines.",
+    "f2": "Check the local news.",
     "f3": "Check the local sports teams.",
-    "f4": "What city am I in? Ask me, then sweep the local desk.",
+    "f4": "Check the local politics.",
     "f5": "Any local crime or civic news worth reporting?"
   }
 }

@@ -1,14 +1,14 @@
 {
   "topic": "Triage",
-  "name": "First look",
-  "description": "The read-only first pass when something looks wrong",
+  "name": "Something's wrong",
+  "description": "The error, the logs, and what to look at first",
   "sort_order": 0,
   "is_active": true,
   "macros": {
-    "f1": "Check the logs for errors and warnings.",
-    "f2": "Give me a system status report.",
-    "f3": "Diagnose the current state — read only, change nothing.",
+    "f1": "We have an error. Check the logs for errors and warnings.",
+    "f2": "What is failing right now?",
+    "f3": "Anything in the logs I should worry about?",
     "f4": "Why did that fail?",
-    "f5": "Let's fix it."
+    "f5": "Check the logs from the last hour."
   }
 }

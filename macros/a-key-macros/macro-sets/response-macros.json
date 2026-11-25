@@ -1,7 +1,7 @@
 {
   "topic": "Response Macros",
   "name": "Simple responses",
-  "description": "The short acknowledgements",
+  "description": "The short acknowledgements and the fill-in-the-blank question",
   "sort_order": 0,
   "is_active": true,
   "macros": {
@@ -9,6 +9,6 @@
     "f2": "No",
     "f3": "Please continue.",
     "f4": "Sounds good.",
-    "f5": "Understood."
+    "f5": "Tell me more about XXXX."
   }
 }

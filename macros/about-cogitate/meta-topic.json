@@ -1,16 +1,16 @@
 {
-  "name": "About Cogitate",
+  "name": "Exa Tour",
   "namespace": "agent",
-  "description": "The tour — logging, the wiki, agent profiles, the knowledge base and workflows",
+  "description": "Common questions for Exa about the Cogitate system",
   "surface": "exa",
   "role": "default",
   "is_active": true,
   "sort_order": 20,
   "macro_sets": [
-    "logging.json",
-    "wiki.json",
-    "agent-profiles.json",
-    "knowledge.json",
-    "workflows.json"
+    "agents.json",
+    "how-it-works.json",
+    "what-it-knows.json",
+    "what-it-does.json",
+    "running-it.json"
   ]
 }

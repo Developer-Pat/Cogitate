@@ -1,14 +1,14 @@
 {
   "topic": "Knowledge",
-  "name": "Docs and memory",
-  "description": "RAG freshness, ingest results and the memory stores",
-  "sort_order": 3,
+  "name": "Knowledge and workflows",
+  "description": "The index, the ingest, and the runs that touch them",
+  "sort_order": 4,
   "is_active": true,
   "macros": {
-    "f1": "Is the RAG index current?",
-    "f2": "Run the ingest and report what changed.",
-    "f3": "Which documents are indexed, and which failed?",
-    "f4": "Check the cognitive memory stores.",
-    "f5": "What can the agents answer from these docs?"
+    "f1": "The RAG index is stale. Check its status.",
+    "f2": "Is the ingest running?",
+    "f3": "The workflow XXXX failed. Why?",
+    "f4": "Check the last workflow run.",
+    "f5": "Which documents failed to index?"
   }
 }

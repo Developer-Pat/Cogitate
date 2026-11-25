@@ -1,14 +1,14 @@
 {
-  "topic": "Agents",
-  "name": "The pool",
-  "description": "Agent state, kits, tool permissions and stuck sessions",
+  "topic": "Agent problems",
+  "name": "Agents",
+  "description": "One agent misbehaving — configuration, tools, stuck sessions",
   "sort_order": 2,
   "is_active": true,
   "macros": {
-    "f1": "List the agents and their state.",
-    "f2": "Which agents are running, stalled or idle?",
-    "f3": "Check the agent kits and tool permissions.",
-    "f4": "What did the last agent run cost?",
-    "f5": "Is anything stuck in a session?"
+    "f1": "The agent XXXX is having issues. Tell me what is wrong.",
+    "f2": "Is agent XXXX configured correctly?",
+    "f3": "Which agents are failing?",
+    "f4": "What tools does agent XXXX have?",
+    "f5": "Is agent XXXX stuck?"
   }
 }

@@ -185,16 +185,20 @@ async def test_bindings_name_the_shipped_topics(test_session: AsyncSession, auto
             await test_session.execute(select(MetaTopic.name, MetaTopic.id))
         ).all()
     }
+    # Names come from the packs, never from this file: a pack rename is a display
+    # change and must not fail a test that is about BINDINGS.
     assert bindings == {
-        "agent": {"f": by_name["Bob"], "a": by_name["A-Key Macros"]},
-        "exa": {"f": by_name["About Cogitate"], "a": by_name["Exa Diagnostics"]},
+        "agent": {"f": by_name[_pack("agent-bob").name], "a": by_name[_pack("a-key-macros").name]},
+        "exa": {"f": by_name[_pack("about-cogitate").name], "a": by_name[_pack("exa-diagnostics").name]},
     }
 
 
 async def test_a_deleted_topic_binds_nothing(test_session: AsyncSession, auto_clean_tables) -> None:  # noqa: ANN001
     await apply_pack(test_session, _pack("agent-bob"))
     bob = (
-        await test_session.execute(select(MetaTopic).where(MetaTopic.name == "Bob"))
+        await test_session.execute(
+            select(MetaTopic).where(MetaTopic.name == _pack("agent-bob").name)
+        )
     ).scalar_one()
     await test_session.delete(bob)
     await test_session.commit()

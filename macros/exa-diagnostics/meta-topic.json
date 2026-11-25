@@ -1,7 +1,7 @@
 {
   "name": "Exa Diagnostics",
   "namespace": "agent",
-  "description": "The action keys — triage, providers, agents, knowledge, housekeeping",
+  "description": "The action keys — say what is broken, get told what is wrong",
   "surface": "exa",
   "role": "action",
   "is_active": true,
@@ -10,7 +10,7 @@
     "triage.json",
     "providers.json",
     "agents.json",
-    "knowledge.json",
-    "housekeeping.json"
+    "interface.json",
+    "knowledge.json"
   ]
 }

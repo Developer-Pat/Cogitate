@@ -1,14 +1,14 @@
 {
   "topic": "Providers",
-  "name": "Models",
-  "description": "Provider health, keys, routing and call failures",
+  "name": "Providers and services",
+  "description": "Keys, models, and the local services behind them",
   "sort_order": 1,
   "is_active": true,
   "macros": {
-    "f1": "Check the provider health.",
-    "f2": "Which providers are configured, and which are missing keys?",
-    "f3": "What is calling which model right now?",
-    "f4": "Are any provider calls failing or slow?",
-    "f5": "Walk the provider configuration end to end."
+    "f1": "The provider is not answering. Is it configured correctly?",
+    "f2": "Which providers are missing keys?",
+    "f3": "Is the local service running?",
+    "f4": "Which model is answering?",
+    "f5": "Are any provider calls failing?"
   }
 }
