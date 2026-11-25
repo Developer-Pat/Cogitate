@@ -482,8 +482,12 @@ export default function ExaChat() {
   // service master for manual speech; this pref gates ONLY the
   // auto-read branch). localStorage-backed (per-browser, no backend
   // churn); the ref mirrors the state for the ws closure.
+  // OFF unless this browser has switched it on (2026-11-25): a shipped install must
+  // not start reading replies aloud — the old default was 'true', so a fresh browser
+  // began voicing every answer and, where TTS is unconfigured, raising an error the
+  // user never asked for.
   const autoSpeakRef = useRef(
-    (localStorage.getItem('exa-auto-speak') ?? 'true') !== 'false'
+    (localStorage.getItem('exa-auto-speak') ?? 'false') !== 'false'
   )
   const [autoSpeak, setAutoSpeak] = useState(autoSpeakRef.current)
   const toggleAutoSpeak = () => {
