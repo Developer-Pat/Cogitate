@@ -86,9 +86,8 @@ export default function SpeechPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [cfg, voiceOptions, sttCfg] = await Promise.all([
+        const [cfg, sttCfg] = await Promise.all([
           ttsConfigService.getConfig(),
-          ttsConfigService.getVoices(),
           getSttConfig(),
         ]);
         if (cancelled) return;
@@ -98,6 +97,16 @@ export default function SpeechPage() {
         setTtsRate(cfg.rate);
         setTtsProvider(cfg.provider);
         setStickyMode(cfg.sticky_mode ?? 'siren');
+        // NO VOICE LIST WHILE SPEECH IS OFF (2026-11-25): the list costs an outbound
+        // call — the edge engine asks Microsoft — and the backend refuses it while the
+        // switch is off. An off install shows an empty picker rather than reaching out;
+        // saving with the toggle on refetches it (handleSaveTtsConfig).
+        if (!cfg.enabled) {
+          setTtsVoice(cfg.voice);
+          return;
+        }
+        const voiceOptions = await ttsConfigService.getVoices();
+        if (cancelled) return;
         setTtsVoices(voiceOptions.voices);
 
         // THE STALE-VOICE REPAIR. WHICH engine speaks is chosen on /providers/capabilities, where

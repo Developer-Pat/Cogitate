@@ -1,0 +1,14 @@
+{
+  "topic": "India — Eastern Lens",
+  "name": "Hindi press",
+  "description": "India through its own Hindi press — welfare, courts, religion, cricket",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Please sweep the India beat — Eastern lens.",
+    "f2": "What is the Hindi press leading with today?",
+    "f3": "Any India story the English press is not carrying?",
+    "f4": "Check the latest Uttar Pradesh and Bihar politics.",
+    "f5": "What is still developing in India?"
+  }
+}

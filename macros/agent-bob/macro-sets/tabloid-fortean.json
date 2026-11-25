@@ -1,0 +1,14 @@
+{
+  "topic": "Tabloid & Fortean",
+  "name": "Weird desk",
+  "description": "UFOs, cryptids, paranormal and conspiracy — no celebrity news",
+  "sort_order": 2,
+  "is_active": true,
+  "macros": {
+    "f1": "Please check the latest tabloid news — weird and Fortean only.",
+    "f2": "Any UFO or UAP story today?",
+    "f3": "Any cryptid or paranormal story today?",
+    "f4": "Any conspiracy story worth a second source?",
+    "f5": "What is the strangest story you have today?"
+  }
+}

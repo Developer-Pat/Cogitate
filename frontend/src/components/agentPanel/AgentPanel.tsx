@@ -17,6 +17,7 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import { useCognitiveHubStore } from '@/stores/cognitiveHubStore';
 import { SessionService } from '@/services/domain/SessionService';
 import { addTopics, removeTopics } from '@/services/messagingFeed';
+import { uuidv4 } from '@/utils/uuid';
 import { eventBus } from '@/services/eventBus';
 import { backoffDelay, shouldReconnectOnClose } from '@/services/exaSocketPolicy';
 import type { ConversationSession } from '@/types/agentInteraction';
@@ -243,7 +244,7 @@ export function AgentPanel() {
     const unsub = eventBus.subscribe('timer:*', (payload) => {
       const p = (payload ?? {}) as { timer_id?: string; context?: string };
       if (!p.timer_id) return;
-      const id = crypto.randomUUID();
+      const id = uuidv4();
       const ctx = p.context || 'the long-running job finished';
       pendingPromptRef.current = {
         id,
@@ -386,7 +387,7 @@ export function AgentPanel() {
               const tpl = contextTemplates[ctx];
               if (tpl) {
                 const label = ctx === 'macros' ? 'Macros' : ctx === 'setup' ? 'Setup' : ctx === 'execution' ? 'Workflow Execution' : ctx;
-                const id = crypto.randomUUID();
+                const id = uuidv4();
                 // embed the context's skill (consult-tool-injected
                 // delivery — same pattern as the Diagnose button):
                 // macros → macro-management; agents → create-agent;
@@ -423,7 +424,7 @@ export function AgentPanel() {
               if (last && last.role === 'assistant' && last.activity?.length) {
                 next[next.length - 1] = { ...last, activityDone: true };
               }
-              return [...next, { id: crypto.randomUUID(), role: 'assistant', text: '⏹ Stopped.' }];
+              return [...next, { id: uuidv4(), role: 'assistant', text: '⏹ Stopped.' }];
             });
           } else if (msg.type === 'status' && msg.status === 'time_limit') {
             // whole-turn cap (2026-08-14): the backend auto-stopped the
@@ -439,7 +440,7 @@ export function AgentPanel() {
               return [
                 ...next,
                 {
-                  id: crypto.randomUUID(),
+                  id: uuidv4(),
                   role: 'assistant',
                   text: '⏱ Time limit reached — the run was stopped automatically. '
                     + (msg.message || 'You can re-ask with more detail, or raise the limit on the Exa Agent page.'),
@@ -468,7 +469,7 @@ export function AgentPanel() {
               if (last && last.role === 'assistant' && last.activity?.length) {
                 next[next.length - 1] = { ...last, activityDone: true };
               }
-              return [...next, { id: crypto.randomUUID(), role: 'assistant', text: '⏱ Tool-call limit reached — the run was stopped automatically. ' + (msg.message || 'You can re-ask with more detail, or raise the limit on the Exa Agent page.') }];
+              return [...next, { id: uuidv4(), role: 'assistant', text: '⏱ Tool-call limit reached — the run was stopped automatically. ' + (msg.message || 'You can re-ask with more detail, or raise the limit on the Exa Agent page.') }];
             });
           } else if (msg.type === 'tool_call') {
             const title = msg.update?.title || msg.update?.kind || 'tool';
@@ -484,7 +485,7 @@ export function AgentPanel() {
               if (last && last.role === 'assistant') {
                 next[next.length - 1] = { ...last, activity: [...(last.activity || []), title].slice(-200) };
               } else {
-                next.push({ id: crypto.randomUUID(), role: 'assistant', text: '', activity: [title] });
+                next.push({ id: uuidv4(), role: 'assistant', text: '', activity: [title] });
               }
               return next;
             });
@@ -509,7 +510,7 @@ export function AgentPanel() {
               if (last && last.role === 'assistant' && !last._done) {
                 next[next.length - 1] = { ...last, text: last.text + String(msg.text || '') };
               } else {
-                next.push({ id: crypto.randomUUID(), role: 'assistant', text: String(msg.text || '') });
+                next.push({ id: uuidv4(), role: 'assistant', text: String(msg.text || '') });
               }
               return next;
             });
@@ -626,7 +627,7 @@ export function AgentPanel() {
       pendingPromptRef.current = null;
       setMessages((prev) => prev.map((m) => ({ ...m, pending: false })));
     }
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'user', text }]);
+    setMessages((prev) => [...prev, { id: uuidv4(), role: 'user', text }]);
     setInput('');
     busyRef.current = true;
     setBusy(true);
@@ -810,7 +811,7 @@ export function AgentPanel() {
         `actual evidence, and report: what you observed (with evidence), ` +
         `the likely root cause, and a proposed fix for the user to apply.`;
       setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         role: 'user',
         text: `🔍 Diagnose: ${agentLabel} / ${sessionLabel}`,
       }]);

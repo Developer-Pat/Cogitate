@@ -669,3 +669,74 @@ async def test_big_pipe_line_skipped_no_false_alarm(caplog):
     assert "exceeded the stream limit" in text, "the skip must be logged (visible, never silent)"
     assert "EXITED unexpectedly" in text, "the alarm fires at the REAL EOF (not at the big line)"
     assert client._proc is None, "the once-guard ran at the real EOF"
+
+
+class TestMultiCallTurns:
+    """A usage reading arrives after EVERY model call — the turn ends on the RESPONSE.
+
+    THE BUG THIS PINS (2026-11-25): the stream used to end on the first `usage`
+    event, on the assumption that usage meant "turn over". Hermes emits usage after
+    every API call, so a tool-using turn was closed after its FIRST call: the router
+    sent `done` with an empty reply while the agent kept working for another
+    30-70 seconds, streaming hundreds of message chunks into a queue nobody read.
+    Single-call turns looked fine, which is why it survived so long.
+    """
+
+    MULTI_CALL_ACP = r'''
+import json, sys
+
+def send(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg["method"] == "initialize":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"agentInfo": {"name": "fake", "version": "0.0.1"}}})
+    elif msg["method"] == "session/new":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"sessionId": "multi-1"}})
+        send({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "multi-1",
+            "update": {"size": 1000, "used": 1, "sessionUpdate": "usage_update"}}})
+    elif msg["method"] == "session/set_config_option":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"configOptions": []}})
+    elif msg["method"] == "session/prompt":
+        # model call #1: a thought, then a usage reading — the turn is NOT over
+        send({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "multi-1",
+            "update": {"content": {"type": "text", "text": "looking"}, "sessionUpdate": "agent_thought_chunk"}}})
+        send({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "multi-1",
+            "update": {"size": 1000, "used": 5, "sessionUpdate": "usage_update"}}})
+        # model call #2: the ANSWER — the part the old code threw away
+        for chunk in ["The ", "answer ", "is 42."]:
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {
+                "sessionId": "multi-1",
+                "update": {"content": {"type": "text", "text": chunk}, "sessionUpdate": "agent_message_chunk"}}})
+        send({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "multi-1",
+            "update": {"size": 1000, "used": 9, "sessionUpdate": "usage_update"}}})
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"stopReason": "end_turn", "usage": {}}})
+    elif msg["method"] == "session/close":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
+        break
+'''
+
+    def _client(self, tmp_path):
+        script = tmp_path / "multi_call_acp.py"
+        script.write_text(self.MULTI_CALL_ACP, encoding="utf-8")
+        return AcpClient(command=["python3", str(script)], cwd=str(tmp_path))
+
+    async def test_a_usage_reading_does_not_end_the_turn(self, tmp_path):
+        client = self._client(tmp_path)
+        await client.start()
+        events = []
+        async for ev in client.stream_prompt("hi"):
+            events.append(ev)
+
+        kinds = [e.kind for e in events]
+        assert kinds.count("usage") == 2, "both readings arrive; neither ends the turn"
+        assert "done" in kinds, "the prompt's RESPONSE ends the turn"
+        text = "".join(e.text for e in events if e.kind == "message")
+        assert text == "The answer is 42.", f"the answer after the first usage reading was lost: {text!r}"
+        await client.close()

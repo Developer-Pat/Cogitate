@@ -5,6 +5,7 @@ import { HelmetProvider } from 'react-helmet-async'
 import './App.css'
 import { QueryProvider } from './providers/QueryProvider'
 import { NotificationContainer } from './components/NotificationContainer'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { useWorkflowToasts } from './hooks/useWorkflowToasts'
 import { useNotifyBridge } from './hooks/useNotifyBridge'
 import { enableCrossTabNotifyReceiver } from './services/crossTab/crossTabNotifyReceiver'
@@ -745,7 +746,16 @@ function App() {
                             userPermissions={userPermissions}
                             isAuthenticated={isAuthenticated}
                           >
-                            <route.component />
+                            {/* THE PAGE-LEVEL CATCH (2026-11-25): a page's own
+                                boundary sits INSIDE the page, so a throw from the
+                                page component itself — an updater in setState, a
+                                bad value on mount — escapes it and unmounts the
+                                whole app: a blank window with the reason only in
+                                the console. This one wraps the routed element, so
+                                the fallback renders and the shell survives. */}
+                            <ErrorBoundary>
+                              <route.component />
+                            </ErrorBoundary>
                           </RouteGuard>
                         }
                       />

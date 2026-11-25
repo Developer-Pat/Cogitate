@@ -15,10 +15,12 @@ import { BackendStatusIndicator } from '../components/ui/BackendStatusIndicator'
 export default function Dashboard() {
   usePageTitle('Dashboard', 'System overview and quick actions')
   
-  // Get app version from CacheBuster (it's available via localStorage)
-  const appVersion = typeof window !== 'undefined'
-    ? (localStorage.getItem('app_version') || '0.0.0')
-    : '0.0.0'
+  // The build's own version. Read from the build-time constant, not from localStorage: the stored
+  // copy is written by CacheBuster's effect, so a first render (or a fresh profile) read the empty
+  // case and the header said "v0.0.0" on a real release. localStorage stays as the fallback.
+  const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined)
+    || (typeof window !== 'undefined' ? localStorage.getItem('app_version') : null)
+    || '0.0.0'
 
   return (
     <ErrorBoundary>

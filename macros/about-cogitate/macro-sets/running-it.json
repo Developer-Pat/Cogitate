@@ -1,0 +1,14 @@
+{
+  "topic": "Running it",
+  "name": "Operations",
+  "description": "Providers and models, local LLMs, speech, themes, logs",
+  "sort_order": 4,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about providers and models.",
+    "f2": "Can I configure local LLMs?",
+    "f3": "Tell me about speech and voices.",
+    "f4": "Tell me about themes.",
+    "f5": "How do I clear the logs?"
+  }
+}

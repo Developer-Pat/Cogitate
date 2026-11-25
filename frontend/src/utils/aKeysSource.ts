@@ -48,22 +48,29 @@ export function saveAKeysSourceId(surface: MacroSurface, id: number | null): voi
 /**
  * THE CASCADE RESOLVER: which meta-topic feeds the A1-A5 flyouts?
  *   1) the explicit saved A-default — if it still exists
- *   2) the seeded "A-Key Macros" topic — if present (the out-of-box)
- *   3) NULL — deactivated (never first-available; the caller shows
+ *   2) the SHIPPED PACK's A binding for this surface — the initialization
+ *      answer a fresh install has no browser storage to remember
+ *   3) the seeded "A-Key Macros" topic — if present (the older out-of-box)
+ *   4) NULL — deactivated (never first-available; the caller shows
  *      "No Action-key source" instead of arbitrary content)
  */
 export function resolveAKeysSource(
   metaTopics: AKeySourceTopic[],
   surface: MacroSurface,
   savedId: number | null = loadAKeysSourceId(surface),
+  shippedId: number | null = null,
 ): number | null {
   // 1) Explicit A-default (still exists)
   if (savedId !== null && metaTopics.some((mt) => mt.id === savedId)) {
     return savedId
   }
-  // 2) The seeded out-of-box topic
+  // 2) The shipped pack's binding (GET /macros/macro-packs)
+  if (shippedId !== null && metaTopics.some((mt) => mt.id === shippedId)) {
+    return shippedId
+  }
+  // 3) The seeded out-of-box topic
   const seed = metaTopics.find((mt) => mt.name === AKEYS_SEED_META_TOPIC_NAME)
   if (seed) return seed.id
-  // 3) Deactivated — never arbitrary content
+  // 4) Deactivated — never arbitrary content
   return null
 }

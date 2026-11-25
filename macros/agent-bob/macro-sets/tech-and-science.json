@@ -1,0 +1,14 @@
+{
+  "topic": "Technology & Science",
+  "name": "Tech and science",
+  "description": "AI, chips, physics, energy, longevity and health",
+  "sort_order": 4,
+  "is_active": true,
+  "macros": {
+    "f1": "Please check the latest AI and LLM headlines.",
+    "f2": "Please check the latest chip and semiconductor news.",
+    "f3": "Please check the latest physics and energy news.",
+    "f4": "Please check the latest longevity and health news.",
+    "f5": "Please check the latest technology company news and product launches."
+  }
+}

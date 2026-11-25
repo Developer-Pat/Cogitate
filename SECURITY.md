@@ -22,13 +22,11 @@ frontend test suite and the frontend build.
 ### Accepted risks
 
 These findings are open on purpose. Each closes only with a major-version jump of a build or test tool, or of a
-parent that has to take one. Three are build/test tooling with no path into a running install; the fourth is a
-rendering helper whose advisory needs crafted input plus user interaction. None grants code execution, privilege
-escalation or data access on its own, and there is no open critical or high finding.
+parent that has to take one. None is reachable by a running install through a path that grants code execution,
+privilege escalation or data access, and there is no open critical or high finding.
 
 | Package | Severity | Pinned by | What closes it |
 |---|---|---|---|
-| `@vitest/mocker` | moderate | `storybook` 9 pins 3.x | storybook 10 |
 | `postcss-selector-parser` | moderate | `@tailwindcss/typography` | a typography release on 6.1.5 or later |
 | `minimatch` | moderate | `glob` 10, via storybook's docgen plugin | the glob 14 chain |
 | `katex` (shipped, via `mermaid`) | low | `mermaid` | a mermaid release on katex 0.18 |
