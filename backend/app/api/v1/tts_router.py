@@ -112,6 +112,25 @@ def _default_voice(voices: list[TtsVoice]) -> str | None:
     return DEFAULT_CONFIG["voice"] if DEFAULT_CONFIG["voice"] in names else names[0]
 
 
+async def _require_enabled(db: AsyncSession) -> dict:
+    """THE OFF SWITCH IS A SWITCH, NOT A HINT (2026-11-25).
+
+    `enabled` gated the frontend, and a frontend gate is not a control: a stale tab,
+    a script or a plain curl could still ask this endpoint to speak — and speaking is
+    an OUTBOUND call to a third party (the keyless edge-tts path talks to Microsoft).
+    Spurious network access is a security problem, not a UX preference, so a disabled
+    install refuses HERE: before the engine is resolved, before a provider is built,
+    before any subprocess or socket is opened.
+    """
+    cfg = await get_tts_config(db)
+    if not cfg.get("enabled", False):
+        raise HTTPException(
+            status_code=409,
+            detail="Speech is switched off. Turn it on in Speech settings.",
+        )
+    return cfg
+
+
 @router.get("/voices")
 async def list_voices(db: AsyncSession = Depends(get_db_session)):
     """The configured provider's selectable voices, and which of them a fresh choice should be.
@@ -120,6 +139,7 @@ async def list_voices(db: AsyncSession = Depends(get_db_session)):
     engine — the engine can be changed elsewhere now, and a stale voice would otherwise error on the
     next speak ("Unknown piper voice: …").
     """
+    await _require_enabled(db)
     try:
         provider = get_tts_provider(await _required_engine(db))
     except ValueError as exc:
@@ -135,7 +155,7 @@ async def speak(
     db: AsyncSession = Depends(get_db_session),
 ):
     """Synthesize the text -> the wav bytes (the configured provider)."""
-    cfg = await get_tts_config(db)
+    cfg = await _require_enabled(db)
     try:
         provider = get_tts_provider(await _required_engine(db))
         wav = await provider.synthesize(text, voice or cfg["voice"], rate=cfg.get("rate", 1.0))

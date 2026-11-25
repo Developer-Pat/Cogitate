@@ -1,0 +1,14 @@
+{
+  "topic": "World Headlines",
+  "name": "International press",
+  "description": "The wires and the Western press — world, business, Europe, Asia, Middle East",
+  "sort_order": 1,
+  "is_active": true,
+  "macros": {
+    "f1": "Please check the top headlines from the international press.",
+    "f2": "Please check the top headlines from Europe.",
+    "f3": "Please check the top headlines from Asia and the Pacific.",
+    "f4": "Please check the top headlines from the Middle East.",
+    "f5": "Please check the latest global economy and business news."
+  }
+}

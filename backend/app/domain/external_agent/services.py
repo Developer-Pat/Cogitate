@@ -78,7 +78,7 @@ class ExternalAgentInactive(RuntimeError):
 class AcpEvent:
     """One streamed event from the ACP subprocess."""
 
-    kind: str  # "message" | "thought" | "usage" | "tool_call" | "approval" | "status"
+    kind: str  # "message" | "thought" | "usage" | "tool_call" | "approval" | "done" | "closed"
     text: str = ""
     session_update: str = ""
 
@@ -132,6 +132,10 @@ class AcpClient:
         # shared _event_queue.
         self._event_queue: asyncio.Queue[AcpEvent] = asyncio.Queue()
         self._active_queue: asyncio.Queue[AcpEvent] | None = None
+        # THE TURN-END KEY (2026-11-25): the JSON-RPC id of the prompt in
+        # flight. Its RESPONSE is the only true end-of-turn — see the read
+        # loop's note; a usage_update arrives after every model call.
+        self._prompt_request_id: int | None = None
         self._prompt_lock = asyncio.Lock()
         # CHAT AUTHORIZATION (2026-08-21): incoming
         # session/request_permission futures keyed by their ACP
@@ -239,6 +243,17 @@ class AcpClient:
                     fut = self._pending.pop(msg["id"])
                     if not fut.done():
                         fut.set_result(msg)
+                    # THE TURN ENDS ON THE RESPONSE, NOT ON A USAGE READING
+                    # (2026-11-25, the silent-multi-call-turn bug). Hermes emits a
+                    # usage_update after EVERY model call, so ending the stream on
+                    # `usage` closed the turn after the first API call: the router
+                    # sent `done` with an empty reply while the agent went on
+                    # working for another 30-70s, streaming hundreds of
+                    # agent_message_chunk frames into a queue nobody was reading.
+                    # One-call turns looked fine; tool-using turns lost the answer.
+                    if self._prompt_request_id is not None and msg.get("id") == self._prompt_request_id:
+                        target = self._active_queue or self._event_queue
+                        await target.put(AcpEvent(kind="done", session_update="turn_end"))
                 elif msg.get("method") == "session/update":
                     up = msg.get("params", {}).get("update", {})
                     content = up.get("content", {})
@@ -568,17 +583,21 @@ class AcpClient:
         allows one active prompt per session). The read loop routes
         this prompt's events to its own queue; concurrent callers
         wait on the lock and each receives only its own events (no
-        interleaving, no stolen chunks). Ends at the usage event;
-        the lock releases when the generator exhausts or is closed.
+        interleaving, no stolen chunks). Ends when the prompt's RESPONSE
+        lands (`done`) or the agent dies (`closed`) — never on a usage
+        reading, which arrives after every model call; the lock releases
+        when the generator exhausts or is closed.
         """
         assert self._session_id, "call start() first"
         async with self._prompt_lock:
             queue: asyncio.Queue[AcpEvent] = asyncio.Queue()
             self._active_queue = queue
+            request_id = await self._next_id()
+            self._prompt_request_id = request_id
             try:
                 await self._send({
                     "jsonrpc": "2.0",
-                    "id": await self._next_id(),
+                    "id": request_id,
                     "method": "session/prompt",
                     "params": {
                         "sessionId": self._session_id,
@@ -591,9 +610,10 @@ class AcpClient:
                     # "closed" = the subprocess was killed (nuke/close
                     # pushed the sentinel) — exit the generator so the
                     # lock releases and the router can respawn
-                    if ev.kind in ("usage", "closed"):
+                    if ev.kind in ("done", "closed"):
                         break
             finally:
+                self._prompt_request_id = None
                 self._active_queue = None
 
     async def cancel(self) -> None:

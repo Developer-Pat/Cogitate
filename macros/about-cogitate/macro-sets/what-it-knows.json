@@ -1,0 +1,14 @@
+{
+  "topic": "What it knows",
+  "name": "Knowledge",
+  "description": "Wiki, RAG and graph — the system's knowledge of itself",
+  "sort_order": 2,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about system expertise.",
+    "f2": "Tell me about the wiki.",
+    "f3": "Tell me about the RAG index.",
+    "f4": "Tell me about the knowledge graph.",
+    "f5": "How do I search the docs?"
+  }
+}

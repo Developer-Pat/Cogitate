@@ -6,6 +6,7 @@ import ChatInterface from '../components/features/agentInteraction/ChatInterface
 import SessionManager from '../components/features/agentInteraction/SessionManager'
 import CognitiveTraceDebugOverlay from '../components/features/agentInteraction/CognitiveTraceDebugOverlay'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { uuidv4 } from '../utils/uuid'
 import { useTracePanel } from '../hooks/useTracePanel'
 import { useMessageStore, selectUnreadCount } from '../stores/messageStore'
 import { useNotificationStore } from '../stores/notificationStore'
@@ -362,7 +363,7 @@ export default function ExaChat() {
       if (!p.timer_id) return
       const ctx = p.context || 'the long-running job finished'
       setPendingPickup({
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         label: ctx,
         text: `The timer fired. Pick up where you left off: ${ctx}. Read the results, give me the digest, and clean up the working copy.`,
       })
@@ -386,7 +387,7 @@ export default function ExaChat() {
       if (!req) return
       consumeSwapRequest()
       setPendingPickup({
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         label: req.label,
         text: req.text,
       })
@@ -481,8 +482,12 @@ export default function ExaChat() {
   // service master for manual speech; this pref gates ONLY the
   // auto-read branch). localStorage-backed (per-browser, no backend
   // churn); the ref mirrors the state for the ws closure.
+  // OFF unless this browser has switched it on (2026-11-25): a shipped install must
+  // not start reading replies aloud — the old default was 'true', so a fresh browser
+  // began voicing every answer and, where TTS is unconfigured, raising an error the
+  // user never asked for.
   const autoSpeakRef = useRef(
-    (localStorage.getItem('exa-auto-speak') ?? 'true') !== 'false'
+    (localStorage.getItem('exa-auto-speak') ?? 'false') !== 'false'
   )
   const [autoSpeak, setAutoSpeak] = useState(autoSpeakRef.current)
   const toggleAutoSpeak = () => {
@@ -550,7 +555,7 @@ export default function ExaChat() {
           return [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: uuidv4(),
               role: 'assistant',
               content: msg.text || '',
               isStreaming: true,
@@ -577,7 +582,7 @@ export default function ExaChat() {
           return [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: uuidv4(),
               role: 'assistant',
               content: '',
               metadata: { reasoning: msg.text || '' },
@@ -597,7 +602,7 @@ export default function ExaChat() {
           }
           return [
             ...prev,
-            { id: crypto.randomUUID(), role: 'assistant', content: '', activity: [title], timestamp: new Date() },
+            { id: uuidv4(), role: 'assistant', content: '', activity: [title], timestamp: new Date() },
           ]
         })
       } else if (msg.type === 'status' && msg.status === 'working') {
@@ -626,7 +631,7 @@ export default function ExaChat() {
           return [
             ...next,
             {
-              id: crypto.randomUUID(),
+              id: uuidv4(),
               role: 'assistant',
               content: msg.message || 'Tool-call limit reached — the run was stopped.',
               timestamp: new Date(),
@@ -651,7 +656,7 @@ export default function ExaChat() {
           }
           return [
             ...prev,
-            { id: crypto.randomUUID(), role: 'assistant', content: msg.reply || '', timestamp: new Date() },
+            { id: uuidv4(), role: 'assistant', content: msg.reply || '', timestamp: new Date() },
           ]
         })
         persistMessage('assistant', msg.reply)
@@ -757,7 +762,7 @@ export default function ExaChat() {
       if (!wsRef.current || wsRef.current.readyState > WebSocket.OPEN) return
       setExaMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: 'user', content: text, timestamp: new Date() },
+        { id: uuidv4(), role: 'user', content: text, timestamp: new Date() },
       ])
       persistMessage('user', text)
       // THE AUTO-TITLE (2026-09-04, the Exa-panel P1 — REPLACED 2026-09-26).
@@ -795,7 +800,7 @@ export default function ExaChat() {
     setPendingPickup(null)
     setExaMessages((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), role: 'user', content: p.text, timestamp: new Date() },
+      { id: uuidv4(), role: 'user', content: p.text, timestamp: new Date() },
     ])
     persistMessage('user', p.text)
     wsRef.current?.send(JSON.stringify({ type: 'prompt', text: p.text }))

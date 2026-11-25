@@ -185,6 +185,27 @@ async def list_meta_topics(
         raise HTTPException(status_code=500, detail=f"Failed to list meta topics: {str(e)}")
 
 
+@router.get("/macro-packs")
+async def get_macro_pack_bindings(
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Which meta-topic feeds each surface's F keys and A keys, by install.
+
+    THE INITIALIZATION ANSWER (the shipped macro packs): a fresh install has no
+    browser storage, so the frontend cannot know what a pack put where. This
+    reports it — `{"agent": {"f": 12, "a": 27}, "exa": {"f": 30, "a": 31}}` — and
+    the store uses it as the fallback behind the user's own saved selection.
+    Ids, confirmed against the table: a topic that was deleted binds nothing.
+    """
+    from app.domain.macros.packs import pack_bindings
+
+    try:
+        return {"bindings": await pack_bindings(db)}
+    except Exception as e:  # pragma: no cover - the store treats a failure as "unknown"
+        logger.error(f"Failed to read macro pack bindings: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to read macro pack bindings: {str(e)}")
+
+
 @router.get("/meta-topics/{meta_topic_id}", response_model=MetaTopicResponse)
 async def get_meta_topic(
     meta_topic_id: int,

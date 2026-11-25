@@ -1,0 +1,14 @@
+{
+  "topic": "Knowledge",
+  "name": "Knowledge and workflows",
+  "description": "The index, the ingest, and the runs that touch them",
+  "sort_order": 4,
+  "is_active": true,
+  "macros": {
+    "f1": "The RAG index is stale. Check its status.",
+    "f2": "Is the ingest running?",
+    "f3": "The workflow XXXX failed. Why?",
+    "f4": "Check the last workflow run.",
+    "f5": "Which documents failed to index?"
+  }
+}

@@ -112,7 +112,10 @@ def client(monkeypatch, test_session):
     app.dependency_overrides[get_db_session] = lambda: test_session
 
     async def fake_get_config(db):
-        return dict(DEFAULT_CONFIG)
+        # ENABLED on purpose: these tests are about what the endpoints DO when speech is
+        # on. The shipped default is off (DEFAULT_CONFIG["enabled"] is False) and the
+        # refusal has its own tests below.
+        return {**DEFAULT_CONFIG, "enabled": True}
 
     async def fake_save_config(db, updates):
         return {**DEFAULT_CONFIG, **updates}
@@ -152,6 +155,39 @@ def test_voices_lists_the_resolved_engines_voices(client, monkeypatch):
         "voices": [{"name": "v-one"}, {"name": "v-two"}],
         "default": "v-one",
     }
+
+
+async def _disabled(db):
+    return {**DEFAULT_CONFIG, "enabled": False}
+
+
+def test_speak_refuses_when_speech_is_off(client, monkeypatch):
+    """THE OFF SWITCH IS A SWITCH: a disabled install does not synthesize, whatever asks."""
+    monkeypatch.setattr(tts_router_mod, "get_tts_config", _disabled)
+
+    resp = client.get("/tts/speak", params={"text": "hello"})
+
+    assert resp.status_code == 409
+    assert "switched off" in resp.json()["detail"]
+
+
+def test_the_voice_list_refuses_when_speech_is_off(client, monkeypatch):
+    """`/voices` runs the engine's own listing (edge-tts asks Microsoft), so it is gated too."""
+    monkeypatch.setattr(tts_router_mod, "get_tts_config", _disabled)
+
+    assert client.get("/tts/voices").status_code == 409
+
+
+def test_the_guard_runs_before_a_provider_is_built(client, monkeypatch):
+    """No provider, no subprocess, no socket while the switch is off."""
+    def exploding(name):
+        raise AssertionError("a provider was constructed while speech was off")
+
+    monkeypatch.setattr(tts_router_mod, "get_tts_config", _disabled)
+    monkeypatch.setattr(tts_router_mod, "get_tts_provider", exploding)
+
+    assert client.get("/tts/speak", params={"text": "hi"}).status_code == 409
+    assert client.get("/tts/voices").status_code == 409
 
 
 def test_config_reports_the_resolved_engine(client):

@@ -1,0 +1,16 @@
+{
+  "name": "Lois",
+  "namespace": "agent",
+  "description": "Reporter — India, China/Asia and weird news, in three lenses",
+  "surface": "agent",
+  "role": null,
+  "is_active": true,
+  "sort_order": 10,
+  "macro_sets": [
+    "india-eastern.json",
+    "india-western.json",
+    "asia-eastern.json",
+    "asia-western.json",
+    "weird-news.json"
+  ]
+}

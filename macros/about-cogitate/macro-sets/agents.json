@@ -1,0 +1,14 @@
+{
+  "topic": "Agents",
+  "name": "Agents",
+  "description": "Profiles, the types you can create, the system agent, avatars",
+  "sort_order": 0,
+  "is_active": true,
+  "macros": {
+    "f1": "Tell me about agent profiles.",
+    "f2": "What types of agents can I create?",
+    "f3": "Tell me about Exa, the system agent.",
+    "f4": "Can Exa monitor the system for me?",
+    "f5": "Where do the agent avatars come from?"
+  }
+}

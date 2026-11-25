@@ -58,9 +58,12 @@ for line in sys.stdin:
         if pending_prompt is not None:
             pp = pending_prompt
             pending_prompt = None
-            print(json.dumps({"jsonrpc": "2.0", "id": pp["id"], "result": {"reply": "ok"}}), flush=True)
             print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": "perm-session-1", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": json.dumps(msg)}}}}), flush=True)
             print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": "perm-session-1", "update": {"sessionUpdate": "usage_update", "content": {}}}}), flush=True)
+            # THE RESPONSE COMES LAST (2026-11-25): an ACP agent streams its
+            # output and THEN answers session/prompt. The turn now ends on that
+            # response, so a fake that answers first loses everything after it.
+            print(json.dumps({"jsonrpc": "2.0", "id": pp["id"], "result": {"reply": "ok"}}), flush=True)
 '''
 
 

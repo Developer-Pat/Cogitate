@@ -1,0 +1,14 @@
+{
+  "topic": "Conversation",
+  "name": "Conversation management",
+  "description": "Continue, cancel, refocus, summarise",
+  "sort_order": 2,
+  "is_active": true,
+  "macros": {
+    "f1": "Lets continue working on the previous topic.",
+    "f2": "Ignore my previous request.",
+    "f3": "Focus on the current task.",
+    "f4": "Summarize this conversation so far.",
+    "f5": "What have we covered?"
+  }
+}

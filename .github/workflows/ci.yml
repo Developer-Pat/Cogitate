@@ -23,6 +23,9 @@ jobs:
   backend:
     name: backend · ${{ matrix.group }}
     runs-on: ubuntu-24.04
+    # A hang must FAIL, not run for an hour: the unit group took ~10 minutes when it last completed on a
+    # runner, and a stuck job reports `in_progress` forever, which reads as "still testing" to everyone.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -60,6 +63,7 @@ jobs:
   frontend:
     name: frontend · typecheck, tests, build
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

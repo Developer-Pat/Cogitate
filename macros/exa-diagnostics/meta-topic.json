@@ -1,0 +1,16 @@
+{
+  "name": "Exa Diagnostics",
+  "namespace": "agent",
+  "description": "The action keys — say what is broken, get told what is wrong",
+  "surface": "exa",
+  "role": "action",
+  "is_active": true,
+  "sort_order": 21,
+  "macro_sets": [
+    "triage.json",
+    "providers.json",
+    "agents.json",
+    "interface.json",
+    "knowledge.json"
+  ]
+}

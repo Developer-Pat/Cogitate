@@ -1,0 +1,14 @@
+{
+  "topic": "Asia — Eastern Lens",
+  "name": "Regional press",
+  "description": "China and Asia through the region's own press",
+  "sort_order": 2,
+  "is_active": true,
+  "macros": {
+    "f1": "Please sweep the Asia beat — Eastern lens.",
+    "f2": "What is the Chinese press leading with today?",
+    "f3": "Any Asia story the English press is not carrying?",
+    "f4": "Check the latest Taiwan and Hong Kong news.",
+    "f5": "What is still developing in Asia?"
+  }
+}

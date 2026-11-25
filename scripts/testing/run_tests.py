@@ -527,9 +527,20 @@ def _on_term(signum, frame):
     raise SystemExit(130)
 
 
-def _run_pytest(args, ts: str, run_dir: Path, events: Path, selection: list[str],
-                label: str, use_parallel: bool, backend_up: bool) -> int:
-    """The backend groups: pytest, one run folder, three artifacts."""
+# A STALLED TEST MUST NAME ITSELF (2026-11-25). CI's unit group ran for 30 minutes and
+# was then cancelled by the job's own timeout, which names nothing: 49 tests never
+# reported, the job said "cancelled", and two days of diagnosis went into reading
+# artifacts to find a set of filenames. A per-test cap converts that into
+# `FAILED <nodeid> -- timed out after Ns`, which is an answer.
+#
+# The value sits far above the slowest real test (40s — a permission test that waits on
+# purpose) and far below the job's 30 minutes, so a hang is caught in minutes while a
+# slow-but-honest test is never touched. Tune with COGITATE_TEST_TIMEOUT.
+PER_TEST_TIMEOUT_S = int(os.environ.get("COGITATE_TEST_TIMEOUT", "120"))
+
+
+def _pytest_args(selection: list[str], run_dir: Path, use_parallel: bool) -> list[str]:
+    """The pytest command line. Pure, so the flags can be asserted without a subprocess."""
     cmd = [
         str(ROOT / ".venv" / "bin" / "python3"),
         "-m", "pytest",
@@ -539,6 +550,8 @@ def _run_pytest(args, ts: str, run_dir: Path, events: Path, selection: list[str]
         # report holds dots and tracebacks, and the failure NAMES have to be
         # dug out of the middle - which is how a 66-failure run reads as "~10".
         "-rf",
+        # THE PER-TEST CAP. See PER_TEST_TIMEOUT_S: a stall must fail by name.
+        f"--timeout={PER_TEST_TIMEOUT_S}",
         # THE STRUCTURED RESULT. Written when the session ENDS, which is why it
         # answers "what did each test do" and never "what is happening".
         f"--junitxml={run_dir / 'report.xml'}",
@@ -547,6 +560,13 @@ def _run_pytest(args, ts: str, run_dir: Path, events: Path, selection: list[str]
     ]
     if use_parallel:
         cmd += ["-n", "auto"]
+    return cmd
+
+
+def _run_pytest(args, ts: str, run_dir: Path, events: Path, selection: list[str],
+                label: str, use_parallel: bool, backend_up: bool) -> int:
+    """The backend groups: pytest, one run folder, three artifacts."""
+    cmd = _pytest_args(selection, run_dir, use_parallel)
 
     report = run_dir / "report.md"
     print(f"[run_tests] group={label} parallel={use_parallel} "
