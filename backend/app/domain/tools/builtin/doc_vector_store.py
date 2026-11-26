@@ -263,6 +263,15 @@ class DocVectorStore:
         self.embedding_dims = embedding.dims or 0
         self.batch_size = batch_size
         self._db: Optional[sqlite3.Connection] = None
+        # THE STORE IS USED FROM MORE THAN ONE THREAD (2026-11-26). The ingest ran its per-document
+        # work ON the event loop's thread, so a 16-second embedding call froze the whole app; the fix
+        # moves that work to a worker thread, which means this store's connection is now touched by
+        # the loop (a tool searching) and a worker (a document being written) at the same time.
+        # `check_same_thread=False` makes that legal (CPython's sqlite3 is serialized:
+        # `sqlite3.threadsafety == 3`), and this lock makes the write half ATOMIC — a reader never
+        # sees a document half-deleted and half-inserted. It is re-entrant because `index_document`
+        # takes it and then calls `_remove_document`, which takes it again.
+        self._write_lock = threading.RLock()
         self._initialized = False
 
     def _refuse_unconfigured(self) -> bool:
@@ -388,18 +397,22 @@ class DocVectorStore:
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create the sqlite3 connection with sqlite-vec loaded."""
-        if self._db is None:
-            # Ensure parent directory exists
-            db_dir = Path(self.db_path).parent
-            db_dir.mkdir(parents=True, exist_ok=True)
+        with self._write_lock:
+            if self._db is None:
+                # Ensure parent directory exists
+                db_dir = Path(self.db_path).parent
+                db_dir.mkdir(parents=True, exist_ok=True)
 
-            self._db = sqlite3.connect(self.db_path)
-            self._db.row_factory = sqlite3.Row
-            self._db.enable_load_extension(True)
-            sqlite_vec.load(self._db)
-            self._db.enable_load_extension(False)
-            self._db.execute("PRAGMA journal_mode=WAL")
-        return self._db
+                # `check_same_thread=False`: the ingest writes from a worker thread while a tool may
+                # read from the event loop's (see `_write_lock`). The connection is created under the
+                # lock so two threads cannot build two connections.
+                self._db = sqlite3.connect(self.db_path, check_same_thread=False)
+                self._db.row_factory = sqlite3.Row
+                self._db.enable_load_extension(True)
+                sqlite_vec.load(self._db)
+                self._db.enable_load_extension(False)
+                self._db.execute("PRAGMA journal_mode=WAL")
+            return self._db
 
     def init_db(self) -> None:
         """Create tables if they don't exist.
@@ -552,50 +565,54 @@ class DocVectorStore:
         # Remove existing entries for this source path before re-indexing
         self._remove_document(source_path)
 
+        # THE SLOW HALF STAYS OUTSIDE THE LOCK. Embedding is one blocking HTTP call per chunk — 16
+        # seconds for a full-size chunk on a CPU-only box — and a search must not queue behind it.
         texts = [c["chunk_text"] for c in chunks]
         embeddings = self.embed_chunks(texts)
 
-        db = self._get_connection()
-        inserted = 0
+        # THE WRITE HALF IS ATOMIC (see `_write_lock`): a reader sees the document whole or not at all.
+        with self._write_lock:
+            db = self._get_connection()
+            inserted = 0
 
-        for chunk, emb in zip(chunks, embeddings):
-            if emb is None:
-                logger.warning(
-                    "Skipping chunk (embedding failed): %s heading=%s",
-                    source_path, chunk.get("heading", ""),
+            for chunk, emb in zip(chunks, embeddings):
+                if emb is None:
+                    logger.warning(
+                        "Skipping chunk (embedding failed): %s heading=%s",
+                        source_path, chunk.get("heading", ""),
+                    )
+                    continue
+
+                # Insert metadata row
+                cursor = db.execute(
+                    """
+                    INSERT INTO doc_chunks
+                        (source_path, chunk_text, heading, heading_ancestry,
+                         char_start, char_end, checksum)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chunk["source_path"],
+                        chunk["chunk_text"],
+                        chunk.get("heading", ""),
+                        chunk.get("heading_ancestry", ""),
+                        chunk.get("char_start", 0),
+                        chunk.get("char_end", 0),
+                        chunk["checksum"],
+                    ),
                 )
-                continue
+                chunk_id = cursor.lastrowid
 
-            # Insert metadata row
-            cursor = db.execute(
-                """
-                INSERT INTO doc_chunks
-                    (source_path, chunk_text, heading, heading_ancestry,
-                     char_start, char_end, checksum)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    chunk["source_path"],
-                    chunk["chunk_text"],
-                    chunk.get("heading", ""),
-                    chunk.get("heading_ancestry", ""),
-                    chunk.get("char_start", 0),
-                    chunk.get("char_end", 0),
-                    chunk["checksum"],
-                ),
-            )
-            chunk_id = cursor.lastrowid
+                # Insert embedding into vec_docs virtual table
+                from sqlite_vec import serialize_float32
 
-            # Insert embedding into vec_docs virtual table
-            from sqlite_vec import serialize_float32
+                db.execute(
+                    "INSERT INTO vec_docs (rowid, embedding) VALUES (?, ?)",
+                    (chunk_id, serialize_float32(emb)),
+                )
+                inserted += 1
 
-            db.execute(
-                "INSERT INTO vec_docs (rowid, embedding) VALUES (?, ?)",
-                (chunk_id, serialize_float32(emb)),
-            )
-            inserted += 1
-
-        db.commit()
+            db.commit()
         logger.info(
             "Indexed %d/%d chunks from %s",
             inserted, len(chunks), source_path,
@@ -610,34 +627,35 @@ class DocVectorStore:
         if not self._initialized:
             self.init_db()
 
-        db = self._get_connection()
+        with self._write_lock:
+            db = self._get_connection()
 
-        # Find chunk IDs for this source path
-        cursor = db.execute(
-            "SELECT id FROM doc_chunks WHERE source_path = ?",
-            (source_path,),
-        )
-        ids = [row["id"] for row in cursor.fetchall()]
+            # Find chunk IDs for this source path
+            cursor = db.execute(
+                "SELECT id FROM doc_chunks WHERE source_path = ?",
+                (source_path,),
+            )
+            ids = [row["id"] for row in cursor.fetchall()]
 
-        if not ids:
-            return 0
+            if not ids:
+                return 0
 
-        # Delete from vec_docs (virtual table)
-        for chunk_id in ids:
-            try:
-                db.execute("DELETE FROM vec_docs WHERE rowid = ?", (chunk_id,))
-            except Exception as exc:
-                logger.warning(
-                    "Failed to delete vec_docs rowid=%d: %s", chunk_id, exc,
-                )
+            # Delete from vec_docs (virtual table)
+            for chunk_id in ids:
+                try:
+                    db.execute("DELETE FROM vec_docs WHERE rowid = ?", (chunk_id,))
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to delete vec_docs rowid=%d: %s", chunk_id, exc,
+                    )
 
-        # Delete from metadata table
-        db.execute(
-            "DELETE FROM doc_chunks WHERE source_path = ?",
-            (source_path,),
-        )
-        db.commit()
-        return len(ids)
+            # Delete from metadata table
+            db.execute(
+                "DELETE FROM doc_chunks WHERE source_path = ?",
+                (source_path,),
+            )
+            db.commit()
+            return len(ids)
 
     def remove_stale_documents(self, existing_paths: Set[str]) -> int:
         """Remove vector entries for documents that no longer exist.

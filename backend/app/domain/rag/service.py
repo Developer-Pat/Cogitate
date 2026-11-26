@@ -565,7 +565,14 @@ class RagIngestService:
                     logger.debug("Skipping empty file: %s", rel_path)
                     continue
 
-                n_chunks = store.index_document(rel_path, content)
+                # OFF THE EVENT LOOP (2026-11-26). `index_document` is one blocking HTTP call per
+                # chunk plus sqlite writes — 16 seconds for a full-size chunk on a CPU-only box,
+                # measured. Called directly from this coroutine it held the loop for the whole file,
+                # so `/api/v1/health` timed out and even the RAG page's own status poll went
+                # unanswered while a job ran. A worker thread keeps the app responsive; the store's
+                # connection is opened `check_same_thread=False` for exactly this (see its
+                # `_write_lock`).
+                n_chunks = await asyncio.to_thread(store.index_document, rel_path, content)
                 progress.total_chunks += n_chunks
                 progress.files_processed += 1
 
@@ -583,14 +590,15 @@ class RagIngestService:
             status.progress = progress
             _write_status_file(status)
 
-            # Yield control briefly so the event loop can handle other tasks
-            # (e.g., polling requests for status).
+            # Let the loop run whatever else is waiting (the status poll, a chat turn) between files.
             await asyncio.sleep(0)
 
         # ── Stale document cleanup ────────────────────────────────────────
         stale_removed = 0
         try:
-            stale_removed = store.remove_stale_documents(all_discovered_paths)
+            stale_removed = await asyncio.to_thread(
+                store.remove_stale_documents, all_discovered_paths
+            )
             if stale_removed:
                 logger.info("Removed %d stale chunk(s)", stale_removed)
         except Exception as exc:
@@ -600,7 +608,7 @@ class RagIngestService:
         try:
             from app.domain.tools.builtin.doc_vector_store import _rebuild_doc_index_json  # noqa: PLC0415
 
-            _rebuild_doc_index_json(doc_index_abs, self._project_root)
+            await asyncio.to_thread(_rebuild_doc_index_json, doc_index_abs, self._project_root)
         except Exception as exc:
             logger.error("Failed to regenerate doc index: %s", exc)
 
