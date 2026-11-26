@@ -756,8 +756,10 @@ class RagIngestService:
         # ── Stale document cleanup ────────────────────────────────────────
         stale_removed = 0
         try:
+            # THE ROOTS ARE PART OF THE QUESTION (2026-11-26): a run given two roots must not sweep
+            # the other four out of the index, which is exactly what a narrowed run used to do.
             stale_removed = await asyncio.to_thread(
-                store.remove_stale_documents, all_discovered_paths
+                store.remove_stale_documents, all_discovered_paths, dirs
             )
             if stale_removed:
                 logger.info("Removed %d stale chunk(s)", stale_removed)

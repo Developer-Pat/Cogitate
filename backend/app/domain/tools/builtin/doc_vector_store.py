@@ -39,7 +39,7 @@ import re
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, cast
 
 import httpx
 import sqlite3
@@ -669,7 +669,9 @@ class DocVectorStore:
             db.commit()
             return len(ids)
 
-    def remove_stale_documents(self, existing_paths: Set[str]) -> int:
+    def remove_stale_documents(
+        self, existing_paths: Set[str], roots: Optional[Sequence[str]] = None
+    ) -> int:
         """Remove vector entries for documents that no longer exist.
 
         Parameters
@@ -677,6 +679,11 @@ class DocVectorStore:
         existing_paths:
             Set of source paths that still exist on disk.  Any chunk whose
             ``source_path`` is NOT in this set will be removed.
+        roots:
+            The ingestion roots THIS RUN was given. When set, staleness is judged only inside them —
+            a narrowed run must not delete the roots it was told to leave alone. Measured before this
+            guard existed: indexing `entities + help` removed **845 chunks** that belonged to
+            dev-notes and the atlas, because "not discovered this run" read as "gone from disk".
 
         Returns
         -------
@@ -690,6 +697,12 @@ class DocVectorStore:
         # Find all distinct source paths in the index
         cursor = db.execute("SELECT DISTINCT source_path FROM doc_chunks")
         indexed_paths = {row["source_path"] for row in cursor.fetchall()}
+
+        if roots:
+            # A path is in scope when it sits UNDER one of this run's roots. Everything outside them
+            # is somebody else's business, not stale content.
+            prefixes = tuple(root.rstrip("/") + "/" for root in roots)
+            indexed_paths = {p for p in indexed_paths if p.startswith(prefixes)}
 
         stale = indexed_paths - existing_paths
         total_removed = 0
