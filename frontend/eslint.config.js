@@ -12,7 +12,11 @@ import { globalIgnores } from 'eslint/config'
 import storeUsagePlugin from './eslint-plugin-store-usage.js'
 
 export default tseslint.config([
-  globalIgnores(['dist']),
+  // BUILD OUTPUT IS NOT SOURCE (2026-11-25). `storybook-static` is gitignored but was
+  // still being linted, so a local Storybook build turned `npm run lint` into 13
+  // "Definition for rule … was not found" errors in a minified bundle — noise that
+  // reads as a broken config and hides the one real finding underneath it.
+  globalIgnores(['dist', 'storybook-static']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   usePromptHistoryStore,
   MAX_HISTORY,
@@ -210,5 +210,42 @@ describe('the rehydrate migration', () => {
     // deduped (first occurrence wins) AND alphabetical
     expect(texts).toEqual(['apple', 'zebra'])
     sessionStorage.removeItem('cogitate-prompt-history')
+  })
+})
+
+/**
+ * THE CAP UNDER A TIE (2026-11-25) — the bug this file kept failing on, in CI and not
+ * here, as "expected true to be false" at the cap test above.
+ *
+ * `createdAt` is milliseconds. A burst of sends lands several in the SAME one, and the
+ * old cap compared only `createdAt`, so every tie was "equal" and the entry it dropped
+ * was whatever `reduce` kept as the minimum — `next[0]`, which is the one just added.
+ * On a fast machine the 205 adds fit inside a millisecond and the newest prompt was
+ * discarded; on a slow one they straddled it and the test passed. Frozen time makes
+ * that deterministic, so the tie is now pinned instead of raced.
+ */
+describe('the cap when every add lands in the same millisecond', () => {
+  beforeEach(() => {
+    usePromptHistoryStore.setState({ prompts: [] })
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-25T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('drops the five OLDEST — and never the one just added', () => {
+    const { addPrompt } = usePromptHistoryStore.getState()
+
+    for (let i = 0; i < MAX_HISTORY + 5; i++) addPrompt(`tied prompt ${i}`, '16')
+
+    const { prompts } = usePromptHistoryStore.getState()
+    expect(prompts).toHaveLength(MAX_HISTORY)
+
+    for (let i = 0; i < 5; i++) {
+      expect(prompts.some((p) => p.text === `tied prompt ${i}`)).toBe(false)
+    }
+    expect(prompts.some((p) => p.text === `tied prompt ${MAX_HISTORY + 4}`)).toBe(true)
   })
 })

@@ -20,7 +20,8 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { TrashShelfTable, shelfShape } from '../TrashShelfTable'
+import { TrashShelfTable } from '../TrashShelfTable'
+import { shelfShape } from '../shelfShape'
 import type { TrashEntry, TrashListing } from '@/services/domain/TrashService'
 
 const entry = (over: Partial<TrashEntry> = {}): TrashEntry => ({
