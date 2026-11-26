@@ -144,14 +144,14 @@ flowchart TB
 
 | | A — ollama here | B — ollama elsewhere | C — the /v1 client |
 |---|---|---|---|
-| what it needs | ollama + a 262 MB model | a reachable server; a key for the cloud | one client, tested at three call sites |
+| what it needs | ollama + a 274 MB model | a reachable server; a key for the cloud | one client, tested at three call sites |
 | keyless | yes | cloud: no | yes, for the llama.cpp half |
 | cost | one runtime on the box under test | the index depends on another host or a network | a small piece of work, and its own review |
 | unblocks today | **yes** | yes, if the host answers | no — it is the change, not the answer |
 | agrees with earlier rulings | yes — the capability names a ROW + a model | yes | yes — it *removes* a limitation, it does not move a value |
 
 **Recommendation: A now, C as its own item.** Ollama on the box is the documented offer — `nomic-embed-text`
-weighed **261.6 MB across three layers** off the registry manifest today — it is keyless, and
+weighs **274 MB** on disk — it is keyless, and
 it is the exact path a fresh install meets — so landing it does double duty: the index gets built and the
 surface a user is asked to walk gets walked. C is real work and it is worth doing, but it is not the thing
 standing between this install and a judged answer; scheduling it as the answer to today's problem would be
@@ -160,6 +160,29 @@ solving the general case on the customer's time.
 **Not recommended:** pointing the `ollama` row at a llama.cpp server. It resolves — address, model and width
 all present — and then the call returns 404, because the route does not exist. That failure would look like
 a broken install rather than a missing client, which is the worst kind.
+
+## What option A measured, on the box it was taken on
+
+*(recorded after the ruling, 2026-11-26 — the ruling stands; this is what it costs here.)*
+
+- **ollama installs and the row is created in one call.** A fresh install has **zero** provider rows: the
+  endpoint that creates the default `ollama` row exists (`POST /providers/initialize-default`, id 1,
+  `http://localhost:11434`) and **nothing calls it** — the UI's own Setup → Local LLM tab is instructions
+  only, and the Add Provider dialog's type list has no `ollama` entry. Called by hand, the Capabilities page
+  then shows every other capability resolving to that row and Embeddings still saying *no embedding model*,
+  which is the ruling working as designed.
+- **The ingest blocks the whole API while it runs.** `RagIngestService.run` is a coroutine, but
+  `DocVectorStore.index_document` makes a **synchronous** `httpx` POST per chunk
+  (`doc_vector_store.py:475`), so the event loop is held for the duration of every file: measured
+  `/api/v1/health` at `000` (timeout) and the UI's own 2.5-second status poll unable to answer.
+- **On a pre-AVX CPU the model is ~16 s per 1,500-character chunk.** The box is a **Xeon X5670**
+  (`avx`/`avx2`: **0** flags): one chunk measured **16.99 s**, then **15.96 s**. 623 files were discovered
+  for ~3,500 chunks, so the full corpus is a **15-hour** job — on a box whose app is frozen for its duration.
+- **`all-minilm` is not the cheap way out.** It is in the width table (384) and pulls in 49 MB, but its
+  **256-token context** refuses the app's 1,500-character chunk outright:
+  `HTTP 500 {"error":"the input length exceeds the context length"}`.
+- **Incremental resume works.** The job was stopped after 5 files; a `restart` left **5 documents /
+  28 chunks / 3,215,360 bytes** in the index, and the next incremental run skips them.
 
 ## What to do, on an install that has nothing
 
