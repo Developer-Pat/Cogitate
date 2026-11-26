@@ -175,9 +175,11 @@ a broken install rather than a missing client, which is the worst kind.
   `DocVectorStore.index_document` makes a **synchronous** `httpx` POST per chunk
   (`doc_vector_store.py:475`), so the event loop is held for the duration of every file: measured
   `/api/v1/health` at `000` (timeout) and the UI's own 2.5-second status poll unable to answer.
-- **On a pre-AVX CPU the model is ~16 s per 1,500-character chunk.** The box is a **Xeon X5670**
-  (`avx`/`avx2`: **0** flags): one chunk measured **16.99 s**, then **15.96 s**. 623 files were discovered
-  for ~3,500 chunks, so the full corpus is a **15-hour** job — on a box whose app is frozen for its duration.
+- **A pre-AVX CPU makes the model the clock.** The box is a **Xeon X5670** (`avx`/`avx2`: **0** flags): a
+  full-size 1,500-character chunk measured **16.99 s**, then **15.96 s** — while the first five real files
+  averaged **4.1 s a chunk** (28 chunks, 114 s). 623 files were discovered for ~3,500 chunks, so the corpus
+  is a job measured in **hours, not minutes** (between roughly 4 and 15), on a box whose app is frozen for
+  its duration.
 - **`all-minilm` is not the cheap way out.** It is in the width table (384) and pulls in 49 MB, but its
   **256-token context** refuses the app's 1,500-character chunk outright:
   `HTTP 500 {"error":"the input length exceeds the context length"}`.
