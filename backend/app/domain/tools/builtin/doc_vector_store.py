@@ -51,6 +51,7 @@ import sqlite_vec  # type: ignore[import-untyped]
 from app.domain.providers.embeddings import (
     EmbeddingService,
     declared_width_of,
+    max_embed_chars_for,
     width_mismatch_report,
 )
 
@@ -63,10 +64,14 @@ DEFAULT_DB_PATH = "data/system_docs_vector.db"  # fallback; the canonical
 #   is the single resolver; the string default only covers callers
 #   that never pass a db_path and never loaded the app config.
 
-# Maximum characters to send to the embedding model in a single call.
-# nomic-embed-text has a 2048-token limit (~1500 chars), and crashes with HTTP 500
-# on inputs over ~1020 chars with this model version.  Set safely at 950.
-MAX_EMBED_CHARS = 950
+# THE INPUT BUDGET IS THE MODEL'S, NOT THIS MODULE'S (2026-11-26).
+#
+# This used to be `MAX_EMBED_CHARS = 950`, and the chunker above cut at `MAX_CHUNK_CHARS = 4000` —
+# two constants that had to agree and that nothing made agree. The embedder won silently: every chunk
+# past 950 characters was truncated, so **21.4 % of the documentation** (524,104 of 2,450,485
+# characters, measured over the six roots) never reached the model. Both are now ONE lookup,
+# `embeddings.max_embed_chars_for(model)`: the chunker cuts to it, and the embedder refuses a longer
+# chunk by name instead of embedding its opening.
 # NO ADDRESS, MODEL OR DIMS LIVE HERE (the service-literals arc's model half, 2026-10-10). This module
 # used to carry all three — `DEFAULT_OLLAMA_BASE`, and `DEFAULT_EMBEDDING_MODEL`/`DEFAULT_EMBEDDING_DIMS`
 # (`nomic-embed-text`, 768) copied into four further modules. None of them is a property of THIS store:
@@ -79,17 +84,44 @@ DEFAULT_TOP_K = 10
 MAX_TOP_K = 20
 DEFAULT_MIN_SCORE = 0.0
 
-# Maximum chunk size in characters before splitting on paragraph boundaries.
-# Approx 250 tokens at ~4 chars/token.
-MAX_CHUNK_CHARS = 4000
+# THE CHUNKER'S FALLBACK ONLY. The store always passes the MODEL's own budget
+# (`embeddings.max_embed_chars_for`); this default serves a direct caller that names none. It used to
+# be 4000, which was above what the embedder sent — see the note beside MAX_EMBED_CHARS.
+MAX_CHUNK_CHARS = 2000
 
 # ─── Heading-Aware Chunker ────────────────────────────────────────────────────
+
+
+def _split_to_cap(text: str, cap: int) -> List[str]:
+    """Split text into pieces of at most ``cap`` characters — paragraph first, then word boundary.
+
+    **The cap is a guarantee, not a target.** A paragraph longer than it (a fenced code block, a wide
+    table, a wall of prose with no blank lines) is cut at the last space before the limit, and at the
+    limit itself when there is none. Without this the chunker emitted chunks far over its own cap —
+    measured: an 11,597-character chunk against a 4,000 claim — and the embedder was left to hide it.
+    """
+    pieces: List[str] = []
+    for para in re.split(r"\n\s*\n", text):
+        para = para.strip()
+        if not para:
+            continue
+        while len(para) > cap:
+            cut = para.rfind(" ", 0, cap)
+            if cut <= 0:
+                cut = cap
+            piece = para[:cut].strip()
+            if piece:
+                pieces.append(piece)
+            para = para[cut:].strip()
+        if para:
+            pieces.append(para)
+    return pieces
 
 
 def chunk_document(
     content: str,
     source_path: str,
-    max_chunk_chars: int = MAX_CHUNK_CHARS,
+    max_chunk_chars: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Split a markdown document into heading-aware chunks.
 
@@ -127,18 +159,25 @@ def chunk_document(
             text = m.group(2).strip()
             headings.append((level, text, i))
 
+    cap = max_chunk_chars or MAX_CHUNK_CHARS
+
     if not headings:
-        # No headings — treat entire document as one chunk
-        checksum = hashlib.md5(content.encode("utf-8")).hexdigest()
-        chunks.append({
-            "source_path": source_path,
-            "chunk_text": content.strip(),
-            "heading": "",
-            "heading_ancestry": "",
-            "char_start": 0,
-            "char_end": len(content),
-            "checksum": checksum,
-        })
+        # NO HEADINGS IS NOT AN EXCUSE FOR ONE GIANT CHUNK. A plain note used to become a single chunk
+        # of any length — measured, an 11,597-character one — which the embedder then had to truncate.
+        # It is split like any other text now, so the cap holds with or without headings.
+        pieces = _split_to_cap(content, cap)
+        offset = 0
+        for piece in pieces:
+            chunks.append({
+                "source_path": source_path,
+                "chunk_text": piece,
+                "heading": "",
+                "heading_ancestry": "",
+                "char_start": offset,
+                "char_end": offset + len(piece),
+                "checksum": hashlib.md5(piece.encode("utf-8")).hexdigest(),
+            })
+            offset += len(piece) + 2
         return chunks
 
     # Build sections: each heading starts a new section, subsuming content until
@@ -172,7 +211,7 @@ def chunk_document(
 
     # Chunk each section, splitting oversized ones on paragraph boundaries
     for sec in sections:
-        if len(sec["text"]) <= max_chunk_chars:
+        if len(sec["text"]) <= cap:
             checksum = hashlib.md5(sec["text"].encode("utf-8")).hexdigest()
             # Calculate char positions (approximate from line ranges)
             char_start = sum(len(line) + 1 for line in lines[:sec["start_line"]])
@@ -187,45 +226,19 @@ def chunk_document(
                 "checksum": checksum,
             })
         else:
-            # Split on paragraph boundaries
-            paragraphs = re.split(r"\n\s*\n", sec["text"])
-            current_chunk = ""
+            # One helper for both paths, so the cap cannot be honoured in one and ignored in the other.
             char_pos = sum(len(line) + 1 for line in lines[:sec["start_line"]])
-
-            for para in paragraphs:
-                if not para.strip():
-                    continue
-                if len(current_chunk) + len(para) + 1 > max_chunk_chars and current_chunk:
-                    # Finalize current chunk
-                    checksum = hashlib.md5(current_chunk.encode("utf-8")).hexdigest()
-                    chunks.append({
-                        "source_path": source_path,
-                        "chunk_text": current_chunk.strip(),
-                        "heading": sec["heading"],
-                        "heading_ancestry": sec["heading_ancestry"],
-                        "char_start": char_pos,
-                        "char_end": char_pos + len(current_chunk),
-                        "checksum": checksum,
-                    })
-                    char_pos += len(current_chunk) + 2
-                    current_chunk = para
-                else:
-                    if current_chunk:
-                        current_chunk += "\n\n" + para
-                    else:
-                        current_chunk = para
-
-            if current_chunk.strip():
-                checksum = hashlib.md5(current_chunk.encode("utf-8")).hexdigest()
+            for piece in _split_to_cap(sec["text"], cap):
                 chunks.append({
                     "source_path": source_path,
-                    "chunk_text": current_chunk.strip(),
+                    "chunk_text": piece,
                     "heading": sec["heading"],
                     "heading_ancestry": sec["heading_ancestry"],
                     "char_start": char_pos,
-                    "char_end": char_pos + len(current_chunk),
-                    "checksum": checksum,
+                    "char_end": char_pos + len(piece),
+                    "checksum": hashlib.md5(piece.encode("utf-8")).hexdigest(),
                 })
+                char_pos += len(piece) + 2
 
     return chunks
 
@@ -262,6 +275,9 @@ class DocVectorStore:
         self.embedding_model = embedding.model or ""
         self.embedding_dims = embedding.dims or 0
         self.batch_size = batch_size
+        # THE INPUT BUDGET COMES FROM THE MODEL (one lookup, `providers/embeddings.py`): the chunker
+        # cuts to it and `_call_ollama_embed` refuses anything longer, so no text is ever half-embedded.
+        self.max_embed_chars = max_embed_chars_for(embedding.model)
         self._db: Optional[sqlite3.Connection] = None
         # THE STORE IS USED FROM MORE THAN ONE THREAD (2026-11-26). The ingest ran its per-document
         # work ON the event loop's thread, so a 16-second embedding call froze the whole app; the fix
@@ -472,17 +488,25 @@ class DocVectorStore:
     def _call_ollama_embed(self, text: str) -> Optional[List[float]]:
         """Call the Ollama embeddings API for a single text.
 
-        Truncates text to ``MAX_EMBED_CHARS`` (~950 chars) to stay within the
-        model's token limit (2048 tokens for ``nomic-embed-text``).  Longer
-        prompts cause Ollama to return HTTP 500.
+        **The text is sent whole.** It used to be truncated to 950 characters — silently, so 21.4 % of
+        the corpus never reached the model — while the chunker cut at 4,000: two constants that had to
+        agree and that nothing made agree. The chunker now cuts to ``self.max_embed_chars`` (the
+        model's own budget), so a longer text here is a BUG, and it is refused by name rather than
+        half-embedded.
 
         Returns ``None`` on failure (logged, not raised).
         """
         if self._refuse():
             return None
-        # Truncate to stay within model token budget
-        if len(text) > MAX_EMBED_CHARS:
-            text = text[:MAX_EMBED_CHARS]
+        if len(text) > self.max_embed_chars:
+            logger.error(
+                "chunk of %d chars exceeds the '%s' budget of %d — refusing to embed part of it "
+                "(the chunker must cut to max_embed_chars_for(model))",
+                len(text),
+                self.embedding_model,
+                self.max_embed_chars,
+            )
+            return None
 
         try:
             with httpx.Client(timeout=30.0) as client:
@@ -518,9 +542,13 @@ class DocVectorStore:
     def embed_query(self, text: str) -> Optional[List[float]]:
         """Embed a single query string.
 
+        A QUERY MAY BE CUT, a document may not: a pasted paragraph of 3,000 characters is a probe, and
+        the search still works on its opening — whereas a document chunk stands for its text forever,
+        which is why the chunker must fit and the embedder refuses instead of trimming.
+
         Returns a list of floats (the embedding vector) or ``None`` on failure.
         """
-        return self._call_ollama_embed(text)
+        return self._call_ollama_embed(text[: self.max_embed_chars])
 
     def embed_chunks(
         self, chunks: List[str], on_chunk: Optional[Callable[[], None]] = None
@@ -570,7 +598,7 @@ class DocVectorStore:
         if not self._initialized:
             self.init_db()
 
-        chunks = chunk_document(content, source_path)
+        chunks = chunk_document(content, source_path, self.max_embed_chars)
         if not chunks:
             return 0
 

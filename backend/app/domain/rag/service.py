@@ -109,10 +109,12 @@ def _matches_denied(path: str, patterns: List[str]) -> bool:
 
 # ─── What a run would cost ───────────────────────────────────────────────────
 #
-# MEASURED, NOT ASSUMED (2026-11-26): this corpus is 2,590,587 bytes over 623 files and the index
-# built from it held 3,527 chunks — about 735 characters a chunk. Heading-aware splitting sets the
-# chunk count, not size: MAX_CHUNK_CHARS is 4000, and estimating from it would under-count five-fold.
-CHARS_PER_CHUNK_ESTIMATE = 735
+# MEASURED, NOT ASSUMED (2026-11-26, after the chunk/embed contract was fixed): the six roots hold
+# 2,448,755 characters and the chunker now produces **5,276 chunks** at a 2,000-character cap — about
+# **464 characters a chunk**. Heading-aware splitting sets the count, not size (the mean chunk is 464
+# characters, the p90 1,110), so estimating from the cap alone would be wrong by a factor of four.
+# Re-measure this after any change to the chunker or its cap — it is a property of both.
+CHARS_PER_CHUNK_ESTIMATE = 464
 # Until this install has run once, there is no rate of its own to price with. 5.0 s sits inside the
 # measured band (4.1-7.4 s a chunk on a CPU-only Xeon) and is LABELLED as a default, never as measured.
 DEFAULT_RATE_S_PER_CHUNK = 5.0

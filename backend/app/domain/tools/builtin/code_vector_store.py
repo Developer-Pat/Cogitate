@@ -50,6 +50,7 @@ import sqlite_vec  # type: ignore[import-untyped]
 from app.domain.providers.embeddings import (
     EmbeddingService,
     declared_width_of,
+    max_embed_chars_for,
     width_mismatch_report,
 )
 
@@ -70,15 +71,17 @@ DEFAULT_TOP_K = 10
 MAX_TOP_K = 20
 DEFAULT_MIN_SCORE = 0.0
 
-# Maximum chunk size in characters before we truncate.
-# Source code chunks are typically small (functions/classes), but we cap
-# large top-level assignments or config files.
-MAX_CHUNK_CHARS = 4000
+# THE INPUT BUDGET IS THE MODEL'S (2026-11-26) — the same one-lookup the doc store uses
+# (`embeddings.max_embed_chars_for`). Code is token-denser than prose, which is why the budget is
+# conservative; what must not happen is a chunk the embedder then trims, which is what these two
+# constants used to allow (4,000 cut here, 950 sent there).
+MAX_CHUNK_CHARS = 2000
 
 # Maximum text length (in characters) to send to the embedding model.
 # nomic-embed-text has a ~2048 token limit but the runner process crashes
 # on inputs over ~1020 chars with this model version.  Set safely at 950.
-MAX_EMBED_CHARS = 950
+# retired: the input budget is the MODEL's (`max_embed_chars_for`), looked up in the store's
+# constructor — a hardcoded 950 here meant the embedder trimmed three quarters of anything long.
 
 # Language detection by file extension
 EXTENSION_LANGUAGE_MAP: Dict[str, str] = {
@@ -552,6 +555,8 @@ class CodeVectorStore:
         self.embedding_model = embedding.model or ""
         self.embedding_dims = embedding.dims or 0
         self.batch_size = batch_size
+        # The model's own input budget — the same lookup the doc store uses (see its note).
+        self.max_embed_chars = max_embed_chars_for(embedding.model)
         self._db: Optional[sqlite3.Connection] = None
         self._initialized = False
 
@@ -760,9 +765,14 @@ class CodeVectorStore:
         """
         if self._refuse():
             return None
-        # Truncate to stay within model token budget
-        if len(text) > MAX_EMBED_CHARS:
-            text = text[:MAX_EMBED_CHARS]
+        if len(text) > self.max_embed_chars:
+            logger.error(
+                "code chunk of %d chars exceeds the '%s' budget of %d — refusing to embed part of it",
+                len(text),
+                self.embedding_model,
+                self.max_embed_chars,
+            )
+            return None
 
         try:
             with httpx.Client(timeout=30.0) as client:
