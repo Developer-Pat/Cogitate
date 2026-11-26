@@ -467,21 +467,35 @@ async def cancel_ingest() -> dict:
 
     for _ in range(50):  # ~5 s
         await asyncio.sleep(0.1)
-        current = _read_status_file()
-        if current is not None and current.status != "running":
-            return {"cancelled": True, "status": current.status, "job_id": current.job_id}
+        # A CANCEL IS THE PROCESS BEING GONE, not a word in a file: a child can write `cancelled`
+        # and then keep running (measured: 33 s, waiting on its own executor). So the word alone does
+        # not end this loop — the pid does.
         if not _pid_is_alive(record.pid):
-            # It died without leaving a word (a SIGKILL, a crash, a machine that stopped). The record
-            # is settled HERE — a job whose owner is gone must not keep the page locked out.
-            _settle_cancelled(record)
-            return {"cancelled": True, "status": "cancelled", "job_id": record.job_id}
+            current = _read_status_file()
+            if current is not None and current.status == "running":
+                # It died without leaving a word (a crash, a box that went down): settle it here.
+                _settle_cancelled(record)
+                current = _read_status_file()
+            return {
+                "cancelled": True,
+                "status": current.status if current is not None else "cancelled",
+                "job_id": record.job_id,
+            }
 
-    # Still alive after the signal: say so instead of pretending it stopped.
+    # STILL ALIVE: a child that ignored SIGTERM gets SIGKILL, and the record is settled here. A cancel
+    # that leaves the process running is how a page ends up refusing new runs for no visible reason.
+    try:
+        os.killpg(record.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    await asyncio.sleep(0.5)
+    _settle_cancelled(record)
     return {
-        "cancelled": False,
-        "status": "running",
+        "cancelled": True,
+        "escalated": True,
+        "status": "cancelled",
         "job_id": record.job_id,
-        "message": "The job did not stop within 5 s — it may be inside an embedding call.",
+        "message": "The job ignored SIGTERM, so it was killed (SIGKILL); the record is settled.",
     }
 
 

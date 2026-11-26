@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import signal
 import sys
 from datetime import datetime, timezone
@@ -71,7 +72,11 @@ def _install_sigterm(job_id: str) -> None:
     def _on_term(signum: int, frame: object) -> NoReturn:
         logger.warning("ingest %s cancelled by signal %s", job_id, signum)
         _finish_record(job_id, "cancelled", "cancelled: the process was told to stop")
-        raise SystemExit(EXIT_CANCELLED)
+        # LEAVE NOW, do not unwound the loop. `SystemExit` here waits for the default executor's
+        # threads to finish their in-flight embedding call — which is what a cancel is trying to
+        # escape. The record is already written, so there is nothing left to make tidy: measured, a
+        # child asked to stop kept running 33 s later until the API escalated to SIGKILL.
+        os._exit(EXIT_CANCELLED)
 
     signal.signal(signal.SIGTERM, _on_term)
 
