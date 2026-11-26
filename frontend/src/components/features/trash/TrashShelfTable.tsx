@@ -19,6 +19,7 @@
 
 import React from 'react';
 import type { TrashEntry, TrashListing } from '@/services/domain/TrashService';
+import { shelfShape } from './shelfShape';
 
 interface TrashShelfTableProps {
   listing: TrashListing | null;
@@ -48,27 +49,6 @@ function holds(entry: TrashEntry): string {
   if (entry.files.length === 0) return entry.is_dir ? 'empty' : '—';
   if (entry.files.length <= 3) return entry.files.join(', ');
   return `${entry.files.length} files`;
-}
-
-/**
- * WHAT IS TRUE OF THE WHOLE SHELF, and the one place that measures it.
- *
- * `sharedNote` is the shelf's own sentence when EVERY entry says the same thing,
- * and null when they differ — the caller shows it once in the blurb instead of a
- * column of one repeated string. `mixedStates` is the row-backed distinction
- * showing up within a shelf (the agents shelf: a trashed agent beside residue),
- * which the blurb has to mention because the rows no longer say it uniformly.
- */
-export function shelfShape(listing: TrashListing | null): {
-  sharedNote: string | null;
-  mixedStates: boolean;
-} {
-  const entries = listing?.entries ?? [];
-  const notes = new Set(entries.map((e) => e.note).filter(Boolean));
-  return {
-    sharedNote: entries.length > 0 && notes.size === 1 ? entries[0].note : null,
-    mixedStates: new Set(entries.map((e) => e.restorable)).size > 1,
-  };
 }
 
 export const TrashShelfTable: React.FC<TrashShelfTableProps> = ({

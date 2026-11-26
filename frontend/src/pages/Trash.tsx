@@ -39,7 +39,8 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useDomainSync } from '../hooks/useDomainSync';
 import { useNotificationStore } from '../stores/notificationStore';
-import { TrashShelfTable, shelfShape } from '../components/features/trash/TrashShelfTable';
+import { TrashShelfTable } from '../components/features/trash/TrashShelfTable';
+import { shelfShape } from '../components/features/trash/shelfShape';
 import { PurgeEntryModal } from '../components/features/trash/PurgeEntryModal';
 import { EmptyShelfModal } from '../components/features/trash/EmptyShelfModal';
 import {
