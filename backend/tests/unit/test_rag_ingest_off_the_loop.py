@@ -27,13 +27,24 @@ class _ProbeStore:
     def __init__(self) -> None:
         self.threads: list[int] = []
         self.indexed: list[str] = []
+        self.chunks_seen_mid_file: list[int] = []
 
     def init_db(self) -> None:
         return None
 
-    def index_document(self, rel_path: str, content: str) -> int:
+    def index_document(self, rel_path: str, content: str, on_chunk=None) -> int:
         self.threads.append(threading.get_ident())
         time.sleep(0.25)  # the blocking part, on purpose
+        # Two chunks, reported the way the real store reports them (the ingest's heartbeat). The gap
+        # is wider than the record's write throttle so the second one really lands in the file.
+        for _ in range(2):
+            if on_chunk is not None:
+                on_chunk()
+            time.sleep(0.6)
+        # What the record says WHILE this document is still open — the per-chunk progress fix.
+        status = rag_service.RagIngestService.get_status()
+        if status is not None and status.progress is not None:
+            self.chunks_seen_mid_file.append(status.progress.chunks_done)
         self.indexed.append(rel_path)
         return 1
 
@@ -114,3 +125,18 @@ async def test_the_job_still_reports_itself_complete(corpus):
     status = rag_service.RagIngestService.get_status()
     assert status is not None and status.status == "completed"
     assert status.result is not None and status.result.files_processed == 2
+    # Two files, two chunks each: the run's own rate is now recorded for the next run to price with.
+    assert status.result.s_per_chunk is not None and status.result.s_per_chunk > 0
+
+
+async def test_the_record_moves_while_a_document_is_still_open(corpus):
+    """A card must not sit at 0 for the length of a document (measured: six minutes)."""
+    service, probe = corpus
+    embedding = EmbeddingService(address="http://127.0.0.1:9", model="nomic-embed-text", dims=768)
+
+    await _run_with_a_ticker(service, embedding)
+
+    assert probe.chunks_seen_mid_file, "the record was never read mid-document"
+    assert max(probe.chunks_seen_mid_file) >= 1, (
+        "the record still read 0 chunks while a document was being indexed — progress is per FILE again"
+    )

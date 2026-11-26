@@ -39,7 +39,7 @@ import re
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
 
 import httpx
 import sqlite3
@@ -522,11 +522,17 @@ class DocVectorStore:
         """
         return self._call_ollama_embed(text)
 
-    def embed_chunks(self, chunks: List[str]) -> List[Optional[List[float]]]:
+    def embed_chunks(
+        self, chunks: List[str], on_chunk: Optional[Callable[[], None]] = None
+    ) -> List[Optional[List[float]]]:
         """Embed a list of chunk texts in batches.
 
         Returns a parallel list where each element is either an embedding
         vector or ``None`` if that chunk's embedding failed.
+
+        ``on_chunk`` is called after EVERY chunk, before the next one starts. That is the ingest's
+        heartbeat: a document with forty chunks takes minutes on a CPU-only box, and without a per-chunk
+        signal the run's record sits at the last file it finished and reads as dead.
         """
         results: List[Optional[List[float]]] = []
         for i in range(0, len(chunks), self.batch_size):
@@ -537,12 +543,18 @@ class DocVectorStore:
             for text in batch:
                 emb = self._call_ollama_embed(text)
                 results.append(emb)
+                if on_chunk is not None:
+                    on_chunk()
         return results
 
     # ── Indexing ───────────────────────────────────────────────────────────
 
-    def index_document(self, source_path: str, content: str) -> int:
+    def index_document(
+        self, source_path: str, content: str, on_chunk: Optional[Callable[[], None]] = None
+    ) -> int:
         """Chunk, embed, and store a document in the vector index.
+
+        ``on_chunk`` is passed straight to :meth:`embed_chunks` — the caller's heartbeat.
 
         Parameters
         ----------
@@ -568,7 +580,7 @@ class DocVectorStore:
         # THE SLOW HALF STAYS OUTSIDE THE LOCK. Embedding is one blocking HTTP call per chunk — 16
         # seconds for a full-size chunk on a CPU-only box — and a search must not queue behind it.
         texts = [c["chunk_text"] for c in chunks]
-        embeddings = self.embed_chunks(texts)
+        embeddings = self.embed_chunks(texts, on_chunk=on_chunk)
 
         # THE WRITE HALF IS ATOMIC (see `_write_lock`): a reader sees the document whole or not at all.
         with self._write_lock:

@@ -135,12 +135,20 @@ class IngestResponse(BaseModel):
 
 
 class IngestProgress(BaseModel):
-    """Progress sub-model for a running ingest job."""
+    """Progress sub-model for a running ingest job.
+
+    Two chunk counters, because they answer different questions. ``total_chunks`` is what the INDEX
+    holds from this run — it moves when a document commits. ``chunks_done`` is how far the work has
+    got — it moves per chunk, which is the only way a card can show life during a six-minute document
+    (measured: `0 / 0` for six minutes while embeddings visibly flowed).
+    """
 
     files_discovered: int = Field(0, ge=0)
     files_processed: int = Field(0, ge=0)
     files_failed: int = Field(0, ge=0)
     total_chunks: int = Field(0, ge=0)
+    chunks_done: int = Field(0, ge=0)
+    current_file: str = Field("", description="The document being indexed right now, if any.")
     elapsed_seconds: float = Field(0.0, ge=0.0)
 
 
@@ -153,6 +161,11 @@ class IngestResult(BaseModel):
     total_chunks: int = Field(..., ge=0)
     stale_removed: int = Field(0, ge=0)
     elapsed_seconds: float = Field(..., ge=0.0)
+    # MEASURED, NOT ASSUMED: the run's own seconds-per-chunk, which the Ingestables tab multiplies by
+    # an estimated chunk count to price a run. None when the run indexed nothing.
+    s_per_chunk: Optional[float] = Field(
+        None, description="Seconds per chunk this run measured — the rate an estimate is built on."
+    )
 
 
 class IngestJobStatusResponse(BaseModel):
@@ -161,10 +174,12 @@ class IngestJobStatusResponse(BaseModel):
     job_id: str = Field(..., description="Job identifier.")
     status: str = Field(
         ...,
-        description="Job status: 'running', 'completed', or 'failed'.",
-        pattern=r"^(running|completed|failed)$",
+        description="Job status: 'running', 'completed', 'failed' or 'cancelled'.",
+        pattern=r"^(running|completed|failed|cancelled)$",
     )
     mode: str = Field(..., description="The ingestion mode used.")
+    dirs: List[str] = Field(default_factory=list, description="The ingestion roots this run was given.")
+    pid: Optional[int] = Field(None, description="The process doing the work.")
     started_at: datetime = Field(..., description="Job creation timestamp.")
     completed_at: Optional[datetime] = Field(
         None, description="Job completion timestamp (null while running)."
@@ -184,14 +199,28 @@ class IngestJobStatusResponse(BaseModel):
 
 
 class IngestStatusFile(BaseModel):
-    """Internal model matching the on-disk ``data/rag_ingest_status.json`` format."""
+    """Internal model matching the on-disk ``data/rag_ingest_status.json`` format.
+
+    THE RECORD IS THE CONTRACT between the UI, the API and the process doing the work, so liveness is
+    carried IN it rather than inferred from one word: ``pid`` says which process owns the job and
+    ``heartbeat_at`` says when it last proved it was alive. A record that says ``running`` with a dead
+    pid or a cold heartbeat is a job nobody is doing — and that is what used to lock the RAG page out
+    for good (`is_running()` was the word alone).
+    """
 
     job_id: str
-    status: str  # running | completed | failed
+    status: str  # running | completed | failed | cancelled
     mode: str
     index_type: str = "docs"
     started_at: datetime
     completed_at: Optional[datetime] = None
     error: Optional[str] = None
+    dirs: List[str] = Field(
+        default_factory=list, description="The ingestion roots this run was given."
+    )
+    pid: Optional[int] = Field(None, description="The process doing the work (None before it starts).")
+    heartbeat_at: Optional[datetime] = Field(
+        None, description="Last proof of life from that process."
+    )
     progress: Optional[IngestProgress] = None
     result: Optional[IngestResult] = None

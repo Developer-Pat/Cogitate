@@ -21,7 +21,7 @@ import time
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from app.core.config import BASE_DIR, Paths
 from app.core.system_manager import SystemManagerConfig
@@ -258,6 +258,47 @@ def _write_status_file(status: IngestStatusFile) -> None:
         raise
 
 
+# ─── Liveness: a record says who owns the job and when it last proved it was alive ───────────────
+#
+# `is_running()` used to be "the status file says running", and nothing cleared that word when the
+# process writing it died — a cancelled task, a crash, or (measured, twice) uvicorn's `--reload`
+# taking the backend down mid-ingest. The record then answered `409 An ingest job is already running`
+# for ever, with no cancel and no reset anywhere in the UI; editing the JSON by hand was the only way
+# out. Liveness is now the three facts the record itself carries: the word, the pid, and a heartbeat.
+HEARTBEAT_STALE_S = 120.0  # a job silent for longer than this is not doing anything
+HEARTBEAT_WRITE_S = 1.0  # at most one record write a second, however fast the chunks come
+
+
+def _pid_is_alive(pid: Optional[int]) -> bool:
+    """Whether a pid names a live process — the same check for the API process and a child."""
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # it exists; it is only not ours to signal
+    except OSError:
+        return False
+    return True
+
+
+def _job_is_live(status: Optional[IngestStatusFile], *, now: Optional[datetime] = None) -> bool:
+    """A job is running only while its owner is alive AND has been heard from recently.
+
+    The heartbeat carries the age; the pid carries the ownership. Either alone is not enough — a pid
+    can be reused by an unrelated process, and a heartbeat can be fresh in a file nobody is writing.
+    """
+    if status is None or status.status != "running":
+        return False
+    if not _pid_is_alive(status.pid):
+        return False
+    heartbeat = status.heartbeat_at or status.started_at
+    age = ((now or datetime.now(timezone.utc)) - heartbeat).total_seconds()
+    return age <= HEARTBEAT_STALE_S
+
+
 # ─── RagIngestService ─────────────────────────────────────────────────────────
 
 
@@ -300,9 +341,8 @@ class RagIngestService:
 
     @classmethod
     def is_running(cls) -> bool:
-        """Check whether an ingest job is currently running."""
-        status = _read_status_file()
-        return status is not None and status.status == "running"
+        """Whether an ingest job is running — the word, the pid AND a fresh heartbeat (see above)."""
+        return _job_is_live(_read_status_file())
 
     @classmethod
     def get_index_health(
@@ -422,8 +462,10 @@ class RagIngestService:
         index_type: str = "docs",
         config: Optional[SystemManagerConfig] = None,
         embedding: Optional[EmbeddingService] = None,
+        dirs: Optional[Sequence[str]] = None,
+        job_id: Optional[str] = None,
     ) -> None:
-        """Execute the ingestion pipeline in a background task.
+        """Execute the ingestion pipeline.
 
         Args:
             mode: ``"incremental"``, ``"full"``, or ``"force-reingest"``.
@@ -431,10 +473,14 @@ class RagIngestService:
             config: System manager config. If ``None``, uses code-level defaults.
             embedding: the resolved embedding service (the `embeddings` capability). Required: an
                 ingest without an address, a model and a width would write vectors nobody can read.
+            dirs: which ingestion roots to walk. ``None`` means the code's own six (`INGESTION_DIRS`);
+                the run config passes a subset, and the record keeps what was asked for.
+            job_id: the id the caller already announced (the API writes the record before spawning a
+                child, so both sides must agree on it).
 
-        This method is designed to be run via ``asyncio.create_task()``.
-        It updates the status file as it progresses and handles all exceptions
-        internally, writing the final status (``completed`` or ``failed``).
+        One implementation, two callers: the API spawns a child process (`ingest_cli`) that calls this,
+        and the tests call it directly. It owns the record for the whole run — heartbeat included — and
+        writes the final status (``completed``, ``failed`` or ``cancelled``).
         """
         # ── Resolve configuration ─────────────────────────────────────────
         if config is None:
@@ -457,8 +503,10 @@ class RagIngestService:
             else Paths.rag_index_path
         )
 
-        job_id = f"rag-ingest-{int(time.time())}"
+        dirs = list(dirs) if dirs is not None else list(INGESTION_DIRS)
+        job_id = job_id or f"rag-ingest-{int(time.time())}"
         started_at = datetime.now(timezone.utc)
+        last_write = 0.0
 
         # Initialise progress
         progress = IngestProgress.model_construct()
@@ -468,13 +516,39 @@ class RagIngestService:
             mode=mode,
             index_type=index_type,
             started_at=started_at,
+            dirs=dirs,
+            # THE OWNER IS WRITTEN DOWN. For a child process that is the child; for an in-process run
+            # it is this process — and either way a reader can ask whether it still exists.
+            pid=os.getpid(),
+            heartbeat_at=started_at,
             progress=progress,
         )
+
+        def _heartbeat(force: bool = False) -> None:
+            """Prove the job is alive, and carry the progress with it — at most once a second.
+
+            Called per CHUNK (that is what makes a card move during a six-minute document); the
+            throttle keeps a fast box from rewriting the file ten times a second.
+            """
+            nonlocal last_write
+            now = time.monotonic()
+            if not force and now - last_write < HEARTBEAT_WRITE_S:
+                return
+            last_write = now
+            status.heartbeat_at = datetime.now(timezone.utc)
+            progress.elapsed_seconds = (status.heartbeat_at - started_at).total_seconds()
+            status.progress = progress
+            _write_status_file(status)
+
+        def _on_chunk() -> None:
+            progress.chunks_done += 1
+            _heartbeat()
+
         _write_status_file(status)
 
         # ── File discovery ────────────────────────────────────────────────
         try:
-            discovered = discover_files(project_root=self._project_root)
+            discovered = discover_files(ingest_dirs=dirs, project_root=self._project_root)
         except Exception as exc:
             logger.error("File discovery failed: %s", exc)
             status.status = "failed"
@@ -565,14 +639,20 @@ class RagIngestService:
                     logger.debug("Skipping empty file: %s", rel_path)
                     continue
 
+                progress.current_file = rel_path
+                _heartbeat(force=True)
+
                 # OFF THE EVENT LOOP (2026-11-26). `index_document` is one blocking HTTP call per
                 # chunk plus sqlite writes — 16 seconds for a full-size chunk on a CPU-only box,
                 # measured. Called directly from this coroutine it held the loop for the whole file,
                 # so `/api/v1/health` timed out and even the RAG page's own status poll went
                 # unanswered while a job ran. A worker thread keeps the app responsive; the store's
                 # connection is opened `check_same_thread=False` for exactly this (see its
-                # `_write_lock`).
-                n_chunks = await asyncio.to_thread(store.index_document, rel_path, content)
+                # `_write_lock`). `on_chunk` is the heartbeat's other half: the record moves while a
+                # long document is being embedded, not only when it commits.
+                n_chunks = await asyncio.to_thread(
+                    store.index_document, rel_path, content, _on_chunk
+                )
                 progress.total_chunks += n_chunks
                 progress.files_processed += 1
 
@@ -585,10 +665,11 @@ class RagIngestService:
                 progress.files_failed += 1
                 logger.error("Failed to ingest %s: %s", rel_path, exc)
 
-            # Update progress after every file
+            # Update progress after every file, and prove the job is alive doing it
+            progress.current_file = ""
             progress.elapsed_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
             status.progress = progress
-            _write_status_file(status)
+            _heartbeat(force=True)
 
             # Let the loop run whatever else is waiting (the status poll, a chat turn) between files.
             await asyncio.sleep(0)
@@ -624,6 +705,8 @@ class RagIngestService:
             total_chunks=progress.total_chunks,
             stale_removed=stale_removed,
             elapsed_seconds=elapsed,
+            # THE RATE IS A MEASUREMENT, NOT A GUESS (the Ingestables tab prices a run with it).
+            s_per_chunk=(elapsed / progress.total_chunks) if progress.total_chunks else None,
         )
         _write_status_file(status)
 
