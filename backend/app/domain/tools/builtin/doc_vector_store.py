@@ -101,20 +101,39 @@ def _split_to_cap(text: str, cap: int) -> List[str]:
     measured: an 11,597-character chunk against a 4,000 claim — and the embedder was left to hide it.
     """
     pieces: List[str] = []
+    current = ""
+
+    def flush() -> None:
+        nonlocal current
+        if current.strip():
+            pieces.append(current.strip())
+        current = ""
+
     for para in re.split(r"\n\s*\n", text):
         para = para.strip()
         if not para:
             continue
-        while len(para) > cap:
-            cut = para.rfind(" ", 0, cap)
-            if cut <= 0:
-                cut = cap
-            piece = para[:cut].strip()
-            if piece:
-                pieces.append(piece)
-            para = para[cut:].strip()
-        if para:
-            pieces.append(para)
+        # A paragraph too big for one chunk: close what is open, cut it, keep the remainder as the
+        # start of the next one. This is the case that used to be emitted whole (11,597 chars).
+        if len(para) > cap:
+            flush()
+            while len(para) > cap:
+                cut = para.rfind(" ", 0, cap)
+                if cut <= 0:
+                    cut = cap
+                piece = para[:cut].strip()
+                if piece:
+                    pieces.append(piece)
+                para = para[cut:].strip()
+            current = para
+            continue
+        # ACCUMULATE — short paragraphs belong together; splitting two lines into two chunks is how a
+        # chunk count balloons and a match loses its context.
+        if current and len(current) + 2 + len(para) > cap:
+            flush()
+        current = f"{current}\n\n{para}" if current else para
+
+    flush()
     return pieces
 
 
