@@ -701,6 +701,33 @@ class DocVectorStore:
 
         return total_removed
 
+    def clear(self) -> Dict[str, int]:
+        """Empty the index — every chunk and every vector — and report what it removed.
+
+        The destructive half of Rebuild, offered on its own (the RAG page). It runs under the write
+        lock, so a reader sees the index whole before or whole after, never half-emptied. A store that
+        was never initialised (no model, no table) reports zeros rather than creating one to delete.
+        """
+        result: Dict[str, int] = {"documents": 0, "chunks": 0}
+        with self._write_lock:
+            db = self._get_connection()
+            try:
+                row = db.execute("SELECT COUNT(*) AS n FROM doc_chunks").fetchone()
+                result["chunks"] = int(row["n"]) if row else 0
+                row = db.execute(
+                    "SELECT COUNT(DISTINCT source_path) AS n FROM doc_chunks"
+                ).fetchone()
+                result["documents"] = int(row["n"]) if row else 0
+                for statement in ("DELETE FROM vec_docs", "DELETE FROM doc_chunks"):
+                    try:
+                        db.execute(statement)
+                    except sqlite3.OperationalError as exc:
+                        logger.warning("clear: %s skipped — %s", statement, exc)
+                db.commit()
+            except sqlite3.OperationalError as exc:
+                logger.warning("clear: nothing to clear — %s", exc)
+        return result
+
     # ── Indexed Paths Listing ──────────────────────────────────────────────
 
     def list_indexed_paths(self) -> List[str]:

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import sqlite3
 import tempfile
@@ -104,6 +105,71 @@ def _matches_denied(path: str, patterns: List[str]) -> bool:
         if normalized in path:
             return True
     return False
+
+
+# ─── What a run would cost ───────────────────────────────────────────────────
+#
+# MEASURED, NOT ASSUMED (2026-11-26): this corpus is 2,590,587 bytes over 623 files and the index
+# built from it held 3,527 chunks — about 735 characters a chunk. Heading-aware splitting sets the
+# chunk count, not size: MAX_CHUNK_CHARS is 4000, and estimating from it would under-count five-fold.
+CHARS_PER_CHUNK_ESTIMATE = 735
+# Until this install has run once, there is no rate of its own to price with. 5.0 s sits inside the
+# measured band (4.1-7.4 s a chunk on a CPU-only Xeon) and is LABELLED as a default, never as measured.
+DEFAULT_RATE_S_PER_CHUNK = 5.0
+
+
+def estimate_ingest(
+    ingest_dirs: Optional[List[str]] = None,
+    rate_s_per_chunk: Optional[float] = None,
+) -> dict:
+    """Price a run: files, bytes, chunks and minutes for each root, then a total.
+
+    The walk is the app's own discovery (`discover_files`), so the file counts are exactly what the run
+    would see — denied patterns, extensions and all. The chunk count and the minutes are **estimates**:
+    one calibrated ratio and one measured rate, both reported in the payload so no surface can present
+    them as a promise.
+    """
+    roots = list(ingest_dirs or INGESTION_DIRS)
+    measured = rate_s_per_chunk is not None and rate_s_per_chunk > 0
+    rate = float(rate_s_per_chunk) if measured else DEFAULT_RATE_S_PER_CHUNK
+
+    rows: List[Dict[str, object]] = []
+    total_files = total_bytes = total_chunks = 0
+    for root in roots:
+        found = discover_files(ingest_dirs=[root], project_root=BASE_DIR)
+        sizes = []
+        for path, _rel in found:
+            try:
+                sizes.append(path.stat().st_size)
+            except OSError:
+                sizes.append(0)
+        chunks = sum(max(1, math.ceil(size / CHARS_PER_CHUNK_ESTIMATE)) for size in sizes)
+        rows.append(
+            {
+                "dir": root,
+                "files": len(found),
+                "bytes": sum(sizes),
+                "chunks": chunks,
+                "minutes": round(chunks * rate / 60, 1),
+            }
+        )
+        total_files += len(found)
+        total_bytes += sum(sizes)
+        total_chunks += chunks
+
+    return {
+        "dirs": rows,
+        "total": {
+            "files": total_files,
+            "bytes": total_bytes,
+            "chunks": total_chunks,
+            "minutes": round(total_chunks * rate / 60, 1),
+        },
+        "rate_s_per_chunk": rate,
+        "rate_source": "last run" if measured else "default (this install has not measured one yet)",
+        "chars_per_chunk": CHARS_PER_CHUNK_ESTIMATE,
+        "estimated": True,
+    }
 
 
 def discover_files(
@@ -270,7 +336,12 @@ HEARTBEAT_WRITE_S = 1.0  # at most one record write a second, however fast the c
 
 
 def _pid_is_alive(pid: Optional[int]) -> bool:
-    """Whether a pid names a live process — the same check for the API process and a child."""
+    """Whether a pid names a process that is still DOING something.
+
+    A zombie is not doing anything: it has exited and is waiting to be reaped. `os.kill(pid, 0)`
+    answers "yes" for one — measured, a cancelled child read as alive until its parent reaped it —
+    so the state letter from `/proc` settles it.
+    """
     if not pid:
         return False
     try:
@@ -281,6 +352,14 @@ def _pid_is_alive(pid: Optional[int]) -> bool:
         return True  # it exists; it is only not ours to signal
     except OSError:
         return False
+    try:
+        with open(f"/proc/{pid}/stat", "r", encoding="utf-8") as stat:
+            # `pid (comm) S ...` — comm may contain spaces and parentheses, so split on the LAST ')'
+            state = stat.read().rsplit(")", 1)[1].split()[0]
+        if state == "Z":
+            return False
+    except (FileNotFoundError, IndexError, OSError):
+        pass
     return True
 
 

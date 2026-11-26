@@ -11,33 +11,80 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import signal
+import subprocess
+import sys
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import BASE_DIR, Paths
 from app.core.database import get_db_session
 from app.domain.providers.embeddings import EmbeddingService, resolve_embedding_service
 
 from app.core.system_manager import SystemManagerConfig
 from app.domain.rag.schemas import (
+    IngestJobStatusResponse,
+    IngestProgress,
     IngestRequest,
     IngestResponse,
-    IngestJobStatusResponse,
+    IngestStatusFile,
     RagStatusResponse,
 )
-from app.domain.rag.service import RagIngestService
+from app.domain.rag.service import (
+    INGESTION_DIRS,
+    RagIngestService,
+    estimate_ingest,
+    _job_is_live,
+    _pid_is_alive,
+    _read_status_file,
+    _write_status_file,
+)
 from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 
+
+def _settle_cancelled(record: IngestStatusFile) -> None:
+    """Mark a job cancelled whose owner never wrote its own last word.
+
+    The child handles SIGTERM and says so itself; this is the backstop for a job whose process simply
+    stopped existing (a kill -9, a crash, a box that went down). It never touches a record that is no
+    longer running, and never a newer job's.
+    """
+    current = _read_status_file()
+    if current is None or current.job_id != record.job_id or current.status != "running":
+        return
+    current.status = "cancelled"
+    current.completed_at = datetime.now(timezone.utc)
+    current.error = "cancelled: the process stopped without writing its result"
+    current.progress = None
+    _write_status_file(current)
+
 rag_router = APIRouter(prefix="", tags=["rag"])
 
-# Active background task reference (singleton per process).
-# We store the asyncio.Task so we can inspect it if needed.
-_active_ingest_task: asyncio.Task | None = None
+# THE CHILDREN THIS PROCESS SPAWNED. Holding the Popen is not bookkeeping — it is the only way to
+# REAP a finished child, and an unreaped child stays a zombie whose pid still answers `os.kill(pid, 0)`.
+# `_reap()` is called from the two endpoints that read the record, so a finished run becomes a visible
+# exit code instead of a process that looks alive for ever.
+_ingest_children: dict[str, subprocess.Popen] = {}
+
+
+def _reap(job_id: str | None = None) -> None:
+    """Collect exit status for finished children (all of them when no job is named)."""
+    for key in list(_ingest_children):
+        if job_id is not None and key != job_id:
+            continue
+        child = _ingest_children[key]
+        if child.poll() is not None:
+            logger.info("ingest child %s exited with %s", key, child.returncode)
+            _ingest_children.pop(key, None)
 
 
 async def _resolve_embedding_service(
@@ -229,7 +276,21 @@ async def trigger_ingest(
             detail=embedding.report(),
         )
 
+    # ── The roots this run may name ──────────────────────────────────────
+    if request.dirs is not None:
+        unknown = [root for root in request.dirs if root not in INGESTION_DIRS]
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"unknown ingestion root(s): {', '.join(unknown)} — "
+                    f"known: {', '.join(INGESTION_DIRS)}"
+                ),
+            )
+
     # ── Conflict guard ───────────────────────────────────────────────────
+    # `is_running()` is liveness now (pid + heartbeat), so a record left behind by a killed job no
+    # longer refuses every future run — which is exactly what it did, twice, on the test box.
     if RagIngestService.is_running():
         status_info = RagIngestService.get_status()
         raise HTTPException(
@@ -243,30 +304,73 @@ async def trigger_ingest(
     # ── Create job record ────────────────────────────────────────────────
     job_id = f"rag-ingest-{int(datetime.now(timezone.utc).timestamp())}"
     started_at = datetime.now(timezone.utc)
+    dirs = list(request.dirs) if request.dirs else list(INGESTION_DIRS)
 
-    # ── Launch background task ───────────────────────────────────────────
-    service = RagIngestService()
-    _active_ingest_task = asyncio.create_task(
-        service.run(
+    # ── Spawn the child ──────────────────────────────────────────────────
+    # THE WORK LEAVES THIS PROCESS (2026-11-26). In-process, an ingest died with every backend cycle
+    # — a `--reload`, a restart, a deploy — and left the record saying `running`, which locked the
+    # page out. A child in its own session owns its lifetime; this process only starts it and reads
+    # the record it writes. `start_new_session=True` is also what makes cancel a group kill.
+    _write_status_file(
+        IngestStatusFile(
+            job_id=job_id,
+            status="starting",
             mode=request.mode,
             index_type=request.index_type,
-            config=config,
-            embedding=embedding,
+            started_at=started_at,
+            dirs=dirs,
+            pid=None,
         )
     )
 
-    # Add a done callback to log completion
-    def _on_done(t: asyncio.Task) -> None:
-        if t.cancelled():
-            logger.warning("Ingest job %s was cancelled", job_id)
-        elif t.exception():
-            logger.error("Ingest job %s failed: %s", job_id, t.exception())
-        else:
-            logger.info("Ingest job %s completed successfully", job_id)
+    log_path = Path(Paths.logs_dir) / "ingest.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "ab") as child_log:
+        child = subprocess.Popen(  # noqa: S603 — our own module, our own interpreter
+            [
+                sys.executable,
+                "-m",
+                "app.domain.rag.ingest_cli",
+                "--job-id",
+                job_id,
+                "--mode",
+                request.mode,
+                "--index-type",
+                request.index_type,
+                "--dirs",
+                ",".join(dirs),
+            ],
+            cwd=str(BASE_DIR),
+            stdout=child_log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+    _ingest_children[job_id] = child
 
-    _active_ingest_task.add_done_callback(_on_done)
+    # The record is live from here: the pid is what `is_running()` asks about, so a second Start is
+    # refused the moment this returns (and a child that dies instantly is detected on the next read).
+    _write_status_file(
+        IngestStatusFile(
+            job_id=job_id,
+            status="running",
+            mode=request.mode,
+            index_type=request.index_type,
+            started_at=started_at,
+            dirs=dirs,
+            pid=child.pid,
+            heartbeat_at=started_at,
+            progress=IngestProgress(),
+        )
+    )
 
-    logger.info("Ingest job %s triggered (mode=%s, index_type=%s)", job_id, request.mode, request.index_type)
+    logger.info(
+        "Ingest job %s spawned as pid %s (mode=%s, dirs=%s)",
+        job_id,
+        child.pid,
+        request.mode,
+        ",".join(dirs),
+    )
 
     return IngestResponse(
         job_id=job_id,
@@ -300,6 +404,7 @@ async def get_ingest_job_status() -> IngestJobStatusResponse:
     **Errors:**
     - ``404 Not Found`` — if no ingest job has ever been triggered.
     """
+    _reap()
     status_info = RagIngestService.get_status()
     if status_info is None:
         raise HTTPException(
@@ -311,9 +416,129 @@ async def get_ingest_job_status() -> IngestJobStatusResponse:
         job_id=status_info.job_id,
         status=status_info.status,
         mode=status_info.mode,
+        dirs=status_info.dirs,
+        pid=status_info.pid,
         started_at=status_info.started_at,
         completed_at=status_info.completed_at,
         error=status_info.error,
         progress=status_info.progress,
         result=status_info.result,
     )
+
+@rag_router.post(
+    "/ingest/cancel",
+    status_code=status.HTTP_200_OK,
+    summary="Stop the running ingest job",
+)
+async def cancel_ingest() -> dict:
+    """Stop the run, and leave a record that says so.
+
+    The job is a child in its own session, so cancel is a **group kill**: the child's own SIGTERM
+    handler writes `cancelled` and exits, and if it is wedged the record is marked here after a short
+    wait. Nothing is cancelled by a word in a file alone — the process is asked to stop, and the
+    record follows.
+    """
+    record = _read_status_file()
+    if record is not None:
+        _reap(record.job_id)
+        record = _read_status_file()
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No ingest job has been started yet."
+        )
+    if not _job_is_live(record):
+        return {
+            "cancelled": False,
+            "status": record.status,
+            "message": "No live ingest job: the record's owner is gone (or it already finished).",
+        }
+    if not record.pid or record.pid == os.getpid():
+        # An in-process job (a test, or a caller that ran it here) has no group to signal — killing
+        # the group would kill this API. Refuse honestly rather than take the app down with it.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This job runs inside the API process and cannot be signalled; it stops with the app.",
+        )
+
+    try:
+        os.killpg(record.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass  # it died between the check and the signal — the record check below settles it
+
+    for _ in range(50):  # ~5 s
+        await asyncio.sleep(0.1)
+        current = _read_status_file()
+        if current is not None and current.status != "running":
+            return {"cancelled": True, "status": current.status, "job_id": current.job_id}
+        if not _pid_is_alive(record.pid):
+            # It died without leaving a word (a SIGKILL, a crash, a machine that stopped). The record
+            # is settled HERE — a job whose owner is gone must not keep the page locked out.
+            _settle_cancelled(record)
+            return {"cancelled": True, "status": "cancelled", "job_id": record.job_id}
+
+    # Still alive after the signal: say so instead of pretending it stopped.
+    return {
+        "cancelled": False,
+        "status": "running",
+        "job_id": record.job_id,
+        "message": "The job did not stop within 5 s — it may be inside an embedding call.",
+    }
+
+
+@rag_router.post(
+    "/index/clear",
+    status_code=status.HTTP_200_OK,
+    summary="Empty the documentation index",
+)
+async def clear_index(
+    embedding: Annotated[EmbeddingService, Depends(_resolve_embedding_service)],
+) -> dict:
+    """Empty the index — the destructive half of Rebuild, offered on its own.
+
+    Refused while a job is running (a clear under a live writer is a race nobody can reason about).
+    The next ingest rebuilds from whatever is on disk.
+    """
+    from app.domain.tools.builtin.doc_vector_store import DocVectorStore  # noqa: PLC0415
+
+    if RagIngestService.is_running():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An ingest job is running — cancel it before clearing the index.",
+        )
+    store = DocVectorStore.get_instance(db_path=str(Paths.rag_index_path), embedding=embedding)
+    removed = store.clear()
+    logger.info("RAG index cleared: %s chunks removed", removed["chunks"])
+    return {"cleared": True, **removed}
+
+class IngestEstimateRequest(BaseModel):
+    """Request body for ``POST /rag/ingest/estimate``."""
+
+    dirs: list[str] | None = None
+
+
+@rag_router.post(
+    "/ingest/estimate",
+    status_code=status.HTTP_200_OK,
+    summary="Price a run before starting it",
+)
+async def estimate_ingest_run(request: IngestEstimateRequest) -> dict:
+    """What a run over these roots would cost — files and bytes counted, chunks and minutes estimated.
+
+    The rate is the LAST RUN'S OWN measurement (`result.s_per_chunk`), and the payload says which rate
+    it used; an install that has never run is priced with a labelled default. Nothing here starts work.
+    """
+    if request.dirs is not None and not request.dirs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="name at least one root, or omit them all"
+        )
+    if request.dirs:
+        unknown = [root for root in request.dirs if root not in INGESTION_DIRS]
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"unknown ingestion root(s): {', '.join(unknown)} — known: {', '.join(INGESTION_DIRS)}",
+            )
+
+    record = _read_status_file()
+    measured = record.result.s_per_chunk if record is not None and record.result is not None else None
+    return estimate_ingest(request.dirs, measured)

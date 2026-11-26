@@ -116,6 +116,13 @@ class IngestRequest(BaseModel):
         description="Which index to rebuild. Currently only 'docs' is supported.",
         pattern=r"^(docs|code)$",
     )
+    dirs: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "The ingestion roots to walk. None means the app's own six; an explicit list narrows the "
+            "run, and an unknown root is refused (400) rather than silently ignored."
+        ),
+    )
 
 
 class IngestResponse(BaseModel):
