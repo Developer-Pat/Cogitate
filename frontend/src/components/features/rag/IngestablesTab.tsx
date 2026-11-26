@@ -40,6 +40,8 @@ const MODES: { id: IngestRequest['mode']; label: string; tip: string }[] = [
 
 const formatMinutes = (minutes: number): string => {
   if (minutes <= 0) return '0 min'
+  // 25 seconds is not "~0 min" — it reads as "nothing", which is the one thing a run never is.
+  if (minutes < 1) return '<1 min'
   if (minutes < 60) return `~${Math.round(minutes)} min`
   const hours = Math.floor(minutes / 60)
   const rest = Math.round(minutes % 60)
