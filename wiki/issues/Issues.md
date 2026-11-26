@@ -55,6 +55,19 @@ the Site Index links this section, never its pages.
 
 ## Resolved
 
+- [[issues/resolved/ci-gate/seven-ways-the-ci-gate-lied|Seven ways the CI gate lied — the green tick, the cancelled check, and the test that measured the developer]] —
+  **CLOSED — five of the seven landed; two banked** *(an IRR: the report over one arc's CI failures, not one
+  mechanism)*. Eighteen pushes to `main` in six days returned **5 green, 5 red and 8 cancelled**, and none of the
+  words was a verdict about the code: `frontend` ran no linter while #19 merged a rule change behind its green
+  tick; `cancelled` covered a superseded push, a job killed at its own 30-minute cap (**6** kills, the worst run
+  **138.4 minutes**) and a stall that reported nothing — and the same job outcome reached the page as `failure`
+  twice because the *frontend* job failed first. A red job's whole log was `EXIT 1`; the seven failure names lived
+  in the artifact. Landed: the per-test cap that named the hang (`71f4bea`, `47a6c59`), the machine-dependent
+  refusal stubbed at the seam the code calls (`591ebb0`, `4c9f7e8`, `f94516f`), the millisecond timestamp that was
+  a real bug and not a flake (`bf793e2`), and the bump-is-a-migration rule (#16's **142** findings, #24's fastapi
+  `_IncludedRouter` and its **7** failing observers). Banked, and named on the page: the lint step itself, and the
+  runner printing no failure name to stdout.
+
 - [[issues/resolved/github-release/the-check-reads-its-own-process-path|The check reads its own process's PATH — one install, two verdicts, and two capabilities that vanish]] —
   **LANDED — `46845da`** *(ruled 2026-11-21: "let'sgo with C", stage A; stage B measured and not taken)*. The app
   resolves two binaries by name — `hermes` (Exa's runtime) and `edge-tts` (speech) — and both live in
