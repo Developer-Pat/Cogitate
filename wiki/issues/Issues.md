@@ -43,6 +43,19 @@ the Site Index links this section, never its pages.
 
 ## In flight
 
+- [[issues/embedding-model-three-facts-one-transport|The embedding model — three facts, one accepted transport, and a choice the install hands to you]] —
+  **OPEN — needs a ruling.** An install with no embedding model reports `no embedding model: indexing and
+  search are off` (measured: **0** documents, 0 bytes), while a working one holds **506 documents / 3,527
+  chunks** at width **768** *and* reports `embedding_model: null` — the index outliving the configuration that
+  built it. The three facts live in three homes (the candidate's row for the address, the candidate for the
+  model, a **ten-entry** width table for the width), and a model outside that table is **reported, never
+  guessed**. The transport narrows the choice more than the provider list suggests: the app speaks Ollama's
+  `/api/embeddings` and `/api/embed` at three call sites and `/v1/embeddings` **nowhere**, so a llama.cpp
+  server (which serves `/v1/embeddings` only) and the hosted vendors are a small client this app does not
+  have. Recommendation: **A now** — ollama and `nomic-embed-text` (768, 261.6 MB) on the box, keyless — and
+  **C as its own item** — the `/v1/embeddings` client, which unlocks this box's llama.cpp and every hosted
+  vendor at once.
+
 - [[issues/seven-levers-one-stable-reading|Seven parked levers, and the set holds one stable reading for them]] —
   **OPEN — needs a ruling.** The reporter arc parked seven levers; the bench holds 3 jobs over **2** of the
   charter's six axes, and the levers land on the four axes with no job. Measured against the instrument's own
