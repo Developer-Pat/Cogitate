@@ -115,9 +115,11 @@ def _matches_denied(path: str, patterns: List[str]) -> bool:
 # size, so estimating from the cap alone would be wrong by a factor of four. Re-measure this after any
 # change to the chunker or its cap — it is a property of both.
 CHARS_PER_CHUNK_ESTIMATE = 516
-# Until this install has run once, there is no rate of its own to price with. 5.0 s sits inside the
-# measured band (4.1-7.4 s a chunk on a CPU-only Xeon) and is LABELLED as a default, never as measured.
-DEFAULT_RATE_S_PER_CHUNK = 5.0
+# Until an install has run its own whole corpus, this prices a run — and it is OUR OWN measurement,
+# not a guess: 6.62 s a chunk over 623 files / 4 734 chunks on the CPU-only Xeon (2026-11-27). It is a
+# property of the corpus SHAPE as much as the machine, so it is LABELLED as a default on every surface
+# and any install's own run replaces it. (5.0 was the previous placeholder and understated by 24 %.)
+DEFAULT_RATE_S_PER_CHUNK = 6.6
 
 
 def estimate_ingest(

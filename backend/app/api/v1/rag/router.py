@@ -554,5 +554,10 @@ async def estimate_ingest_run(request: IngestEstimateRequest) -> dict:
             )
 
     record = _read_status_file()
-    measured = record.result.s_per_chunk if record is not None and record.result is not None else None
+    # A HEAL'S RATE IS NOT A RUN'S RATE (2026-11-27). Heal re-indexes the documents that DISAGREE —
+    # by definition the worst of them (measured: 11.79 s a chunk against 6.62 for the whole corpus) —
+    # so pricing the next full run from it would overstate by 80 %. Only a whole-corpus mode teaches
+    # the estimator; anything else falls back to the labelled default.
+    whole_corpus = record is not None and record.mode != "heal" and record.result is not None
+    measured = record.result.s_per_chunk if whole_corpus and record is not None and record.result else None
     return estimate_ingest(request.dirs, measured)

@@ -67,3 +67,63 @@ def test_an_empty_root_costs_nothing_and_does_not_raise(corpus):
     priced = rag_service.estimate_ingest(["wiki/docs"])
     assert priced["dirs"][0]["files"] == 0
     assert priced["dirs"][0]["minutes"] == 0.0
+
+
+async def test_the_estimator_ignores_a_heal_runs_rate(tmp_path, monkeypatch):
+    """A heal re-indexes the documents that DISAGREE — the worst of them (11.79 s a chunk measured
+    against 6.62 for the whole corpus). Pricing a full run from it overstates by 80 %."""
+    from datetime import datetime, timezone
+
+    from app.api.v1.rag import router as rag_router
+    from app.domain.rag.schemas import IngestResult, IngestStatusFile
+
+    record = IngestStatusFile(
+        job_id="rag-ingest-heal",
+        status="completed",
+        mode="heal",
+        started_at=datetime.now(timezone.utc),
+        pid=1,
+        result=IngestResult(
+            files_discovered=9,
+            files_processed=9,
+            files_failed=0,
+            total_chunks=94,
+            elapsed_seconds=1107.8,
+            s_per_chunk=11.79,
+        ),
+    )
+    monkeypatch.setattr(rag_router, "_read_status_file", lambda: record)
+
+    priced = await rag_router.estimate_ingest_run(rag_router.IngestEstimateRequest(dirs=None))
+
+    assert priced["rate_s_per_chunk"] == rag_service.DEFAULT_RATE_S_PER_CHUNK
+    assert "default" in priced["rate_source"]
+
+
+async def test_the_estimator_uses_a_whole_corpus_runs_rate(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+
+    from app.api.v1.rag import router as rag_router
+    from app.domain.rag.schemas import IngestResult, IngestStatusFile
+
+    record = IngestStatusFile(
+        job_id="rag-ingest-full",
+        status="completed",
+        mode="force-reingest",
+        started_at=datetime.now(timezone.utc),
+        pid=1,
+        result=IngestResult(
+            files_discovered=623,
+            files_processed=623,
+            files_failed=0,
+            total_chunks=4734,
+            elapsed_seconds=31346.0,
+            s_per_chunk=6.62,
+        ),
+    )
+    monkeypatch.setattr(rag_router, "_read_status_file", lambda: record)
+
+    priced = await rag_router.estimate_ingest_run(rag_router.IngestEstimateRequest(dirs=None))
+
+    assert priced["rate_s_per_chunk"] == 6.62
+    assert priced["rate_source"] == "last run"
