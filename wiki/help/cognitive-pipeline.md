@@ -4,7 +4,7 @@ category: cognitive-pipeline
 subtopic: Overview
 order: 1
 confidence: high
-updated: 2026-11-18
+updated: 2026-11-27
 created: 2026-07-27
 tags: [domain/help]
 ---
@@ -60,9 +60,10 @@ default):
   no second pass. Tool-using turns route here — the streaming
   tool loop already runs until the model writes its final text.
 - **HYBRID** — only when the agent's profile uses the hybrid
-  executor AND the first pass is genuinely insufficient (very
-  short content, or a deep-keyword query like analyze/compare/
-  why). The deep pass REPLACES the first pass — it never appends.
+  executor AND the turn asks for depth (a deep-keyword query like
+  analyze/compare/why) or the first pass was cut at the output
+  budget. Answer length is not a trigger. The deep pass REPLACES
+  the first pass — it never appends.
 
 ## Memory Profiles
 

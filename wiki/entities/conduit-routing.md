@@ -3,7 +3,7 @@ title: Conduit Routing
 type: atlas-entity
 path: wiki/entities/conduit-routing.md
 confidence: stub
-updated: 2026-11-18
+updated: 2026-11-27
 tags: [type/entity, domain/entities]
 ---
 
@@ -25,9 +25,10 @@ conduit.py`) decides per message:
    text; no second pass). This is the route for the vast majority
    of turns, including tool-using turns.
 2. **HYBRID** — only when the agent's cognitive profile has
-   `executor=hybrid` AND the first pass is genuinely
-   insufficient: content shorter than 500 chars, or the query
-   matches deep keywords (analyze/explain/compare/why/how/…).
+   `executor=hybrid` AND either the query matches deep keywords
+   (analyze/explain/compare/why/how/…) or the first pass was cut
+   at the output budget. Answer length is not a trigger: a short
+   answer that answers is a complete answer.
    The deep pass then REPLACES the first-pass content (canonical
    executor semantics — the deep pass is prompted as "the
    previous answer was insufficient — provide a thorough
