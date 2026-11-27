@@ -102,8 +102,11 @@ def _parse(argv: Optional[List[str]]) -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         default="incremental",
-        choices=["incremental", "full", "force-reingest"],
-        help="incremental skips what is already indexed; full re-reads everything; force ignores timestamps",
+        choices=["incremental", "full", "force-reingest", "heal"],
+        help=(
+            "incremental skips what is already indexed; full re-reads everything; force ignores "
+            "timestamps; heal re-indexes only the documents the index disagrees with"
+        ),
     )
     parser.add_argument("--index-type", default="docs", choices=["docs", "code"])
     parser.add_argument(

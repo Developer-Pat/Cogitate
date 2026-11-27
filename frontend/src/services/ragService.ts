@@ -39,7 +39,7 @@ export interface RagStatusResponse {
 }
 
 export interface IngestRequest {
-  mode: 'incremental' | 'full' | 'force-reingest';
+  mode: 'incremental' | 'full' | 'force-reingest' | 'heal';
   index_type?: 'docs' | 'code';
   /** The roots to walk; omitted means the app's own six. */
   dirs?: string[];

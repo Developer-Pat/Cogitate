@@ -104,12 +104,13 @@ class IngestRequest(BaseModel):
     mode: str = Field(
         default="incremental",
         description=(
-            "Ingestion mode.  'incremental' only re-indexes files whose "
-            "modification time is newer than the last index.  'full' re-processes "
-            "all discovered files.  'force-reingest' bypasses incremental checks "
-            "and re-indexes everything."
+            "Ingestion mode. 'incremental' only re-indexes files whose modification time is newer "
+            "than the last index. 'full' re-processes all discovered files. 'force-reingest' "
+            "bypasses incremental checks and re-indexes everything. 'heal' re-indexes ONLY the "
+            "documents whose stored chunk count disagrees with a fresh chunking — a skipped chunk, "
+            "a chunker change, an edit whose mtime did not move."
         ),
-        pattern=r"^(incremental|full|force-reingest)$",
+        pattern=r"^(incremental|full|force-reingest|heal)$",
     )
     index_type: str = Field(
         default="docs",

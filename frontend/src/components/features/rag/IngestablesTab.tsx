@@ -36,6 +36,11 @@ const MODES: { id: IngestRequest['mode']; label: string; tip: string }[] = [
     label: 'Force re-ingest',
     tip: 'Ignore the index timestamps entirely — slowest, and it re-embeds everything',
   },
+  {
+    id: 'heal',
+    label: 'Heal',
+    tip: 'Repair only the documents the index disagrees with — a chunk that failed, or a chunker change',
+  },
 ]
 
 const formatMinutes = (minutes: number): string => {

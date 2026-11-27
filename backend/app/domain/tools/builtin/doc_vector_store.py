@@ -527,36 +527,58 @@ class DocVectorStore:
             )
             return None
 
-        try:
-            with httpx.Client(timeout=30.0) as client:
-                resp = client.post(
-                    f"{self.ollama_base}/api/embeddings",
-                    json={"model": self.embedding_model, "prompt": text},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                embedding = data.get("embedding")
-                if embedding is None:
-                    logger.error(
-                        "Ollama embedding returned no embedding field: %s",
-                        data,
+        # THE DEADLINE SCALES WITH THE TEXT (2026-11-27). A 2,000-character chunk is ~21 s of model time
+        # on an idle CPU-only box and over 30 s under load; a flat 30 s deadline lost **12 chunks
+        # (0.25 %)** on the first full run, every one of them the heaviest chunk of its document. ~25 ms
+        # a character, floored at 30 s, and ONE retry: a timeout is usually the machine, not the text.
+        deadline = max(30.0, len(text) * 0.025)
+
+        for attempt in (1, 2):
+            try:
+                with httpx.Client(timeout=deadline) as client:
+                    resp = client.post(
+                        f"{self.ollama_base}/api/embeddings",
+                        json={"model": self.embedding_model, "prompt": text},
                     )
-                    return None
-                return cast(list[float] | None, embedding)
-        except httpx.HTTPStatusError as exc:
-            logger.error(
-                "Ollama embedding HTTP %d for '%s': %s",
-                exc.response.status_code,
-                self.embedding_model,
-                exc,
-            )
-            return None
-        except httpx.RequestError as exc:
-            logger.error("Ollama embedding request failed: %s", exc)
-            return None
-        except Exception as exc:
-            logger.error("Unexpected error in Ollama embedding: %s", exc)
-            return None
+                    resp.raise_for_status()
+                    data = resp.json()
+                    embedding = data.get("embedding")
+                    if embedding is None:
+                        logger.error(
+                            "Ollama embedding returned no embedding field: %s",
+                            data,
+                        )
+                        return None
+                    return cast(list[float] | None, embedding)
+            except httpx.HTTPStatusError as exc:
+                # An HTTP answer is not a flake: retrying a 500 asks the same question again.
+                logger.error(
+                    "Ollama embedding HTTP %d for '%s': %s",
+                    exc.response.status_code,
+                    self.embedding_model,
+                    exc,
+                )
+                return None
+            except (httpx.TimeoutException, httpx.RequestError) as exc:
+                if attempt == 1:
+                    logger.warning(
+                        "embedding attempt 1 failed after %.0fs on %d chars (%s) — retrying",
+                        deadline,
+                        len(text),
+                        type(exc).__name__,
+                    )
+                    continue
+                logger.error(
+                    "Ollama embedding request failed twice (%.0fs deadline, %d chars): %s",
+                    deadline,
+                    len(text),
+                    exc,
+                )
+                return None
+            except Exception as exc:
+                logger.error("Unexpected error in Ollama embedding: %s", exc)
+                return None
+        return None
 
     def embed_query(self, text: str) -> Optional[List[float]]:
         """Embed a single query string.
@@ -760,6 +782,24 @@ class DocVectorStore:
                 logger.info("Removed stale index for %s (%d chunks)", path, removed)
 
         return total_removed
+
+    def document_chunk_counts(self) -> Dict[str, int]:
+        """How many chunks the index holds for each document — the other half of a HEAL check.
+
+        A heal compares this against a fresh chunking of the same file: they disagree when a chunk was
+        skipped (a timeout, a suspend), when the chunker changed, or when an edit did not move the
+        mtime. Nothing else can tell a partial document from a complete one.
+        """
+        with self._write_lock:
+            db = self._get_connection()
+            try:
+                rows = db.execute(
+                    "SELECT source_path, COUNT(*) AS n FROM doc_chunks GROUP BY source_path"
+                ).fetchall()
+            except sqlite3.OperationalError as exc:
+                logger.warning("document_chunk_counts: no index yet — %s", exc)
+                return {}
+        return {row["source_path"]: int(row["n"]) for row in rows}
 
     def clear(self) -> Dict[str, int]:
         """Empty the index — every chunk and every vector — and report what it removed.

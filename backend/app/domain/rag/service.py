@@ -337,6 +337,17 @@ HEARTBEAT_STALE_S = 120.0  # a job silent for longer than this is not doing anyt
 HEARTBEAT_WRITE_S = 1.0  # at most one record write a second, however fast the chunks come
 
 
+def _active_seconds_since(started_monotonic: float) -> float:
+    """How long the job has actually WORKED — the clock stops when the machine sleeps.
+
+    `time.monotonic()` is CLOCK_MONOTONIC on Linux, which does not advance across a suspend; a
+    `datetime.now()` delta does. Measured on the first full run: an 11.3 h suspend turned 8.7 h of work
+    into a reported 19.99 h and a `s_per_chunk` of 15.20 instead of 6.62 — and that rate is what every
+    later estimate is priced from.
+    """
+    return time.monotonic() - started_monotonic
+
+
 def _pid_is_alive(pid: Optional[int]) -> bool:
     """Whether a pid names a process that is still DOING something.
 
@@ -549,7 +560,9 @@ class RagIngestService:
         """Execute the ingestion pipeline.
 
         Args:
-            mode: ``"incremental"``, ``"full"``, or ``"force-reingest"``.
+            mode: ``"incremental"``, ``"full"``, ``"force-reingest"`` or ``"heal"``. ``heal`` re-indexes
+                only the documents the index disagrees with (a skipped chunk, a chunker change, an edit
+                whose mtime did not move) — the repair that does not cost a whole corpus.
             index_type: Which index to rebuild (currently only ``"docs"``).
             config: System manager config. If ``None``, uses code-level defaults.
             embedding: the resolved embedding service (the `embeddings` capability). Required: an
@@ -587,7 +600,15 @@ class RagIngestService:
         dirs = list(dirs) if dirs is not None else list(INGESTION_DIRS)
         job_id = job_id or f"rag-ingest-{int(time.time())}"
         started_at = datetime.now(timezone.utc)
+        # ACTIVE TIME, NOT WALL CLOCK (2026-11-27). `time.monotonic()` on Linux is CLOCK_MONOTONIC,
+        # which STOPS while the machine is suspended — so a laptop that sleeps mid-run does not inflate
+        # the run's rate. Measured before this: a 11.3 h suspend made a 8.7 h run report 19.99 h and
+        # `s_per_chunk` 15.20 instead of 6.62, and that rate is what every later estimate is priced from.
+        started_mono = time.monotonic()
         last_write = 0.0
+
+        def _active_seconds() -> float:
+            return _active_seconds_since(started_mono)
 
         # Initialise progress
         progress = IngestProgress.model_construct()
@@ -617,7 +638,7 @@ class RagIngestService:
                 return
             last_write = now
             status.heartbeat_at = datetime.now(timezone.utc)
-            progress.elapsed_seconds = (status.heartbeat_at - started_at).total_seconds()
+            progress.elapsed_seconds = _active_seconds()
             status.progress = progress
             _write_status_file(status)
 
@@ -648,7 +669,7 @@ class RagIngestService:
             logger.info("No files discovered for ingestion.")
             status.status = "completed"
             status.completed_at = datetime.now(timezone.utc)
-            progress.elapsed_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+            progress.elapsed_seconds = _active_seconds()
             status.progress = progress
             status.result = IngestResult(
                 files_discovered=0,
@@ -676,7 +697,7 @@ class RagIngestService:
                 logger.info("All %d files are up to date.", progress.files_discovered)
                 status.status = "completed"
                 status.completed_at = datetime.now(timezone.utc)
-                progress.elapsed_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+                progress.elapsed_seconds = _active_seconds()
                 status.progress = progress
                 status.result = IngestResult(
                     files_discovered=progress.files_discovered,
@@ -708,6 +729,50 @@ class RagIngestService:
             status.completed_at = datetime.now(timezone.utc)
             _write_status_file(status)
             return
+
+        # ── Heal: only the documents the index does not agree with ───────
+        # A skipped chunk is invisible everywhere else: the document is "processed", `files_failed` is 0,
+        # and `incremental` never revisits it (its mtime did not move). This compares what the index
+        # HOLDS against what the current chunker WOULD produce, and re-indexes the difference.
+        if mode == "heal":
+            from app.domain.tools.builtin.doc_vector_store import chunk_document  # noqa: PLC0415
+
+            indexed_counts = store.document_chunk_counts()
+            differing: List[Tuple[Path, str]] = []
+            for abs_path, rel_path in discovered:
+                try:
+                    content = abs_path.read_text(encoding="utf-8")
+                except OSError as exc:
+                    logger.warning("heal: cannot read %s: %s", rel_path, exc)
+                    continue
+                expected = len(chunk_document(content, rel_path, store.max_embed_chars))
+                stored = indexed_counts.get(rel_path, 0)
+                if stored != expected:
+                    logger.info(
+                        "heal: %s holds %d of %d chunk(s) — re-indexing", rel_path, stored, expected
+                    )
+                    differing.append((abs_path, rel_path))
+            discovered = differing
+            progress.files_discovered = len(differing)
+            progress.files_processed = 0
+            progress.total_chunks = 0
+
+            if not discovered:
+                logger.info("heal: the index agrees with the chunker for all %d file(s)", len(indexed_counts))
+                status.status = "completed"
+                status.completed_at = datetime.now(timezone.utc)
+                progress.elapsed_seconds = _active_seconds()
+                status.progress = progress
+                status.result = IngestResult(
+                    files_discovered=progress.files_discovered,
+                    files_processed=0,
+                    files_failed=0,
+                    total_chunks=0,
+                    stale_removed=0,
+                    elapsed_seconds=progress.elapsed_seconds,
+                )
+                _write_status_file(status)
+                return
 
         # ── Ingestion loop ────────────────────────────────────────────────
         total = len(discovered)
@@ -748,7 +813,7 @@ class RagIngestService:
 
             # Update progress after every file, and prove the job is alive doing it
             progress.current_file = ""
-            progress.elapsed_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+            progress.elapsed_seconds = _active_seconds()
             status.progress = progress
             _heartbeat(force=True)
 
@@ -777,7 +842,7 @@ class RagIngestService:
             logger.error("Failed to regenerate doc index: %s", exc)
 
         # ── Final status ──────────────────────────────────────────────────
-        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+        elapsed = _active_seconds()
         status.status = "completed"
         status.completed_at = datetime.now(timezone.utc)
         status.progress = None  # clear progress in favour of result
