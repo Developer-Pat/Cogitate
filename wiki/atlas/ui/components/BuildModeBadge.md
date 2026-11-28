@@ -3,7 +3,7 @@ title: BuildModeBadge
 type: atlas-component
 path: frontend/src/components/BuildModeBadge.tsx
 confidence: high
-updated: 2026-09-17
+updated: 2026-11-27
 tags: [type/component, domain/atlas-ui]
 ---
 # BuildModeBadge
@@ -28,7 +28,10 @@ A one-word badge in the dashboard header naming which build is being served — 
 | Export | Type | Purpose |
 |---|---|---|
 | `BuildModeBadge` | Component | The badge (also the default export) |
-| `buildModeInfo(isDev)` | Pure function | Returns `{ label, tip }` for a given build flag — split out so **both** branches are testable without stubbing `import.meta.env` |
+
+The label/tooltip text is not exported from here: `buildModeInfo(isDev)` lives in
+`frontend/src/utils/buildMode.ts`, split out so **both** branches are testable without stubbing
+`import.meta.env`. This component imports it.
 
 ## Dependencies
 
