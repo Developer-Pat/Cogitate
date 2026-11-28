@@ -50,6 +50,7 @@ import sqlite_vec  # type: ignore[import-untyped]
 from app.domain.providers.embeddings import (
     EmbeddingService,
     declared_width_of,
+    max_embed_chars_for,
     width_mismatch_report,
 )
 
@@ -70,15 +71,17 @@ DEFAULT_TOP_K = 10
 MAX_TOP_K = 20
 DEFAULT_MIN_SCORE = 0.0
 
-# Maximum chunk size in characters before we truncate.
-# Source code chunks are typically small (functions/classes), but we cap
-# large top-level assignments or config files.
-MAX_CHUNK_CHARS = 4000
+# THE INPUT BUDGET IS THE MODEL'S (2026-11-26) — the same one-lookup the doc store uses
+# (`embeddings.max_embed_chars_for`). Code is token-denser than prose, which is why the budget is
+# conservative; what must not happen is a chunk the embedder then trims, which is what these two
+# constants used to allow (4,000 cut here, 950 sent there).
+MAX_CHUNK_CHARS = 2000
 
 # Maximum text length (in characters) to send to the embedding model.
 # nomic-embed-text has a ~2048 token limit but the runner process crashes
 # on inputs over ~1020 chars with this model version.  Set safely at 950.
-MAX_EMBED_CHARS = 950
+# retired: the input budget is the MODEL's (`max_embed_chars_for`), looked up in the store's
+# constructor — a hardcoded 950 here meant the embedder trimmed three quarters of anything long.
 
 # Language detection by file extension
 EXTENSION_LANGUAGE_MAP: Dict[str, str] = {
@@ -552,6 +555,8 @@ class CodeVectorStore:
         self.embedding_model = embedding.model or ""
         self.embedding_dims = embedding.dims or 0
         self.batch_size = batch_size
+        # The model's own input budget — the same lookup the doc store uses (see its note).
+        self.max_embed_chars = max_embed_chars_for(embedding.model)
         self._db: Optional[sqlite3.Connection] = None
         self._initialized = False
 
@@ -760,40 +765,64 @@ class CodeVectorStore:
         """
         if self._refuse():
             return None
-        # Truncate to stay within model token budget
-        if len(text) > MAX_EMBED_CHARS:
-            text = text[:MAX_EMBED_CHARS]
-
-        try:
-            with httpx.Client(timeout=30.0) as client:
-                resp = client.post(
-                    f"{self.ollama_base}/api/embeddings",
-                    json={"model": self.embedding_model, "prompt": text},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                embedding = data.get("embedding")
-                if embedding is None:
-                    logger.error(
-                        "Ollama embedding returned no embedding field: %s",
-                        data,
-                    )
-                    return None
-                return cast(list[float] | None, embedding)
-        except httpx.HTTPStatusError as exc:
+        if len(text) > self.max_embed_chars:
             logger.error(
-                "Ollama embedding HTTP %d for '%s': %s",
-                exc.response.status_code,
+                "code chunk of %d chars exceeds the '%s' budget of %d — refusing to embed part of it",
+                len(text),
                 self.embedding_model,
-                exc,
+                self.max_embed_chars,
             )
             return None
-        except httpx.RequestError as exc:
-            logger.error("Ollama embedding request failed: %s", exc)
-            return None
-        except Exception as exc:
-            logger.error("Unexpected error in Ollama embedding: %s", exc)
-            return None
+
+        # The deadline scales with the text and a transport failure is retried ONCE — the same rule
+        # the doc store follows, for the same reason (a flat 30 s lost the heaviest chunks).
+        deadline = max(30.0, len(text) * 0.025)
+
+        for attempt in (1, 2):
+            try:
+                with httpx.Client(timeout=deadline) as client:
+                    resp = client.post(
+                        f"{self.ollama_base}/api/embeddings",
+                        json={"model": self.embedding_model, "prompt": text},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    embedding = data.get("embedding")
+                    if embedding is None:
+                        logger.error(
+                            "Ollama embedding returned no embedding field: %s",
+                            data,
+                        )
+                        return None
+                    return cast(list[float] | None, embedding)
+            except httpx.HTTPStatusError as exc:
+                logger.error(
+                    "Ollama embedding HTTP %d for '%s': %s",
+                    exc.response.status_code,
+                    self.embedding_model,
+                    exc,
+                )
+                return None
+            except (httpx.TimeoutException, httpx.RequestError) as exc:
+                if attempt == 1:
+                    logger.warning(
+                        "code embedding attempt 1 failed after %.0fs on %d chars (%s) — retrying",
+                        deadline,
+                        len(text),
+                        type(exc).__name__,
+                    )
+                    continue
+                logger.error(
+                    "Ollama embedding request failed twice (%.0fs deadline, %d chars): %s",
+                    deadline,
+                    len(text),
+                    exc,
+                )
+                return None
+            except Exception as exc:
+                logger.error("Unexpected error in Ollama embedding: %s", exc)
+                return None
+        return None
 
     def embed_query(self, text: str) -> Optional[List[float]]:
         """Embed a single query string.

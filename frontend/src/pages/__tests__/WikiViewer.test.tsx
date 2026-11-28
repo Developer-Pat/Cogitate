@@ -65,6 +65,36 @@ describe('WikiViewer wikilink conversion', () => {
     const bare = screen.getByRole('link', { name: 'Cognitive Profiles' })
     expect(bare).toHaveAttribute('href', '/wiki/cognitive-profiles')
   })
+
+  // A spaced wiki path is a legal target: 66 pages in this corpus have a space
+  // in the filename ("UI Atlas.md", "Paths and Path Resolution.md",
+  // "Message map.md"). The converter's character class used to stop at the
+  // space, so every such link rendered as literal [[...]] text in the viewer.
+  it('renders wikilinks whose path contains a space', async () => {
+    const content = [
+      '---',
+      'title: Test',
+      '---',
+      '# Test',
+      'See [[atlas/ui/UI Atlas|UI Atlas]] and [[dev-notes/architecture/Paths and Path Resolution]].',
+    ].join('\n')
+
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: () => url === '/api/v1/wiki'
+          ? Promise.resolve({ tree: [] })
+          : Promise.resolve({ content, children: [] }),
+      })))
+
+    render(<WikiViewer />)
+    const aliased = await screen.findByRole('link', { name: 'UI Atlas' }, { timeout: 3000 })
+    expect(aliased).toHaveAttribute('href', '/wiki/atlas/ui/UI%20Atlas')
+    // No alias: the label is the last path segment, as Obsidian shows it.
+    const bare = screen.getByRole('link', { name: 'Paths and Path Resolution' })
+    expect(bare).toHaveAttribute('href', '/wiki/dev-notes/architecture/Paths%20and%20Path%20Resolution')
+  })
 })
 
 describe('WikiViewer mermaid palette — darkness, not the theme NAME', () => {

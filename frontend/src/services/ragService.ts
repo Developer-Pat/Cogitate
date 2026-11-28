@@ -39,8 +39,10 @@ export interface RagStatusResponse {
 }
 
 export interface IngestRequest {
-  mode: 'incremental' | 'full' | 'force-reingest';
+  mode: 'incremental' | 'full' | 'force-reingest' | 'heal';
   index_type?: 'docs' | 'code';
+  /** The roots to walk; omitted means the app's own six. */
+  dirs?: string[];
 }
 
 export interface IngestResponse {
@@ -54,7 +56,12 @@ export interface IngestProgress {
   files_discovered: number;
   files_processed: number;
   files_failed: number;
+  /** Chunks the INDEX holds from this run — moves when a document commits. */
   total_chunks: number;
+  /** Chunks attempted so far — moves per chunk, which is what makes a card look alive. */
+  chunks_done: number;
+  /** The document being indexed right now. */
+  current_file: string;
   elapsed_seconds: number;
 }
 
@@ -65,12 +72,37 @@ export interface IngestResult {
   total_chunks: number;
   stale_removed: number;
   elapsed_seconds: number;
+  /** Seconds per chunk THIS run measured — the rate the estimate prices with. */
+  s_per_chunk: number | null;
+}
+
+export interface IngestEstimateRow {
+  dir: string;
+  files: number;
+  bytes: number;
+  chunks: number;
+  minutes: number;
+}
+
+export interface IngestEstimate {
+  dirs: IngestEstimateRow[];
+  total: { files: number; bytes: number; chunks: number; minutes: number };
+  /** The seconds-per-chunk the minutes are built on. */
+  rate_s_per_chunk: number;
+  /** 'last run' or a default — said out loud so a guess is never mistaken for a measurement. */
+  rate_source: string;
+  chars_per_chunk: number;
+  estimated: true;
 }
 
 export interface IngestJobStatusResponse {
   job_id: string;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
   mode: string;
+  /** The roots this run was given. */
+  dirs: string[];
+  /** The process doing the work. */
+  pid: number | null;
   started_at: string;
   completed_at: string | null;
   error: string | null;
@@ -107,11 +139,32 @@ export const ragService = {
   async triggerIngest(
     mode: IngestRequest['mode'] = 'incremental',
     index_type: IngestRequest['index_type'] = 'docs',
+    dirs?: string[],
   ): Promise<ApiResponse<IngestResponse>> {
     return apiClient.post<IngestResponse>('/api/v1/rag/ingest', {
       mode,
       index_type,
+      ...(dirs && dirs.length > 0 ? { dirs } : {}),
     });
+  },
+
+  /** What a run over these roots would cost — counted files, estimated chunks and minutes. */
+  async estimateIngest(dirs?: string[]): Promise<ApiResponse<IngestEstimate>> {
+    return apiClient.post<IngestEstimate>('/api/v1/rag/ingest/estimate', {
+      ...(dirs && dirs.length > 0 ? { dirs } : {}),
+    });
+  },
+
+  /** Stop the running job (the child is signalled; the record follows). */
+  async cancelIngest(): Promise<
+    ApiResponse<{ cancelled: boolean; status: string; job_id?: string; message?: string }>
+  > {
+    return apiClient.post('/api/v1/rag/ingest/cancel', {});
+  },
+
+  /** Empty the index — every chunk and every vector. Refused while a job runs. */
+  async clearIndex(): Promise<ApiResponse<{ cleared: boolean; documents: number; chunks: number }>> {
+    return apiClient.post('/api/v1/rag/index/clear', {});
   },
 
   /**

@@ -43,6 +43,19 @@ the Site Index links this section, never its pages.
 
 ## In flight
 
+- [[issues/embedding-model-three-facts-one-transport|The embedding model — three facts, one accepted transport, and a choice the install hands to you]] —
+  **OPEN — needs a ruling.** An install with no embedding model reports `no embedding model: indexing and
+  search are off` (measured: **0** documents, 0 bytes), while a working one holds **506 documents / 3,527
+  chunks** at width **768** *and* reports `embedding_model: null` — the index outliving the configuration that
+  built it. The three facts live in three homes (the candidate's row for the address, the candidate for the
+  model, a **ten-entry** width table for the width), and a model outside that table is **reported, never
+  guessed**. The transport narrows the choice more than the provider list suggests: the app speaks Ollama's
+  `/api/embeddings` and `/api/embed` at three call sites and `/v1/embeddings` **nowhere**, so a llama.cpp
+  server (which serves `/v1/embeddings` only) and the hosted vendors are a small client this app does not
+  have. Recommendation: **A now** — ollama and `nomic-embed-text` (768, 261.6 MB) on the box, keyless — and
+  **C as its own item** — the `/v1/embeddings` client, which unlocks this box's llama.cpp and every hosted
+  vendor at once.
+
 - [[issues/seven-levers-one-stable-reading|Seven parked levers, and the set holds one stable reading for them]] —
   **OPEN — needs a ruling.** The reporter arc parked seven levers; the bench holds 3 jobs over **2** of the
   charter's six axes, and the levers land on the four axes with no job. Measured against the instrument's own
@@ -54,6 +67,19 @@ the Site Index links this section, never its pages.
   one announced run of four jobs.
 
 ## Resolved
+
+- [[issues/resolved/ci-gate/seven-ways-the-ci-gate-lied|Seven ways the CI gate lied — the green tick, the cancelled check, and the test that measured the developer]] —
+  **CLOSED — five of the seven landed; two banked** *(an IRR: the report over one arc's CI failures, not one
+  mechanism)*. Eighteen pushes to `main` in six days returned **5 green, 5 red and 8 cancelled**, and none of the
+  words was a verdict about the code: `frontend` ran no linter while #19 merged a rule change behind its green
+  tick; `cancelled` covered a superseded push, a job killed at its own 30-minute cap (**6** kills, the worst run
+  **138.4 minutes**) and a stall that reported nothing — and the same job outcome reached the page as `failure`
+  twice because the *frontend* job failed first. A red job's whole log was `EXIT 1`; the seven failure names lived
+  in the artifact. Landed: the per-test cap that named the hang (`71f4bea`, `47a6c59`), the machine-dependent
+  refusal stubbed at the seam the code calls (`591ebb0`, `4c9f7e8`, `f94516f`), the millisecond timestamp that was
+  a real bug and not a flake (`bf793e2`), and the bump-is-a-migration rule (#16's **142** findings, #24's fastapi
+  `_IncludedRouter` and its **7** failing observers). Banked, and named on the page: the lint step itself, and the
+  runner printing no failure name to stdout.
 
 - [[issues/resolved/github-release/the-check-reads-its-own-process-path|The check reads its own process's PATH — one install, two verdicts, and two capabilities that vanish]] —
   **LANDED — `46845da`** *(ruled 2026-11-21: "let'sgo with C", stage A; stage B measured and not taken)*. The app

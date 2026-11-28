@@ -3,7 +3,8 @@ import { PageBanner } from '../components/ui/PageBanner';
 import { PageContainer } from '../components/ui/PageContainer';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { ragService } from '../services/ragService';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotifications } from '@/hooks/useNotifications'
+import IngestablesTab from '@/components/features/rag/IngestablesTab'
 
 import type { RagStatusResponse, IngestJobStatusResponse } from '../services/ragService';
 
@@ -25,7 +26,9 @@ const RagIndex: React.FC = () => {
   const [ingestJobStatus, setIngestJobStatus] = useState<IngestJobStatusResponse | null>(null);
   const [isTriggering, setIsTriggering] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<'incremental' | 'full' | 'force-reingest'>('incremental');
+  const [selectedMode, setSelectedMode] = useState<'incremental' | 'full' | 'force-reingest'>('incremental')
+  /** Two tabs: the index as it stands, and the run config that builds it. */
+  const [activeTab, setActiveTab] = useState<'index' | 'ingestables'>('index');
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { notifySuccess, notifyError } = useNotifications();
 
@@ -106,6 +109,8 @@ const RagIndex: React.FC = () => {
         job_id: res.data.job_id,
         status: 'running',
         mode: res.data.mode,
+        dirs: [],
+        pid: null,
         started_at: res.data.started_at,
         completed_at: null,
         error: null,
@@ -127,12 +132,60 @@ const RagIndex: React.FC = () => {
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
 
+  /** Stop the running job: the child process is signalled and the record settles. */
+  const handleCancelIngest = async () => {
+    const res = await ragService.cancelIngest()
+    if (res.data?.cancelled) {
+      notifySuccess('Ingest Cancelled', `Job ${res.data.job_id ?? ''} stopped`.trim())
+    } else {
+      notifyError('Cancel Refused', res.data?.message ?? res.error?.message ?? 'The job did not stop')
+    }
+    await fetchRagStatus()
+  };
+
   return (
     <PageContainer>
       <PageBanner
         title="RAG Index"
         subtitle="Manage the retrieval index and ingest jobs"
       />
+      <nav className="flex gap-1 border-b border-base-300 overflow-x-auto">
+        {(
+          [
+            { id: 'index', label: 'Index', tip: 'What is indexed, and the job running now' },
+            {
+              id: 'ingestables',
+              label: 'Ingestables',
+              tip: 'Which roots to index, what the run will cost, and the destructive controls',
+            },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            data-tip={tab.tip}
+            className={`tooltip tooltip-bottom pb-2 px-3 font-medium text-sm whitespace-nowrap rounded-t transition-colors ${
+              activeTab === tab.id
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-base-content/60 hover:text-base-content'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+      {activeTab === 'ingestables' && (
+        <IngestablesTab
+          roots={ragStatus?.config?.ingestion_dirs ?? []}
+          running={ingestJobStatus?.status === 'running'}
+          onStarted={() => {
+            setActiveTab('index')
+            startPolling()
+          }}
+          onIndexChanged={() => void fetchRagStatus()}
+        />
+      )}
+      {activeTab === 'index' && (
       <div className="space-y-6">
         {/* Index Health Card */}
         <div className="card bg-base-100 shadow-[var(--card-shadow)] rounded-[var(--card-radius)] p-[var(--card-padding)]">
@@ -264,9 +317,20 @@ const RagIndex: React.FC = () => {
                     </span>
                     <span className="font-mono text-xs text-readout">{ingestJobStatus.job_id}</span>
                   </div>
-                  <span className="text-sm text-readout">
-                    Mode: <span className="badge badge-ghost badge-sm">{ingestJobStatus.mode}</span>
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-readout">
+                      Mode: <span className="badge badge-ghost badge-sm">{ingestJobStatus.mode}</span>
+                    </span>
+                    {ingestJobStatus.status === 'running' && (
+                      <button
+                        className="btn btn-sm btn-outline btn-error"
+                        onClick={() => void handleCancelIngest()}
+                        data-tip="Stop the running job — the process is signalled, the record follows"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {ingestJobStatus.status === 'running' && ingestJobStatus.progress && (
@@ -285,12 +349,21 @@ const RagIndex: React.FC = () => {
                         <div className="stat-value text-lg">{ingestJobStatus.progress.files_failed}</div>
                       </div>
                       <div className="stat p-2 bg-base-200 rounded-box">
-                        <div className="stat-title text-xs">Chunks</div>
-                        <div className="stat-value text-lg">{ingestJobStatus.progress.total_chunks}</div>
+                        <div className="stat-title text-xs">Chunks done</div>
+                        <div className="stat-value text-lg">
+                          {ingestJobStatus.progress.chunks_done ?? ingestJobStatus.progress.total_chunks}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-xs text-readout text-right">
-                      Elapsed: {ingestJobStatus.progress.elapsed_seconds.toFixed(1)}s
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs text-readout truncate" title={ingestJobStatus.progress.current_file}>
+                        {ingestJobStatus.progress.current_file
+                          ? `now: ${ingestJobStatus.progress.current_file}`
+                          : 'between documents'}
+                      </span>
+                      <span className="text-xs text-readout whitespace-nowrap">
+                        Elapsed: {ingestJobStatus.progress.elapsed_seconds.toFixed(1)}s
+                      </span>
                     </div>
                   </div>
                 )}
@@ -393,6 +466,7 @@ const RagIndex: React.FC = () => {
           </div>
         )}
       </div>
+      )}
     </PageContainer>
   );
 };

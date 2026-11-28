@@ -39,7 +39,7 @@ import re
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, cast
 
 import httpx
 import sqlite3
@@ -51,6 +51,7 @@ import sqlite_vec  # type: ignore[import-untyped]
 from app.domain.providers.embeddings import (
     EmbeddingService,
     declared_width_of,
+    max_embed_chars_for,
     width_mismatch_report,
 )
 
@@ -63,10 +64,14 @@ DEFAULT_DB_PATH = "data/system_docs_vector.db"  # fallback; the canonical
 #   is the single resolver; the string default only covers callers
 #   that never pass a db_path and never loaded the app config.
 
-# Maximum characters to send to the embedding model in a single call.
-# nomic-embed-text has a 2048-token limit (~1500 chars), and crashes with HTTP 500
-# on inputs over ~1020 chars with this model version.  Set safely at 950.
-MAX_EMBED_CHARS = 950
+# THE INPUT BUDGET IS THE MODEL'S, NOT THIS MODULE'S (2026-11-26).
+#
+# This used to be `MAX_EMBED_CHARS = 950`, and the chunker above cut at `MAX_CHUNK_CHARS = 4000` —
+# two constants that had to agree and that nothing made agree. The embedder won silently: every chunk
+# past 950 characters was truncated, so **21.4 % of the documentation** (524,104 of 2,450,485
+# characters, measured over the six roots) never reached the model. Both are now ONE lookup,
+# `embeddings.max_embed_chars_for(model)`: the chunker cuts to it, and the embedder refuses a longer
+# chunk by name instead of embedding its opening.
 # NO ADDRESS, MODEL OR DIMS LIVE HERE (the service-literals arc's model half, 2026-10-10). This module
 # used to carry all three — `DEFAULT_OLLAMA_BASE`, and `DEFAULT_EMBEDDING_MODEL`/`DEFAULT_EMBEDDING_DIMS`
 # (`nomic-embed-text`, 768) copied into four further modules. None of them is a property of THIS store:
@@ -79,17 +84,63 @@ DEFAULT_TOP_K = 10
 MAX_TOP_K = 20
 DEFAULT_MIN_SCORE = 0.0
 
-# Maximum chunk size in characters before splitting on paragraph boundaries.
-# Approx 250 tokens at ~4 chars/token.
-MAX_CHUNK_CHARS = 4000
+# THE CHUNKER'S FALLBACK ONLY. The store always passes the MODEL's own budget
+# (`embeddings.max_embed_chars_for`); this default serves a direct caller that names none. It used to
+# be 4000, which was above what the embedder sent — see the note beside MAX_EMBED_CHARS.
+MAX_CHUNK_CHARS = 2000
 
 # ─── Heading-Aware Chunker ────────────────────────────────────────────────────
+
+
+def _split_to_cap(text: str, cap: int) -> List[str]:
+    """Split text into pieces of at most ``cap`` characters — paragraph first, then word boundary.
+
+    **The cap is a guarantee, not a target.** A paragraph longer than it (a fenced code block, a wide
+    table, a wall of prose with no blank lines) is cut at the last space before the limit, and at the
+    limit itself when there is none. Without this the chunker emitted chunks far over its own cap —
+    measured: an 11,597-character chunk against a 4,000 claim — and the embedder was left to hide it.
+    """
+    pieces: List[str] = []
+    current = ""
+
+    def flush() -> None:
+        nonlocal current
+        if current.strip():
+            pieces.append(current.strip())
+        current = ""
+
+    for para in re.split(r"\n\s*\n", text):
+        para = para.strip()
+        if not para:
+            continue
+        # A paragraph too big for one chunk: close what is open, cut it, keep the remainder as the
+        # start of the next one. This is the case that used to be emitted whole (11,597 chars).
+        if len(para) > cap:
+            flush()
+            while len(para) > cap:
+                cut = para.rfind(" ", 0, cap)
+                if cut <= 0:
+                    cut = cap
+                piece = para[:cut].strip()
+                if piece:
+                    pieces.append(piece)
+                para = para[cut:].strip()
+            current = para
+            continue
+        # ACCUMULATE — short paragraphs belong together; splitting two lines into two chunks is how a
+        # chunk count balloons and a match loses its context.
+        if current and len(current) + 2 + len(para) > cap:
+            flush()
+        current = f"{current}\n\n{para}" if current else para
+
+    flush()
+    return pieces
 
 
 def chunk_document(
     content: str,
     source_path: str,
-    max_chunk_chars: int = MAX_CHUNK_CHARS,
+    max_chunk_chars: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Split a markdown document into heading-aware chunks.
 
@@ -127,18 +178,25 @@ def chunk_document(
             text = m.group(2).strip()
             headings.append((level, text, i))
 
+    cap = max_chunk_chars or MAX_CHUNK_CHARS
+
     if not headings:
-        # No headings — treat entire document as one chunk
-        checksum = hashlib.md5(content.encode("utf-8")).hexdigest()
-        chunks.append({
-            "source_path": source_path,
-            "chunk_text": content.strip(),
-            "heading": "",
-            "heading_ancestry": "",
-            "char_start": 0,
-            "char_end": len(content),
-            "checksum": checksum,
-        })
+        # NO HEADINGS IS NOT AN EXCUSE FOR ONE GIANT CHUNK. A plain note used to become a single chunk
+        # of any length — measured, an 11,597-character one — which the embedder then had to truncate.
+        # It is split like any other text now, so the cap holds with or without headings.
+        pieces = _split_to_cap(content, cap)
+        offset = 0
+        for piece in pieces:
+            chunks.append({
+                "source_path": source_path,
+                "chunk_text": piece,
+                "heading": "",
+                "heading_ancestry": "",
+                "char_start": offset,
+                "char_end": offset + len(piece),
+                "checksum": hashlib.md5(piece.encode("utf-8")).hexdigest(),
+            })
+            offset += len(piece) + 2
         return chunks
 
     # Build sections: each heading starts a new section, subsuming content until
@@ -172,7 +230,7 @@ def chunk_document(
 
     # Chunk each section, splitting oversized ones on paragraph boundaries
     for sec in sections:
-        if len(sec["text"]) <= max_chunk_chars:
+        if len(sec["text"]) <= cap:
             checksum = hashlib.md5(sec["text"].encode("utf-8")).hexdigest()
             # Calculate char positions (approximate from line ranges)
             char_start = sum(len(line) + 1 for line in lines[:sec["start_line"]])
@@ -187,45 +245,19 @@ def chunk_document(
                 "checksum": checksum,
             })
         else:
-            # Split on paragraph boundaries
-            paragraphs = re.split(r"\n\s*\n", sec["text"])
-            current_chunk = ""
+            # One helper for both paths, so the cap cannot be honoured in one and ignored in the other.
             char_pos = sum(len(line) + 1 for line in lines[:sec["start_line"]])
-
-            for para in paragraphs:
-                if not para.strip():
-                    continue
-                if len(current_chunk) + len(para) + 1 > max_chunk_chars and current_chunk:
-                    # Finalize current chunk
-                    checksum = hashlib.md5(current_chunk.encode("utf-8")).hexdigest()
-                    chunks.append({
-                        "source_path": source_path,
-                        "chunk_text": current_chunk.strip(),
-                        "heading": sec["heading"],
-                        "heading_ancestry": sec["heading_ancestry"],
-                        "char_start": char_pos,
-                        "char_end": char_pos + len(current_chunk),
-                        "checksum": checksum,
-                    })
-                    char_pos += len(current_chunk) + 2
-                    current_chunk = para
-                else:
-                    if current_chunk:
-                        current_chunk += "\n\n" + para
-                    else:
-                        current_chunk = para
-
-            if current_chunk.strip():
-                checksum = hashlib.md5(current_chunk.encode("utf-8")).hexdigest()
+            for piece in _split_to_cap(sec["text"], cap):
                 chunks.append({
                     "source_path": source_path,
-                    "chunk_text": current_chunk.strip(),
+                    "chunk_text": piece,
                     "heading": sec["heading"],
                     "heading_ancestry": sec["heading_ancestry"],
                     "char_start": char_pos,
-                    "char_end": char_pos + len(current_chunk),
-                    "checksum": checksum,
+                    "char_end": char_pos + len(piece),
+                    "checksum": hashlib.md5(piece.encode("utf-8")).hexdigest(),
                 })
+                char_pos += len(piece) + 2
 
     return chunks
 
@@ -262,7 +294,19 @@ class DocVectorStore:
         self.embedding_model = embedding.model or ""
         self.embedding_dims = embedding.dims or 0
         self.batch_size = batch_size
+        # THE INPUT BUDGET COMES FROM THE MODEL (one lookup, `providers/embeddings.py`): the chunker
+        # cuts to it and `_call_ollama_embed` refuses anything longer, so no text is ever half-embedded.
+        self.max_embed_chars = max_embed_chars_for(embedding.model)
         self._db: Optional[sqlite3.Connection] = None
+        # THE STORE IS USED FROM MORE THAN ONE THREAD (2026-11-26). The ingest ran its per-document
+        # work ON the event loop's thread, so a 16-second embedding call froze the whole app; the fix
+        # moves that work to a worker thread, which means this store's connection is now touched by
+        # the loop (a tool searching) and a worker (a document being written) at the same time.
+        # `check_same_thread=False` makes that legal (CPython's sqlite3 is serialized:
+        # `sqlite3.threadsafety == 3`), and this lock makes the write half ATOMIC — a reader never
+        # sees a document half-deleted and half-inserted. It is re-entrant because `index_document`
+        # takes it and then calls `_remove_document`, which takes it again.
+        self._write_lock = threading.RLock()
         self._initialized = False
 
     def _refuse_unconfigured(self) -> bool:
@@ -388,18 +432,22 @@ class DocVectorStore:
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create the sqlite3 connection with sqlite-vec loaded."""
-        if self._db is None:
-            # Ensure parent directory exists
-            db_dir = Path(self.db_path).parent
-            db_dir.mkdir(parents=True, exist_ok=True)
+        with self._write_lock:
+            if self._db is None:
+                # Ensure parent directory exists
+                db_dir = Path(self.db_path).parent
+                db_dir.mkdir(parents=True, exist_ok=True)
 
-            self._db = sqlite3.connect(self.db_path)
-            self._db.row_factory = sqlite3.Row
-            self._db.enable_load_extension(True)
-            sqlite_vec.load(self._db)
-            self._db.enable_load_extension(False)
-            self._db.execute("PRAGMA journal_mode=WAL")
-        return self._db
+                # `check_same_thread=False`: the ingest writes from a worker thread while a tool may
+                # read from the event loop's (see `_write_lock`). The connection is created under the
+                # lock so two threads cannot build two connections.
+                self._db = sqlite3.connect(self.db_path, check_same_thread=False)
+                self._db.row_factory = sqlite3.Row
+                self._db.enable_load_extension(True)
+                sqlite_vec.load(self._db)
+                self._db.enable_load_extension(False)
+                self._db.execute("PRAGMA journal_mode=WAL")
+            return self._db
 
     def init_db(self) -> None:
         """Create tables if they don't exist.
@@ -459,61 +507,101 @@ class DocVectorStore:
     def _call_ollama_embed(self, text: str) -> Optional[List[float]]:
         """Call the Ollama embeddings API for a single text.
 
-        Truncates text to ``MAX_EMBED_CHARS`` (~950 chars) to stay within the
-        model's token limit (2048 tokens for ``nomic-embed-text``).  Longer
-        prompts cause Ollama to return HTTP 500.
+        **The text is sent whole.** It used to be truncated to 950 characters — silently, so 21.4 % of
+        the corpus never reached the model — while the chunker cut at 4,000: two constants that had to
+        agree and that nothing made agree. The chunker now cuts to ``self.max_embed_chars`` (the
+        model's own budget), so a longer text here is a BUG, and it is refused by name rather than
+        half-embedded.
 
         Returns ``None`` on failure (logged, not raised).
         """
         if self._refuse():
             return None
-        # Truncate to stay within model token budget
-        if len(text) > MAX_EMBED_CHARS:
-            text = text[:MAX_EMBED_CHARS]
-
-        try:
-            with httpx.Client(timeout=30.0) as client:
-                resp = client.post(
-                    f"{self.ollama_base}/api/embeddings",
-                    json={"model": self.embedding_model, "prompt": text},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                embedding = data.get("embedding")
-                if embedding is None:
-                    logger.error(
-                        "Ollama embedding returned no embedding field: %s",
-                        data,
-                    )
-                    return None
-                return cast(list[float] | None, embedding)
-        except httpx.HTTPStatusError as exc:
+        if len(text) > self.max_embed_chars:
             logger.error(
-                "Ollama embedding HTTP %d for '%s': %s",
-                exc.response.status_code,
+                "chunk of %d chars exceeds the '%s' budget of %d — refusing to embed part of it "
+                "(the chunker must cut to max_embed_chars_for(model))",
+                len(text),
                 self.embedding_model,
-                exc,
+                self.max_embed_chars,
             )
             return None
-        except httpx.RequestError as exc:
-            logger.error("Ollama embedding request failed: %s", exc)
-            return None
-        except Exception as exc:
-            logger.error("Unexpected error in Ollama embedding: %s", exc)
-            return None
+
+        # THE DEADLINE SCALES WITH THE TEXT (2026-11-27). A 2,000-character chunk is ~21 s of model time
+        # on an idle CPU-only box and over 30 s under load; a flat 30 s deadline lost **12 chunks
+        # (0.25 %)** on the first full run, every one of them the heaviest chunk of its document. ~25 ms
+        # a character, floored at 30 s, and ONE retry: a timeout is usually the machine, not the text.
+        deadline = max(30.0, len(text) * 0.025)
+
+        for attempt in (1, 2):
+            try:
+                with httpx.Client(timeout=deadline) as client:
+                    resp = client.post(
+                        f"{self.ollama_base}/api/embeddings",
+                        json={"model": self.embedding_model, "prompt": text},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    embedding = data.get("embedding")
+                    if embedding is None:
+                        logger.error(
+                            "Ollama embedding returned no embedding field: %s",
+                            data,
+                        )
+                        return None
+                    return cast(list[float] | None, embedding)
+            except httpx.HTTPStatusError as exc:
+                # An HTTP answer is not a flake: retrying a 500 asks the same question again.
+                logger.error(
+                    "Ollama embedding HTTP %d for '%s': %s",
+                    exc.response.status_code,
+                    self.embedding_model,
+                    exc,
+                )
+                return None
+            except (httpx.TimeoutException, httpx.RequestError) as exc:
+                if attempt == 1:
+                    logger.warning(
+                        "embedding attempt 1 failed after %.0fs on %d chars (%s) — retrying",
+                        deadline,
+                        len(text),
+                        type(exc).__name__,
+                    )
+                    continue
+                logger.error(
+                    "Ollama embedding request failed twice (%.0fs deadline, %d chars): %s",
+                    deadline,
+                    len(text),
+                    exc,
+                )
+                return None
+            except Exception as exc:
+                logger.error("Unexpected error in Ollama embedding: %s", exc)
+                return None
+        return None
 
     def embed_query(self, text: str) -> Optional[List[float]]:
         """Embed a single query string.
 
+        A QUERY MAY BE CUT, a document may not: a pasted paragraph of 3,000 characters is a probe, and
+        the search still works on its opening — whereas a document chunk stands for its text forever,
+        which is why the chunker must fit and the embedder refuses instead of trimming.
+
         Returns a list of floats (the embedding vector) or ``None`` on failure.
         """
-        return self._call_ollama_embed(text)
+        return self._call_ollama_embed(text[: self.max_embed_chars])
 
-    def embed_chunks(self, chunks: List[str]) -> List[Optional[List[float]]]:
+    def embed_chunks(
+        self, chunks: List[str], on_chunk: Optional[Callable[[], None]] = None
+    ) -> List[Optional[List[float]]]:
         """Embed a list of chunk texts in batches.
 
         Returns a parallel list where each element is either an embedding
         vector or ``None`` if that chunk's embedding failed.
+
+        ``on_chunk`` is called after EVERY chunk, before the next one starts. That is the ingest's
+        heartbeat: a document with forty chunks takes minutes on a CPU-only box, and without a per-chunk
+        signal the run's record sits at the last file it finished and reads as dead.
         """
         results: List[Optional[List[float]]] = []
         for i in range(0, len(chunks), self.batch_size):
@@ -524,12 +612,18 @@ class DocVectorStore:
             for text in batch:
                 emb = self._call_ollama_embed(text)
                 results.append(emb)
+                if on_chunk is not None:
+                    on_chunk()
         return results
 
     # ── Indexing ───────────────────────────────────────────────────────────
 
-    def index_document(self, source_path: str, content: str) -> int:
+    def index_document(
+        self, source_path: str, content: str, on_chunk: Optional[Callable[[], None]] = None
+    ) -> int:
         """Chunk, embed, and store a document in the vector index.
+
+        ``on_chunk`` is passed straight to :meth:`embed_chunks` — the caller's heartbeat.
 
         Parameters
         ----------
@@ -545,57 +639,61 @@ class DocVectorStore:
         if not self._initialized:
             self.init_db()
 
-        chunks = chunk_document(content, source_path)
+        chunks = chunk_document(content, source_path, self.max_embed_chars)
         if not chunks:
             return 0
 
         # Remove existing entries for this source path before re-indexing
         self._remove_document(source_path)
 
+        # THE SLOW HALF STAYS OUTSIDE THE LOCK. Embedding is one blocking HTTP call per chunk — 16
+        # seconds for a full-size chunk on a CPU-only box — and a search must not queue behind it.
         texts = [c["chunk_text"] for c in chunks]
-        embeddings = self.embed_chunks(texts)
+        embeddings = self.embed_chunks(texts, on_chunk=on_chunk)
 
-        db = self._get_connection()
-        inserted = 0
+        # THE WRITE HALF IS ATOMIC (see `_write_lock`): a reader sees the document whole or not at all.
+        with self._write_lock:
+            db = self._get_connection()
+            inserted = 0
 
-        for chunk, emb in zip(chunks, embeddings):
-            if emb is None:
-                logger.warning(
-                    "Skipping chunk (embedding failed): %s heading=%s",
-                    source_path, chunk.get("heading", ""),
+            for chunk, emb in zip(chunks, embeddings):
+                if emb is None:
+                    logger.warning(
+                        "Skipping chunk (embedding failed): %s heading=%s",
+                        source_path, chunk.get("heading", ""),
+                    )
+                    continue
+
+                # Insert metadata row
+                cursor = db.execute(
+                    """
+                    INSERT INTO doc_chunks
+                        (source_path, chunk_text, heading, heading_ancestry,
+                         char_start, char_end, checksum)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chunk["source_path"],
+                        chunk["chunk_text"],
+                        chunk.get("heading", ""),
+                        chunk.get("heading_ancestry", ""),
+                        chunk.get("char_start", 0),
+                        chunk.get("char_end", 0),
+                        chunk["checksum"],
+                    ),
                 )
-                continue
+                chunk_id = cursor.lastrowid
 
-            # Insert metadata row
-            cursor = db.execute(
-                """
-                INSERT INTO doc_chunks
-                    (source_path, chunk_text, heading, heading_ancestry,
-                     char_start, char_end, checksum)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    chunk["source_path"],
-                    chunk["chunk_text"],
-                    chunk.get("heading", ""),
-                    chunk.get("heading_ancestry", ""),
-                    chunk.get("char_start", 0),
-                    chunk.get("char_end", 0),
-                    chunk["checksum"],
-                ),
-            )
-            chunk_id = cursor.lastrowid
+                # Insert embedding into vec_docs virtual table
+                from sqlite_vec import serialize_float32
 
-            # Insert embedding into vec_docs virtual table
-            from sqlite_vec import serialize_float32
+                db.execute(
+                    "INSERT INTO vec_docs (rowid, embedding) VALUES (?, ?)",
+                    (chunk_id, serialize_float32(emb)),
+                )
+                inserted += 1
 
-            db.execute(
-                "INSERT INTO vec_docs (rowid, embedding) VALUES (?, ?)",
-                (chunk_id, serialize_float32(emb)),
-            )
-            inserted += 1
-
-        db.commit()
+            db.commit()
         logger.info(
             "Indexed %d/%d chunks from %s",
             inserted, len(chunks), source_path,
@@ -610,36 +708,39 @@ class DocVectorStore:
         if not self._initialized:
             self.init_db()
 
-        db = self._get_connection()
+        with self._write_lock:
+            db = self._get_connection()
 
-        # Find chunk IDs for this source path
-        cursor = db.execute(
-            "SELECT id FROM doc_chunks WHERE source_path = ?",
-            (source_path,),
-        )
-        ids = [row["id"] for row in cursor.fetchall()]
+            # Find chunk IDs for this source path
+            cursor = db.execute(
+                "SELECT id FROM doc_chunks WHERE source_path = ?",
+                (source_path,),
+            )
+            ids = [row["id"] for row in cursor.fetchall()]
 
-        if not ids:
-            return 0
+            if not ids:
+                return 0
 
-        # Delete from vec_docs (virtual table)
-        for chunk_id in ids:
-            try:
-                db.execute("DELETE FROM vec_docs WHERE rowid = ?", (chunk_id,))
-            except Exception as exc:
-                logger.warning(
-                    "Failed to delete vec_docs rowid=%d: %s", chunk_id, exc,
-                )
+            # Delete from vec_docs (virtual table)
+            for chunk_id in ids:
+                try:
+                    db.execute("DELETE FROM vec_docs WHERE rowid = ?", (chunk_id,))
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to delete vec_docs rowid=%d: %s", chunk_id, exc,
+                    )
 
-        # Delete from metadata table
-        db.execute(
-            "DELETE FROM doc_chunks WHERE source_path = ?",
-            (source_path,),
-        )
-        db.commit()
-        return len(ids)
+            # Delete from metadata table
+            db.execute(
+                "DELETE FROM doc_chunks WHERE source_path = ?",
+                (source_path,),
+            )
+            db.commit()
+            return len(ids)
 
-    def remove_stale_documents(self, existing_paths: Set[str]) -> int:
+    def remove_stale_documents(
+        self, existing_paths: Set[str], roots: Optional[Sequence[str]] = None
+    ) -> int:
         """Remove vector entries for documents that no longer exist.
 
         Parameters
@@ -647,6 +748,11 @@ class DocVectorStore:
         existing_paths:
             Set of source paths that still exist on disk.  Any chunk whose
             ``source_path`` is NOT in this set will be removed.
+        roots:
+            The ingestion roots THIS RUN was given. When set, staleness is judged only inside them —
+            a narrowed run must not delete the roots it was told to leave alone. Measured before this
+            guard existed: indexing `entities + help` removed **845 chunks** that belonged to
+            dev-notes and the atlas, because "not discovered this run" read as "gone from disk".
 
         Returns
         -------
@@ -661,6 +767,12 @@ class DocVectorStore:
         cursor = db.execute("SELECT DISTINCT source_path FROM doc_chunks")
         indexed_paths = {row["source_path"] for row in cursor.fetchall()}
 
+        if roots:
+            # A path is in scope when it sits UNDER one of this run's roots. Everything outside them
+            # is somebody else's business, not stale content.
+            prefixes = tuple(root.rstrip("/") + "/" for root in roots)
+            indexed_paths = {p for p in indexed_paths if p.startswith(prefixes)}
+
         stale = indexed_paths - existing_paths
         total_removed = 0
         for path in stale:
@@ -670,6 +782,51 @@ class DocVectorStore:
                 logger.info("Removed stale index for %s (%d chunks)", path, removed)
 
         return total_removed
+
+    def document_chunk_counts(self) -> Dict[str, int]:
+        """How many chunks the index holds for each document — the other half of a HEAL check.
+
+        A heal compares this against a fresh chunking of the same file: they disagree when a chunk was
+        skipped (a timeout, a suspend), when the chunker changed, or when an edit did not move the
+        mtime. Nothing else can tell a partial document from a complete one.
+        """
+        with self._write_lock:
+            db = self._get_connection()
+            try:
+                rows = db.execute(
+                    "SELECT source_path, COUNT(*) AS n FROM doc_chunks GROUP BY source_path"
+                ).fetchall()
+            except sqlite3.OperationalError as exc:
+                logger.warning("document_chunk_counts: no index yet — %s", exc)
+                return {}
+        return {row["source_path"]: int(row["n"]) for row in rows}
+
+    def clear(self) -> Dict[str, int]:
+        """Empty the index — every chunk and every vector — and report what it removed.
+
+        The destructive half of Rebuild, offered on its own (the RAG page). It runs under the write
+        lock, so a reader sees the index whole before or whole after, never half-emptied. A store that
+        was never initialised (no model, no table) reports zeros rather than creating one to delete.
+        """
+        result: Dict[str, int] = {"documents": 0, "chunks": 0}
+        with self._write_lock:
+            db = self._get_connection()
+            try:
+                row = db.execute("SELECT COUNT(*) AS n FROM doc_chunks").fetchone()
+                result["chunks"] = int(row["n"]) if row else 0
+                row = db.execute(
+                    "SELECT COUNT(DISTINCT source_path) AS n FROM doc_chunks"
+                ).fetchone()
+                result["documents"] = int(row["n"]) if row else 0
+                for statement in ("DELETE FROM vec_docs", "DELETE FROM doc_chunks"):
+                    try:
+                        db.execute(statement)
+                    except sqlite3.OperationalError as exc:
+                        logger.warning("clear: %s skipped — %s", statement, exc)
+                db.commit()
+            except sqlite3.OperationalError as exc:
+                logger.warning("clear: nothing to clear — %s", exc)
+        return result
 
     # ── Indexed Paths Listing ──────────────────────────────────────────────
 

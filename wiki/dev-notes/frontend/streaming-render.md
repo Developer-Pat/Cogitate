@@ -116,4 +116,4 @@ total is the second. Frame timing alone will mislead you.
 ## Related
 
 - [[dev-notes/known-issues|Known Issues]] — the standing defect list
-- [[atlas/ui/|UI Atlas]] — the component map
+- [[atlas/ui/UI Atlas|UI Atlas]] — the component map

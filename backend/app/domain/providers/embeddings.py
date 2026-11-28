@@ -69,6 +69,48 @@ EMBEDDING_DIMS_BY_MODEL: dict[str, int] = {
     "embed-multilingual-v3.0": 1024,
 }
 
+# ── The model's INPUT budget — the other definition, beside its width ───────────────────────────
+#
+# The width says how WIDE a vector is; this says how much TEXT the model can be sent. Both are
+# properties of the model, and both belong here for the same reason: written anywhere else they drift
+# apart from it. They already had: the chunker cut at 4,000 characters while the embedder silently
+# truncated every chunk to **950**, so **21.4 % of the documentation** (524,104 of 2,450,485
+# characters, measured) never reached the model — a passage past the first ~950 characters of a long
+# section was searchable only by its opening.
+#
+# Each value is roughly a QUARTER to a THIRD of the model's token window, because markdown with code,
+# URLs and tables runs far denser than prose (~4 chars a token). Deliberately conservative: the cap has
+# to hold for the worst text in the corpus, not the average.
+EMBEDDING_MAX_CHARS_BY_MODEL: dict[str, int] = {
+    # Ollama's local embedding models
+    "nomic-embed-text": 2000,  # 2048-token window; measured to take 12k chars, capped for density
+    "mxbai-embed-large": 1400,  # 512 tokens
+    "all-minilm": 700,  # 256 tokens — the smallest window in the family
+    "snowflake-arctic-embed": 1400,  # 512 tokens
+    # The hosted families, for an install that points a row at one of them
+    "text-embedding-ada-002": 8000,  # 8191 tokens
+    "text-embedding-3-small": 8000,
+    "text-embedding-3-large": 8000,
+    "embed-english-v3.0": 1400,  # 512 tokens
+    "embed-multilingual-v3.0": 1400,
+}
+
+# A model whose width this app does not know never resolves (see above), so this default exists only
+# for a caller that has no model name yet — and it is the CONSERVATIVE end.
+DEFAULT_MAX_EMBED_CHARS = 2000
+
+
+def max_embed_chars_for(model: Optional[str]) -> int:
+    """How much text one call may send for this model — the number the chunker must not exceed.
+
+    ONE lookup, so the chunker and the embedder cannot disagree: a chunk longer than this is a bug in
+    the chunker, and the embedder refuses it by name instead of quietly embedding its opening.
+    """
+    if not model:
+        return DEFAULT_MAX_EMBED_CHARS
+    return EMBEDDING_MAX_CHARS_BY_MODEL.get(model, DEFAULT_MAX_EMBED_CHARS)
+
+
 # The one wording an unconfigured install says — quoted by the ruling, so it lives here once and the
 # surfaces that report it (`/rag/status`, the ingest refusal) all read it.
 NO_EMBEDDING_MODEL = "no embedding model: indexing and search are off"

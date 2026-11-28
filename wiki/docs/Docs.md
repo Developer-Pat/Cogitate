@@ -21,7 +21,7 @@ user-facing).
   family, agent workflows, and the agentic graphs
 - [[script-catalog]] — developer script reference (all scripts, usage,
   backend requirements)
-- [[testing]] — how to run tests + sweeps (fast/full suite, specific areas)
+- [[docs/testing|testing]] — how to run tests + sweeps (fast/full suite, specific areas)
 
 ## Adding content
 

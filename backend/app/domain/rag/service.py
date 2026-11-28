@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import sqlite3
 import tempfile
@@ -21,7 +22,7 @@ import time
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from app.core.config import BASE_DIR, Paths
 from app.core.system_manager import SystemManagerConfig
@@ -104,6 +105,75 @@ def _matches_denied(path: str, patterns: List[str]) -> bool:
         if normalized in path:
             return True
     return False
+
+
+# ─── What a run would cost ───────────────────────────────────────────────────
+#
+# MEASURED, NOT ASSUMED (2026-11-26, after the chunk/embed contract was fixed): the six roots hold
+# 2,449,815 characters and the chunker produces **4,746 chunks** at a 2,000-character cap — about
+# **516 characters a chunk**. Heading-aware splitting (and paragraph accumulation) sets the count, not
+# size, so estimating from the cap alone would be wrong by a factor of four. Re-measure this after any
+# change to the chunker or its cap — it is a property of both.
+CHARS_PER_CHUNK_ESTIMATE = 516
+# Until an install has run its own whole corpus, this prices a run — and it is OUR OWN measurement,
+# not a guess: 6.62 s a chunk over 623 files / 4 734 chunks on the CPU-only Xeon (2026-11-27). It is a
+# property of the corpus SHAPE as much as the machine, so it is LABELLED as a default on every surface
+# and any install's own run replaces it. (5.0 was the previous placeholder and understated by 24 %.)
+DEFAULT_RATE_S_PER_CHUNK = 6.6
+
+
+def estimate_ingest(
+    ingest_dirs: Optional[List[str]] = None,
+    rate_s_per_chunk: Optional[float] = None,
+) -> dict:
+    """Price a run: files, bytes, chunks and minutes for each root, then a total.
+
+    The walk is the app's own discovery (`discover_files`), so the file counts are exactly what the run
+    would see — denied patterns, extensions and all. The chunk count and the minutes are **estimates**:
+    one calibrated ratio and one measured rate, both reported in the payload so no surface can present
+    them as a promise.
+    """
+    roots = list(ingest_dirs or INGESTION_DIRS)
+    measured = rate_s_per_chunk is not None and rate_s_per_chunk > 0
+    rate = float(rate_s_per_chunk) if measured else DEFAULT_RATE_S_PER_CHUNK
+
+    rows: List[Dict[str, object]] = []
+    total_files = total_bytes = total_chunks = 0
+    for root in roots:
+        found = discover_files(ingest_dirs=[root], project_root=BASE_DIR)
+        sizes = []
+        for path, _rel in found:
+            try:
+                sizes.append(path.stat().st_size)
+            except OSError:
+                sizes.append(0)
+        chunks = sum(max(1, math.ceil(size / CHARS_PER_CHUNK_ESTIMATE)) for size in sizes)
+        rows.append(
+            {
+                "dir": root,
+                "files": len(found),
+                "bytes": sum(sizes),
+                "chunks": chunks,
+                "minutes": round(chunks * rate / 60, 1),
+            }
+        )
+        total_files += len(found)
+        total_bytes += sum(sizes)
+        total_chunks += chunks
+
+    return {
+        "dirs": rows,
+        "total": {
+            "files": total_files,
+            "bytes": total_bytes,
+            "chunks": total_chunks,
+            "minutes": round(total_chunks * rate / 60, 1),
+        },
+        "rate_s_per_chunk": rate,
+        "rate_source": "last run" if measured else "default (this install has not measured one yet)",
+        "chars_per_chunk": CHARS_PER_CHUNK_ESTIMATE,
+        "estimated": True,
+    }
 
 
 def discover_files(
@@ -258,6 +328,71 @@ def _write_status_file(status: IngestStatusFile) -> None:
         raise
 
 
+# ─── Liveness: a record says who owns the job and when it last proved it was alive ───────────────
+#
+# `is_running()` used to be "the status file says running", and nothing cleared that word when the
+# process writing it died — a cancelled task, a crash, or (measured, twice) uvicorn's `--reload`
+# taking the backend down mid-ingest. The record then answered `409 An ingest job is already running`
+# for ever, with no cancel and no reset anywhere in the UI; editing the JSON by hand was the only way
+# out. Liveness is now the three facts the record itself carries: the word, the pid, and a heartbeat.
+HEARTBEAT_STALE_S = 120.0  # a job silent for longer than this is not doing anything
+HEARTBEAT_WRITE_S = 1.0  # at most one record write a second, however fast the chunks come
+
+
+def _active_seconds_since(started_monotonic: float) -> float:
+    """How long the job has actually WORKED — the clock stops when the machine sleeps.
+
+    `time.monotonic()` is CLOCK_MONOTONIC on Linux, which does not advance across a suspend; a
+    `datetime.now()` delta does. Measured on the first full run: an 11.3 h suspend turned 8.7 h of work
+    into a reported 19.99 h and a `s_per_chunk` of 15.20 instead of 6.62 — and that rate is what every
+    later estimate is priced from.
+    """
+    return time.monotonic() - started_monotonic
+
+
+def _pid_is_alive(pid: Optional[int]) -> bool:
+    """Whether a pid names a process that is still DOING something.
+
+    A zombie is not doing anything: it has exited and is waiting to be reaped. `os.kill(pid, 0)`
+    answers "yes" for one — measured, a cancelled child read as alive until its parent reaped it —
+    so the state letter from `/proc` settles it.
+    """
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # it exists; it is only not ours to signal
+    except OSError:
+        return False
+    try:
+        with open(f"/proc/{pid}/stat", "r", encoding="utf-8") as stat:
+            # `pid (comm) S ...` — comm may contain spaces and parentheses, so split on the LAST ')'
+            state = stat.read().rsplit(")", 1)[1].split()[0]
+        if state == "Z":
+            return False
+    except (FileNotFoundError, IndexError, OSError):
+        pass
+    return True
+
+
+def _job_is_live(status: Optional[IngestStatusFile], *, now: Optional[datetime] = None) -> bool:
+    """A job is running only while its owner is alive AND has been heard from recently.
+
+    The heartbeat carries the age; the pid carries the ownership. Either alone is not enough — a pid
+    can be reused by an unrelated process, and a heartbeat can be fresh in a file nobody is writing.
+    """
+    if status is None or status.status != "running":
+        return False
+    if not _pid_is_alive(status.pid):
+        return False
+    heartbeat = status.heartbeat_at or status.started_at
+    age = ((now or datetime.now(timezone.utc)) - heartbeat).total_seconds()
+    return age <= HEARTBEAT_STALE_S
+
+
 # ─── RagIngestService ─────────────────────────────────────────────────────────
 
 
@@ -300,9 +435,8 @@ class RagIngestService:
 
     @classmethod
     def is_running(cls) -> bool:
-        """Check whether an ingest job is currently running."""
-        status = _read_status_file()
-        return status is not None and status.status == "running"
+        """Whether an ingest job is running — the word, the pid AND a fresh heartbeat (see above)."""
+        return _job_is_live(_read_status_file())
 
     @classmethod
     def get_index_health(
@@ -422,19 +556,27 @@ class RagIngestService:
         index_type: str = "docs",
         config: Optional[SystemManagerConfig] = None,
         embedding: Optional[EmbeddingService] = None,
+        dirs: Optional[Sequence[str]] = None,
+        job_id: Optional[str] = None,
     ) -> None:
-        """Execute the ingestion pipeline in a background task.
+        """Execute the ingestion pipeline.
 
         Args:
-            mode: ``"incremental"``, ``"full"``, or ``"force-reingest"``.
+            mode: ``"incremental"``, ``"full"``, ``"force-reingest"`` or ``"heal"``. ``heal`` re-indexes
+                only the documents the index disagrees with (a skipped chunk, a chunker change, an edit
+                whose mtime did not move) — the repair that does not cost a whole corpus.
             index_type: Which index to rebuild (currently only ``"docs"``).
             config: System manager config. If ``None``, uses code-level defaults.
             embedding: the resolved embedding service (the `embeddings` capability). Required: an
                 ingest without an address, a model and a width would write vectors nobody can read.
+            dirs: which ingestion roots to walk. ``None`` means the code's own six (`INGESTION_DIRS`);
+                the run config passes a subset, and the record keeps what was asked for.
+            job_id: the id the caller already announced (the API writes the record before spawning a
+                child, so both sides must agree on it).
 
-        This method is designed to be run via ``asyncio.create_task()``.
-        It updates the status file as it progresses and handles all exceptions
-        internally, writing the final status (``completed`` or ``failed``).
+        One implementation, two callers: the API spawns a child process (`ingest_cli`) that calls this,
+        and the tests call it directly. It owns the record for the whole run — heartbeat included — and
+        writes the final status (``completed``, ``failed`` or ``cancelled``).
         """
         # ── Resolve configuration ─────────────────────────────────────────
         if config is None:
@@ -457,8 +599,18 @@ class RagIngestService:
             else Paths.rag_index_path
         )
 
-        job_id = f"rag-ingest-{int(time.time())}"
+        dirs = list(dirs) if dirs is not None else list(INGESTION_DIRS)
+        job_id = job_id or f"rag-ingest-{int(time.time())}"
         started_at = datetime.now(timezone.utc)
+        # ACTIVE TIME, NOT WALL CLOCK (2026-11-27). `time.monotonic()` on Linux is CLOCK_MONOTONIC,
+        # which STOPS while the machine is suspended — so a laptop that sleeps mid-run does not inflate
+        # the run's rate. Measured before this: a 11.3 h suspend made a 8.7 h run report 19.99 h and
+        # `s_per_chunk` 15.20 instead of 6.62, and that rate is what every later estimate is priced from.
+        started_mono = time.monotonic()
+        last_write = 0.0
+
+        def _active_seconds() -> float:
+            return _active_seconds_since(started_mono)
 
         # Initialise progress
         progress = IngestProgress.model_construct()
@@ -468,13 +620,39 @@ class RagIngestService:
             mode=mode,
             index_type=index_type,
             started_at=started_at,
+            dirs=dirs,
+            # THE OWNER IS WRITTEN DOWN. For a child process that is the child; for an in-process run
+            # it is this process — and either way a reader can ask whether it still exists.
+            pid=os.getpid(),
+            heartbeat_at=started_at,
             progress=progress,
         )
+
+        def _heartbeat(force: bool = False) -> None:
+            """Prove the job is alive, and carry the progress with it — at most once a second.
+
+            Called per CHUNK (that is what makes a card move during a six-minute document); the
+            throttle keeps a fast box from rewriting the file ten times a second.
+            """
+            nonlocal last_write
+            now = time.monotonic()
+            if not force and now - last_write < HEARTBEAT_WRITE_S:
+                return
+            last_write = now
+            status.heartbeat_at = datetime.now(timezone.utc)
+            progress.elapsed_seconds = _active_seconds()
+            status.progress = progress
+            _write_status_file(status)
+
+        def _on_chunk() -> None:
+            progress.chunks_done += 1
+            _heartbeat()
+
         _write_status_file(status)
 
         # ── File discovery ────────────────────────────────────────────────
         try:
-            discovered = discover_files(project_root=self._project_root)
+            discovered = discover_files(ingest_dirs=dirs, project_root=self._project_root)
         except Exception as exc:
             logger.error("File discovery failed: %s", exc)
             status.status = "failed"
@@ -493,7 +671,7 @@ class RagIngestService:
             logger.info("No files discovered for ingestion.")
             status.status = "completed"
             status.completed_at = datetime.now(timezone.utc)
-            progress.elapsed_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+            progress.elapsed_seconds = _active_seconds()
             status.progress = progress
             status.result = IngestResult(
                 files_discovered=0,
@@ -521,7 +699,7 @@ class RagIngestService:
                 logger.info("All %d files are up to date.", progress.files_discovered)
                 status.status = "completed"
                 status.completed_at = datetime.now(timezone.utc)
-                progress.elapsed_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+                progress.elapsed_seconds = _active_seconds()
                 status.progress = progress
                 status.result = IngestResult(
                     files_discovered=progress.files_discovered,
@@ -554,6 +732,50 @@ class RagIngestService:
             _write_status_file(status)
             return
 
+        # ── Heal: only the documents the index does not agree with ───────
+        # A skipped chunk is invisible everywhere else: the document is "processed", `files_failed` is 0,
+        # and `incremental` never revisits it (its mtime did not move). This compares what the index
+        # HOLDS against what the current chunker WOULD produce, and re-indexes the difference.
+        if mode == "heal":
+            from app.domain.tools.builtin.doc_vector_store import chunk_document  # noqa: PLC0415
+
+            indexed_counts = store.document_chunk_counts()
+            differing: List[Tuple[Path, str]] = []
+            for abs_path, rel_path in discovered:
+                try:
+                    content = abs_path.read_text(encoding="utf-8")
+                except OSError as exc:
+                    logger.warning("heal: cannot read %s: %s", rel_path, exc)
+                    continue
+                expected = len(chunk_document(content, rel_path, store.max_embed_chars))
+                stored = indexed_counts.get(rel_path, 0)
+                if stored != expected:
+                    logger.info(
+                        "heal: %s holds %d of %d chunk(s) — re-indexing", rel_path, stored, expected
+                    )
+                    differing.append((abs_path, rel_path))
+            discovered = differing
+            progress.files_discovered = len(differing)
+            progress.files_processed = 0
+            progress.total_chunks = 0
+
+            if not discovered:
+                logger.info("heal: the index agrees with the chunker for all %d file(s)", len(indexed_counts))
+                status.status = "completed"
+                status.completed_at = datetime.now(timezone.utc)
+                progress.elapsed_seconds = _active_seconds()
+                status.progress = progress
+                status.result = IngestResult(
+                    files_discovered=progress.files_discovered,
+                    files_processed=0,
+                    files_failed=0,
+                    total_chunks=0,
+                    stale_removed=0,
+                    elapsed_seconds=progress.elapsed_seconds,
+                )
+                _write_status_file(status)
+                return
+
         # ── Ingestion loop ────────────────────────────────────────────────
         total = len(discovered)
         logger.info("Ingesting %d file(s) ...", total)
@@ -565,7 +787,20 @@ class RagIngestService:
                     logger.debug("Skipping empty file: %s", rel_path)
                     continue
 
-                n_chunks = store.index_document(rel_path, content)
+                progress.current_file = rel_path
+                _heartbeat(force=True)
+
+                # OFF THE EVENT LOOP (2026-11-26). `index_document` is one blocking HTTP call per
+                # chunk plus sqlite writes — 16 seconds for a full-size chunk on a CPU-only box,
+                # measured. Called directly from this coroutine it held the loop for the whole file,
+                # so `/api/v1/health` timed out and even the RAG page's own status poll went
+                # unanswered while a job ran. A worker thread keeps the app responsive; the store's
+                # connection is opened `check_same_thread=False` for exactly this (see its
+                # `_write_lock`). `on_chunk` is the heartbeat's other half: the record moves while a
+                # long document is being embedded, not only when it commits.
+                n_chunks = await asyncio.to_thread(
+                    store.index_document, rel_path, content, _on_chunk
+                )
                 progress.total_chunks += n_chunks
                 progress.files_processed += 1
 
@@ -578,19 +813,23 @@ class RagIngestService:
                 progress.files_failed += 1
                 logger.error("Failed to ingest %s: %s", rel_path, exc)
 
-            # Update progress after every file
-            progress.elapsed_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+            # Update progress after every file, and prove the job is alive doing it
+            progress.current_file = ""
+            progress.elapsed_seconds = _active_seconds()
             status.progress = progress
-            _write_status_file(status)
+            _heartbeat(force=True)
 
-            # Yield control briefly so the event loop can handle other tasks
-            # (e.g., polling requests for status).
+            # Let the loop run whatever else is waiting (the status poll, a chat turn) between files.
             await asyncio.sleep(0)
 
         # ── Stale document cleanup ────────────────────────────────────────
         stale_removed = 0
         try:
-            stale_removed = store.remove_stale_documents(all_discovered_paths)
+            # THE ROOTS ARE PART OF THE QUESTION (2026-11-26): a run given two roots must not sweep
+            # the other four out of the index, which is exactly what a narrowed run used to do.
+            stale_removed = await asyncio.to_thread(
+                store.remove_stale_documents, all_discovered_paths, dirs
+            )
             if stale_removed:
                 logger.info("Removed %d stale chunk(s)", stale_removed)
         except Exception as exc:
@@ -600,12 +839,12 @@ class RagIngestService:
         try:
             from app.domain.tools.builtin.doc_vector_store import _rebuild_doc_index_json  # noqa: PLC0415
 
-            _rebuild_doc_index_json(doc_index_abs, self._project_root)
+            await asyncio.to_thread(_rebuild_doc_index_json, doc_index_abs, self._project_root)
         except Exception as exc:
             logger.error("Failed to regenerate doc index: %s", exc)
 
         # ── Final status ──────────────────────────────────────────────────
-        elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+        elapsed = _active_seconds()
         status.status = "completed"
         status.completed_at = datetime.now(timezone.utc)
         status.progress = None  # clear progress in favour of result
@@ -616,6 +855,8 @@ class RagIngestService:
             total_chunks=progress.total_chunks,
             stale_removed=stale_removed,
             elapsed_seconds=elapsed,
+            # THE RATE IS A MEASUREMENT, NOT A GUESS (the Ingestables tab prices a run with it).
+            s_per_chunk=(elapsed / progress.total_chunks) if progress.total_chunks else None,
         )
         _write_status_file(status)
 

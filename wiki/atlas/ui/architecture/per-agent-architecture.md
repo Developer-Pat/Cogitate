@@ -3,7 +3,7 @@ title: Per-Agent Architecture
 type: atlas-architecture
 path: agents/ + backend/app/domain/agents/ + backend/app/domain/agent_registry/ + backend/app/api/v1/cognitive_pipeline/cognitive_profiles.py
 confidence: high
-updated: 2026-08-01
+updated: 2026-11-27
 tags: [type/architecture, domain/atlas-ui]
 ---
 # Per-Agent Architecture
@@ -363,13 +363,11 @@ flowchart TD
     PICK -->|"2. sends message"| ROUTE["conduit_route(...)<br/>message · executor_strategy · accumulated_content · tools_were_used<br/>backend/app/services/cognitive_pipeline/conduit.py"]
 
     ROUTE -->|"strategy ≠ hybrid<br/>or no first-pass content"| SHALLOW["SHALLOW<br/>return first-pass result"]
-    ROUTE -->|"hybrid AND short response (< 500 chars)"| HYBRID1["HYBRID — deep pass"]
-    ROUTE -->|"hybrid AND tools were used"| HYBRID2["HYBRID — deep pass"]
-    ROUTE -->|"hybrid AND deep keywords<br/>(research · analyze · why · compare …)"| HYBRID3["HYBRID — deep pass"]
+    ROUTE -->|"hybrid AND deep keywords<br/>(research · analyze · why · compare …)"| HYBRID1["HYBRID — deep pass"]
+    ROUTE -->|"hybrid AND first pass cut at the budget"| HYBRID2["HYBRID — deep pass"]
 
-    HYBRID1 --> SAME["Same agent re-asked<br/>chat/router.py — the HYBRID branch<br/>system prompt annotated 'previous answer was insufficient'<br/>max_tokens 4096 · temperature 0.7"]
+    HYBRID1 --> SAME["Same agent re-asked<br/>chat/router.py — the HYBRID branch<br/>system prompt annotated 'previous answer was insufficient'<br/>supersedes=True (replaces, never appends)"]
     HYBRID2 --> SAME
-    HYBRID3 --> SAME
 
     SAME --> MEMSTORE["Turn stored to<br/>agents/{folder}/cognitive_memory.db<br/>(agent_{id}:{session})"]
     SHALLOW --> MEMSTORE
@@ -388,7 +386,9 @@ single decision point between a shallow reply and a deep pass. Its contract:
 - `executor_strategy` — the agent's executor selection (from its cognitive
   profile); only `"hybrid"` can trigger a deep pass.
 - `accumulated_content` — the first-pass response text.
-- `tools_were_used` — whether the first pass invoked tools.
+- `tools_were_used` — whether the first pass invoked tools. Reported, never a
+  trigger: the streaming tool loop already synthesises, so re-asking duplicates
+  the answer.
 
 **Outputs**
 
@@ -397,21 +397,25 @@ single decision point between a shallow reply and a deep pass. Its contract:
   (`backend/app/api/v1/chat/router.py`) rebuilds the LLM request with
   `max_tokens=4096`, `temperature=0.7`, appends the first-pass content, annotates
   the system prompt with *"The previous answer was insufficient. Please provide a
-  thorough, well-reasoned response"*, and streams the second pass. The first-pass
-  content and the deep content are concatenated as the final accumulated output.
+  thorough, well-reasoned response"*, and streams the second pass. The deep pass
+  **replaces** the first-pass content (`supersedes=True`) — it never appends.
 - `Route.DELEGATE` — defined in the enum and exercised by an old branch in the
   chat router (which would POST to `/api/v1/chat/delegate`), but **unreachable**
   through `conduit_route()`: the function returns only SHALLOW or HYBRID.
 
-**Deep-pass triggers** (any of):
+**Deep-pass triggers** (either, and only for a `hybrid` profile with a first
+pass to re-examine):
 
-1. First-pass response is short — under 500 characters
-   (the `< 500` check in the HYBRID branch of `chat/router.py`).
-2. Tools were used during the first pass.
-3. The message matches a deep keyword (`research`, `analyze`, `explain`,
+1. The message matches a deep keyword (`research`, `analyze`, `explain`,
    `compare`, `contrast`, `why`, `how`, `difference`, `pros and cons`,
    `evaluate`, `summarize`, `investigate`, `deep dive`, `literature review`,
-   `synthesize`, …).
+   `synthesize`, …) — the user asked for depth.
+2. The first pass was cut at the output budget (`finish_reason == "length"`) —
+   a measured shortfall, not a guess.
+
+Answer LENGTH is not a trigger: a short answer that answers is a complete answer.
+The old `< 500 chars` and `tools_were_used` triggers were removed (2026-09-02 and
+2026-11-20) after both re-asked turns that had already been answered.
 
 **Invariants**
 
