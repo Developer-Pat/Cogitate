@@ -373,6 +373,30 @@ def main() -> int:
         if newest_git and newest_git > page_date_p:
             stale_git.append({**row, "code_date": newest_git.isoformat()})
 
+    # ---- B2. index inventories ------------------------------------------------
+    index_pages = []
+    short_indexes = []
+    for relpath, page in pages.items():
+        ptype = str(page["frontmatter"].get("type", ""))
+        if not (ptype.endswith("-index") or ptype == "wiki-index"):
+            continue
+        d = (WIKI_ROOT / relpath).parent
+        sibs = sorted(m.stem for m in d.glob("*.md") if m.stem != Path(relpath).stem)
+        linked_stems = set()
+        for m in LINK_RE.finditer(strip_code(page["content"])):
+            tgt = m.group(1).split("|")[0].split("#")[0].strip()
+            if not tgt or ".." in tgt:
+                continue
+            kind, resolved, _cands = resolve(tgt)
+            # Only a link to a page IN THIS DIRECTORY counts as listing a sibling;
+            # `[[testing]]` resolving to help/testing is not an entry in docs/.
+            if resolved and (WIKI_ROOT / resolved).parent == d:
+                linked_stems.add(Path(resolved).stem)
+        missing = [s for s in sibs if s not in linked_stems]
+        index_pages.append(relpath)
+        if missing:
+            short_indexes.append({"page": relpath, "missing": missing})
+
     # ---- counts --------------------------------------------------------------
     today = date.today()
 
@@ -438,6 +462,8 @@ def main() -> int:
         "path_removal_records": len(removal_paths),
         "path_stale_mtime": len(stale_mtime),
         "path_stale_git": len(stale_git),
+        "index_pages": len(index_pages),
+        "short_indexes": len(short_indexes),
         "stale_gap": stale_gap,
         "areas": area_rows,
         "hot_stale": len(hot),
@@ -458,6 +484,7 @@ def main() -> int:
         "dangling_paths": dangling,
         "removal_record_paths": removal_paths,
         "wiki_path_pointers": wiki_pointers,
+        "short_index_pages": short_indexes,
         "stale_paths_mtime": stale_mtime,
         "stale_paths_git": stale_git,
     }
@@ -529,6 +556,14 @@ def main() -> int:
                  "`workflows`, `logs`, `dashboard`, `macros`, `testing`, `cognitive-pipeline`, "
                  "`cognitive-profiles` currently land on a page whose title fits the linking page's section — "
                  "correct by luck, not by construction.\n")
+
+    L.append("## B2. Index inventories\n")
+    L.append(f"Index pages (`type: *-index`): **{len(index_pages)}**; **{len(short_indexes)}** list an "
+             f"incomplete set of their directory's pages.\n")
+    for row in sorted(short_indexes, key=lambda r: -len(r["missing"])):
+        L.append(f"- `{row['page']}` — missing {len(row['missing'])}: "
+                 + ", ".join(f"`{m}`" for m in row["missing"]))
+    L.append("")
 
     L.append("## C. `path:` pointers vs the code they point at\n")
     L.append(f"Pages carrying a `path:` pointer: **{len(path_pages)}** — of which "
