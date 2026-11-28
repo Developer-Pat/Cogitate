@@ -86,4 +86,4 @@ to see that slot's prompts.
 - The A-source (and the F-topic) are per surface: the agent chat and Exa remember their own
 
 ## See Also
-- [[cognitive-pipeline]] — How profiles affect agent behavior
+- [[help/cognitive-pipeline|cognitive-pipeline]] — How profiles affect agent behavior

@@ -91,7 +91,7 @@ the sounds store (filesystem) + the notifications config
 
 ## Related
 
-- [[../../help/sounds|wiki/help/sounds.md]] — the page help
+- [[help/sounds|Sounds help]] — the page help
 - The notifications-upgrade (the airplane-mode + the scheduled-mute
   + the attention-worthy filtering) rides on the same config —
   tracked in the backlog

@@ -77,5 +77,5 @@ default):
 - Sessions are isolated per agent switch (no bleed between agents)
 
 ## See Also
-- [[cognitive-profiles]] — Full profile catalogue
+- [[concepts/cognitive-profiles|cognitive-profiles]] — Full profile catalogue
 - [[diagrams/agent-pipeline-flow]] — Visual pipeline diagram

@@ -20,7 +20,7 @@ tags: [type/index]
 | [[provider-management]] | entity | high | Provider registry, model caching, credential pooling |
 | [[tool-system]] | entity | high | Tool registry, tool handlers, agent-tool linking |
 | [[chat-system]] | entity | high | Stream handling, session management, SSE protocol |
-| [[cognitive-profiles]] | concept | high | Profile naming convention, part codes, catalogue |
+| [[concepts/cognitive-profiles|cognitive-profiles]] | concept | high | Profile naming convention, part codes, catalogue |
 | [[frontend-architecture]] | entity | medium | Component tree, stores, routing, key views |
 | [[database-schema]] | entity | medium | Core tables, migration patterns, session storage |
 | [[configuration]] | entity | medium | Config surface, env vars, defaults |
@@ -55,17 +55,17 @@ tags: [type/index]
 
 | Page | Category | Description |
 |------|----------|-------------|
-| [[chat]] | chat | Sending messages, session requirements |
+| [[help/chat|chat]] | chat | Sending messages, session requirements |
 | [[agent-profiles]] | agents | Profile management |
-| [[macros]] | macros | Macro sets, meta-topics, F-keys |
-| [[sessions]] | sessions | Session management |
-| [[settings]] | settings | Application settings |
-| [[tools]] | tools | Tool management |
-| [[dashboard]] | dashboard | Dashboard overview |
-| [[providers]] | providers | Provider configuration |
-| [[workflows]] | workflows | Workflow templates & execution |
-| [[logs]] | logs | Log viewing & analysis |
-| [[cognitive-pipeline]] | cognitive-pipeline | Pipeline configuration |
+| [[help/macros|macros]] | macros | Macro sets, meta-topics, F-keys |
+| [[help/sessions|sessions]] | sessions | Session management |
+| [[help/settings|settings]] | settings | Application settings |
+| [[help/tools|tools]] | tools | Tool management |
+| [[help/dashboard|dashboard]] | dashboard | Dashboard overview |
+| [[help/providers|providers]] | providers | Provider configuration |
+| [[help/workflows|workflows]] | workflows | Workflow templates & execution |
+| [[help/logs|logs]] | logs | Log viewing & analysis |
+| [[help/cognitive-pipeline|cognitive-pipeline]] | cognitive-pipeline | Pipeline configuration |
 | [[search]] | search | The nav sidebar's command box — what to type, and where each verb lands |
 
 ## Issues

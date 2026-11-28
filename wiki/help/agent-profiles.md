@@ -138,7 +138,7 @@ confirmation required).
 - Each agent gets its own `cognitive_memory.db` when using kv_store memory
 
 ## See Also
-- [[cognitive-pipeline]] — Part codes and profiles explained
+- [[help/cognitive-pipeline|cognitive-pipeline]] — Part codes and profiles explained
 
 ## The Package tab
 
