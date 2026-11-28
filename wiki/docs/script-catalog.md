@@ -3,7 +3,7 @@ title: Script Catalog
 type: atlas-docs
 path: wiki/docs/script-catalog.md
 confidence: medium
-updated: 2026-11-23
+updated: 2026-11-28
 tags: [type/docs, domain/docs]
 ---
 
@@ -16,7 +16,7 @@ is its documented `Usage:` line or the project default for that file type.
 Regenerate with `python3 scripts/dev/generate_script_catalog.py`; `--check`
 fails when the page is stale.
 
-**109 scripts** in 10 directories.
+**110 scripts** in 10 directories.
 
 ---
 
@@ -24,7 +24,7 @@ fails when the page is stale.
 
 | Directory | What lives there | Scripts |
 |-----------|------------------|--------:|
-| `scripts/analysis/` | Trace and log analysis, metric collection. | 10 |
+| `scripts/analysis/` | Trace and log analysis, metric collection. | 11 |
 | `scripts/` | Top-level verification helpers. | 2 |
 | `scripts/bench/` | THE BENCH: the fixed job set and its driver. | 1 |
 | `scripts/core/` | Seeding, RAG ingestion, backup, export, sweep, docs. | 33 |
@@ -53,6 +53,7 @@ Trace and log analysis, metric collection.
 | [`fetch_and_analyze_traces.py`](scripts/analysis/fetch_and_analyze_traces.py) | Quick Trace Fetch & Analyze — Fetches traces from the API and analyzes them immediately. | `uv run python scripts/analysis/fetch_and_analyze_traces.py` |
 | [`trace_preflight.py`](scripts/analysis/trace_preflight.py) | Pre-flight checks for trace workflow. — Ensures all prerequisites are met before running automated trace workflow. | `uv run python scripts/analysis/trace_preflight.py` |
 | [`verify_incremental_ingestion.py`](scripts/analysis/verify_incremental_ingestion.py) | Verify incremental ingestion acceptance criteria for both ingest scripts. | `uv run python scripts/analysis/verify_incremental_ingestion.py` |
+| [`wiki_corpus_census.py`](scripts/analysis/wiki_corpus_census.py) | Wiki corpus census — the three defect classes, as counts and as named lists. | `uv run python scripts/analysis/wiki_corpus_census.py` |
 
 ---
 
