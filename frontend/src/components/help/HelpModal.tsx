@@ -19,6 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
 import { frontendLoggingService } from '@/services/frontendLoggingService';
+import { wikilinksToMarkdown } from '@/utils/wikiLinks';
 
 // Initialize Mermaid
 mermaid.initialize({
@@ -51,16 +52,10 @@ interface ModalEventData {
   timestamp: string;
 }
 
-/** Convert [[wikilinks]] to markdown links matching wiki viewer behavior */
+/** Convert [[wikilinks]] to markdown links — the SAME rule the wiki viewer
+ *  uses (utils/wikiLinks.ts), aliases and spaced paths included. */
 function processWikilinks(text: string): string {
-  return text.replace(/\[\[([\w.-]+(?:\/[\w.-]+)*)\]\]/g, (_match, name: string) => {
-    const title = name
-      .split('/')
-      .pop()!
-      .replace(/-/g, ' ')
-      .replace(/\b\w/g, (c: string) => c.toUpperCase());
-    return `[${title}](/wiki/${name})`;
-  });
+  return wikilinksToMarkdown(text);
 }
 
 export function HelpModal({

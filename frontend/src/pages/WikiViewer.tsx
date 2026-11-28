@@ -13,6 +13,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import mermaid from 'mermaid';
 import { frontendLoggingService } from '../services/frontendLoggingService';
+import { wikilinksToMarkdown } from '../utils/wikiLinks';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 import 'highlight.js/styles/atom-one-dark.css';
@@ -442,9 +443,11 @@ export default function WikiViewer() {
     return () => window.removeEventListener('popstate', handler);
   }, [fetchPage]);
 
-  // Convert wikilinks to /wiki/... links. Supports both forms:
-  //   [[path|label]] → [label](/wiki/path)
-  //   [[path]]       → [Title Cased Path](/wiki/path)
+  // Convert wikilinks to /wiki/... links: `[[path|label]]` and `[[path]]`.
+  // The rule lives in ONE place (utils/wikiLinks.ts) because the help modal
+  // renders the same syntax — see that module for why spaces and headings are
+  // handled there rather than in this regex.
+  const processContent = (content: string): string => wikilinksToMarkdown(content);
 
   /** Custom code block: renders mermaid fences as diagrams, others as code. */
   const CodeBlock = useCallback(({ node: _node, inline: _inline, className, children, ...props }: { node?: unknown; inline?: boolean; className?: string; children?: React.ReactNode; [key: string]: unknown }) => {
@@ -469,16 +472,6 @@ export default function WikiViewer() {
       </code>
     );
   }, []);
-
-  const processContent = (content: string): string => {
-    return content.replace(
-      /\[\[([\w.-]+(?:\/[\w.-]+)*)(?:\|([^\]]+))?\]\]/g,
-      (_match, path: string, label?: string) => {
-        const text = label?.trim() || path.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-        return `[${text}](/wiki/${path})`;
-      }
-    );
-  };
 
   const confidenceBadge = (level: string) => {
     const colors: Record<string, string> = {
